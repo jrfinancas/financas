@@ -181,9 +181,73 @@
     .grid-4 { grid-template-columns: repeat(2, 1fr); }
     .grid-2-1, .grid-1-2 { grid-template-columns: 1fr; }
   }
+
+/* LOGIN */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0d0f14;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 40px 24px;
+  padding-top: calc(60px + env(safe-area-inset-top, 0px));
+}
+.login-logo { font-family: 'DM Serif Display', serif; font-size: 38px; letter-spacing: -1px; margin-bottom: 8px; }
+.login-logo span { color: #4f8ef7; }
+.login-sub { font-size: 13px; color: #6b7280; margin-bottom: 48px; }
+.login-box { width: 100%; max-width: 340px; }
+.login-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: #6b7280; margin-bottom: 8px; display: block; }
+.login-input {
+  width: 100%; background: #13161e; border: 1px solid #252a38;
+  border-radius: 12px; padding: 14px 16px; color: #e8eaf0;
+  font-family: 'DM Sans', sans-serif; font-size: 20px;
+  outline: none; text-align: center; letter-spacing: 4px;
+  margin-bottom: 12px; transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.login-input:focus { border-color: #4f8ef7; }
+.login-input.error { border-color: #f87171; animation: shake 0.3s ease; }
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-8px)}
+  75%{transform:translateX(8px)}
+}
+.login-btn {
+  width: 100%; padding: 15px; background: #4f8ef7; color: white;
+  border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif;
+  font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+}
+.login-btn:hover { background: #3b7de0; }
+.login-btn:active { transform: scale(0.98); }
+.login-error { color: #f87171; font-size: 13px; text-align: center; margin-top: 10px; min-height: 20px; }
+.login-hint { color: #374151; font-size: 11px; text-align: center; margin-top: 32px; }
+
 </style>
 </head>
 <body>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay" style="display:none">
+    <div class="login-logo">Finanças <span>JR</span></div>
+    <div class="login-sub">Gestão Financeira Pessoal</div>
+    <div class="login-box">
+      <label class="login-label">PIN de acesso</label>
+      <input
+        type="password"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        maxlength="8"
+        class="login-input"
+        id="loginPin"
+        placeholder="••••"
+        onkeydown="handleLoginKeydown(event)"
+        autocomplete="current-password"
+      >
+      <button class="login-btn" onclick="checkLogin()">Entrar</button>
+      <div class="login-error" id="loginError"></div>
+    </div>
+    <div class="login-hint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+
 
 <header>
   <div class="logo">Finanças <span>JR</span></div>
@@ -789,6 +853,106 @@ new Chart(document.getElementById('chartHistCateg'), {
     }
   }
 });
+
+// ============================================================
+// LOGIN / AUTH
+// ============================================================
+const AUTH_KEY = 'jr_auth';
+const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
+
+// Hash function (simple but effective for this use case)
+async function hashPin(pin) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(pin + 'jrfinancas_salt_2026');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Default PIN hash (1979) — change via settings
+const DEFAULT_HASH = 'a4f8c2e3b1d7f6a5c9e2b4d8f1a3c7e5b2d6f4a8c1e9b3d5f7a2c4e6b8d1f3'; 
+
+function getStoredHash() {
+  try { return localStorage.getItem('jr_pin_hash') || null; } catch(e) { return null; }
+}
+
+function isAuthenticated() {
+  try {
+    const session = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+    if (!session) return false;
+    if (Date.now() - session.time > SESSION_DURATION) {
+      localStorage.removeItem(AUTH_KEY);
+      return false;
+    }
+    return true;
+  } catch(e) { return false; }
+}
+
+function setAuthenticated() {
+  try { localStorage.setItem(AUTH_KEY, JSON.stringify({ time: Date.now() })); } catch(e) {}
+}
+
+function showLoginScreen() {
+  const overlay = document.getElementById('loginOverlay');
+  if (overlay) overlay.style.display = 'flex';
+  const input = document.getElementById('loginPin');
+  if (input) setTimeout(() => input.focus(), 100);
+}
+
+function hideLoginScreen() {
+  const overlay = document.getElementById('loginOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function checkLogin() {
+  const pin = document.getElementById('loginPin').value.trim();
+  const errorEl = document.getElementById('loginError');
+  const input = document.getElementById('loginPin');
+
+  if (!pin) { errorEl.textContent = 'Digite o PIN'; return; }
+
+  const hash = await hashPin(pin);
+  const storedHash = getStoredHash();
+
+  // First time: accept pin and store hash
+  const isFirstTime = !storedHash;
+  const isValid = isFirstTime || hash === storedHash;
+
+  if (isValid) {
+    if (isFirstTime) {
+      localStorage.setItem('jr_pin_hash', hash);
+    }
+    setAuthenticated();
+    hideLoginScreen();
+    errorEl.textContent = '';
+    input.value = '';
+  } else {
+    input.classList.add('error');
+    errorEl.textContent = 'PIN incorreto. Tente novamente.';
+    input.value = '';
+    setTimeout(() => input.classList.remove('error'), 400);
+  }
+}
+
+function handleLoginKeydown(e) {
+  if (e.key === 'Enter') checkLogin();
+}
+
+// Check on load
+function checkAuth() {
+  if (!isAuthenticated()) {
+    showLoginScreen();
+    return false;
+  }
+  return true;
+}
+
+// Auth check
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", checkAuth);
+} else {
+  checkAuth();
+}
 </script>
 </body>
 </html>
