@@ -2179,27 +2179,20 @@ function applyFXToAmount() {
   showToast('✓ Valor aplicado em BRL!', 'var(--green)', '#0d0f14');
 }
 
-// Extend saveNormal to include FX metadata
-const _origSaveNormal = saveNormal;
-saveNormal = function() {
-  // Will be called — FX data stored in window._pendingFX and attached to tx in override below
-  _origSaveNormal();
-};
-
-// Clear FX on clearNormal
-const _origClearNormal = clearNormal;
-clearNormal = function() {
-  _origClearNormal();
-  document.getElementById('fxEnabled').checked = false;
-  document.getElementById('fxSection').style.display = 'none';
-  document.getElementById('fxAmount').value = '';
-  document.getElementById('fxRate').value = '';
-  document.getElementById('iofEnabled').checked = false;
-  document.getElementById('fxResult').style.display = 'none';
-  document.getElementById('fxActiveBadge').style.display = 'none';
+// FX cleanup helper — called from clearNormal
+function clearFXFields() {
+  try {
+    document.getElementById('fxEnabled').checked = false;
+    document.getElementById('fxSection').style.display = 'none';
+    document.getElementById('fxAmount').value = '';
+    document.getElementById('fxRate').value = '';
+    document.getElementById('iofEnabled').checked = false;
+    document.getElementById('fxResult').style.display = 'none';
+    document.getElementById('fxActiveBadge').style.display = 'none';
+  } catch(e) {}
   window._pendingFX = null;
   fxActive = false;
-};
+}
 
 // ============================================================
 // SAFE INIT — runs after all functions defined & DOM ready
