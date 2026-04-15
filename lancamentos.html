@@ -943,7 +943,7 @@ const ACCT_LABELS = { 'santander-unique-visa':'Santander Unique Visa','santander
 // TABS
 // ============================================================
 function setTab(tab, btn) {
-  ['normal','split','payslip','ir','history'].forEach(t => {
+  ['normal','split','payslip','ir','recorrentes','history'].forEach(t => {
     document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
   });
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
