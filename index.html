@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanças JR">
+<meta name="theme-color" content="#0d0f14">
+<title>Finanças JR</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0d0f14; color: #e8eaf0;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    min-height: 100vh; min-height: -webkit-fill-available;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 24px;
+    padding-top: calc(44px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px; letter-spacing: -1px; margin-bottom: 6px;
+  }
+  .logo span { color: #4f8ef7; }
+  .sub { font-size: 13px; color: #6b7280; margin-bottom: 52px; text-align: center; }
+  .menu { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+  a {
+    display: flex; align-items: center; gap: 16px;
+    background: #13161e; border: 1px solid #252a38;
+    border-radius: 16px; padding: 20px;
+    text-decoration: none; color: #e8eaf0;
+    transition: all 0.2s;
+  }
+  a:active { background: #1a1e29; transform: scale(0.98); }
+  .icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .icon.blue { background: rgba(79,142,247,0.15); }
+  .icon.green { background: rgba(52,211,153,0.15); }
+  .label { flex: 1; }
+  .label strong { display: block; font-size: 17px; font-weight: 600; margin-bottom: 3px; }
+  .label span { font-size: 12px; color: #6b7280; line-height: 1.4; }
+  .arrow { color: #252a38; font-size: 20px; }
+
+  /* Install tip */
+  .install-tip {
+    margin-top: 44px; max-width: 380px; width: 100%;
+    background: rgba(79,142,247,0.07);
+    border: 1px solid rgba(79,142,247,0.18);
+    border-radius: 14px; padding: 16px 18px;
+  }
+  .install-tip-title {
+    font-size: 12px; font-weight: 600; color: #4f8ef7;
+    text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px;
+  }
+  .install-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 8px; font-size: 13px; color: #9ca3af;
+  }
+  .install-step:last-child { margin-bottom: 0; }
+  .step-num {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(79,142,247,0.2); color: #4f8ef7;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .version { margin-top: 32px; font-size: 11px; color: #374151; }
+</style>
+</head>
+<body>
+
+<div class="logo">Finanças <span>JR</span></div>
+<div class="sub">Gestão Financeira Pessoal</div>
+
+<div class="menu">
+  <a href="dashboard.html">
+    <div class="icon blue">📊</div>
+    <div class="label">
+      <strong>Dashboard</strong>
+      <span>Patrimônio, investimentos, budget e despesas</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+
+  <a href="lancamentos.html">
+    <div class="icon green">📝</div>
+    <div class="label">
+      <strong>Lançamentos</strong>
+      <span>Normal · Split · Holerite · IR · Recorrentes</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+</div>
+
+<div class="install-tip">
+  <div class="install-tip-title">📱 Adicionar à tela inicial</div>
+  <div class="install-step">
+    <div class="step-num">1</div>
+    <span>Toque no ícone de <strong style="color:#e8eaf0">Compartilhar ↑</strong> na barra do Safari</span>
+  </div>
+  <div class="install-step">
+    <div class="step-num">2</div>
+    <span>Role e toque em <strong style="color:#e8eaf0">"Adicionar à Tela de Início"</strong></span>
+  </div>
+  <div class="install-step">
+    <div class="step-num">3</div>
+    <span>Confirme com <strong style="color:#e8eaf0">Adicionar</strong> — pronto! 🎉</span>
+  </div>
+</div>
+
+<div class="version">v4.0 · jrfinancas.github.io</div>
+
+</body>
+</html>

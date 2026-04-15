@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanças JR">
+<title>Finanças JR · Lançamentos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0f14; --surface:#13161e; --surface2:#1a1e29; --border:#252a38;
+  --text:#e8eaf0; --muted:#6b7280; --accent:#4f8ef7; --accent2:#7c6af7;
+  --green:#34d399; --red:#f87171; --yellow:#fbbf24; --orange:#fb923c;
+  --safe-top:env(safe-area-inset-top,0px); --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;min-height:-webkit-fill-available;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
+
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-0.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px}
+nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all 0.2s}
+nav a:hover,nav a.active{background:var(--surface2);color:var(--accent)}
+
+/* INSTALL BANNER */
+.install-banner{background:rgba(79,142,247,0.1);border-bottom:1px solid rgba(79,142,247,0.2);padding:10px 20px;font-size:12px;color:var(--accent);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.install-banner button{margin-left:auto;background:var(--accent);color:white;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;flex-shrink:0}
+
+/* MAIN */
+.main{max-width:900px;margin:0 auto;padding:20px}
+@media(max-width:640px){.main{padding:12px}}
+
+/* TABS */
+.tabs{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:20px;gap:4px}
+.tab-btn{flex:1;padding:9px 6px;border-radius:8px;border:none;background:none;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;text-align:center;transition:all 0.2s}
+.tab-btn .tab-icon{display:block;font-size:16px;margin-bottom:2px}
+.tab-btn.active{background:var(--surface2);color:var(--accent)}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+
+/* FORM */
+.form-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:6px;display:block}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color 0.2s;-webkit-appearance:none;appearance:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.form-select option{background:#13161e}
+.form-textarea{resize:vertical;min-height:56px;font-size:14px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.form-group{margin-bottom:14px}
+.amount-wrap{position:relative}
+.amount-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;font-size:16px}
+.amount-wrap .form-input{padding-left:34px;font-size:22px;font-family:'DM Serif Display',serif}
+.neg{color:var(--red)}.pos{color:var(--green)}
+
+/* TYPE TOGGLE */
+.type-toggle{display:flex;gap:8px;margin-bottom:14px}
+.type-btn{flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.2s}
+.type-btn.active.expense{background:rgba(248,113,113,0.12);border-color:var(--red);color:var(--red)}
+.type-btn.active.income{background:rgba(52,211,153,0.12);border-color:var(--green);color:var(--green)}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.3s;background:var(--surface2);margin-bottom:10px}
+.upload-zone.has-image{padding:0;overflow:hidden;border-style:solid;border-color:var(--accent)}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(79,142,247,0.05)}
+.upload-zone input[type=file]{display:none}
+.upload-zone img{width:100%;max-height:180px;object-fit:contain;display:none;border-radius:10px}
+.upload-icon{font-size:24px;margin-bottom:4px}
+.upload-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.upload-sub{font-size:11px;color:var(--muted)}
+
+/* AI */
+.btn-analyze{width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px}
+.btn-analyze:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed}
+.ai-status{padding:10px 14px;border-radius:8px;font-size:13px;display:none;margin-bottom:12px}
+.ai-status.reading{background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.2);color:var(--accent)}
+.ai-status.done{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);color:var(--green)}
+.ai-status.error{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.2);color:var(--red)}
+.ai-badge{font-size:10px;padding:2px 6px;border-radius:10px;background:rgba(79,142,247,0.15);color:var(--accent);margin-left:6px}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.confidence{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.conf-dot{width:6px;height:6px;border-radius:50%}
+.conf-high{background:var(--green)}.conf-med{background:var(--yellow)}.conf-low{background:var(--red)}
+
+/* RECEIPT STATUS */
+.receipt-status{display:flex;gap:8px;margin-bottom:14px}
+.rs-btn{flex:1;padding:8px 6px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;cursor:pointer;text-align:center;transition:all 0.2s}
+.rs-btn.active.attached{background:rgba(52,211,153,0.12);border-color:var(--green);color:var(--green)}
+.rs-btn.active.pending{background:rgba(251,191,36,0.12);border-color:var(--yellow);color:var(--yellow)}
+.rs-btn.active.na{background:rgba(107,114,128,0.12);border-color:var(--muted);color:var(--muted)}
+
+/* DEDUCTIBLE BADGE */
+.deductible-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(124,106,247,0.15);color:var(--accent2);margin-bottom:12px}
+
+/* FILE SAVE SUGGESTION */
+.file-suggestion{background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;display:none}
+.file-suggestion .path{font-family:monospace;color:var(--accent);font-size:11px;background:var(--surface2);padding:4px 8px;border-radius:6px;margin:6px 0;display:block;word-break:break-all}
+.file-suggestion .btn-download-receipt{background:var(--accent);color:white;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:6px;width:100%}
+
+/* INSTALLMENTS */
+.installment-preview{background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:14px;display:none}
+.installment-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.installment-row:last-child{border-bottom:none;color:var(--text);font-weight:500}
+
+/* SPLIT */
+.split-line{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px}
+.split-line-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.split-line-num{font-size:11px;font-weight:600;color:var(--accent)}
+.split-total-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:12px}
+.split-check{font-size:12px;font-weight:500}
+.split-check.ok{color:var(--green)}.split-check.over{color:var(--red)}.split-check.under{color:var(--yellow)}
+.split-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.btn-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0 4px;transition:color 0.2s}
+.btn-remove:hover{color:var(--red)}
+.btn-add-line{width:100%;padding:10px;background:none;border:1px dashed var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all 0.2s;margin-bottom:14px}
+.btn-add-line:hover{border-color:var(--accent);color:var(--accent)}
+
+/* PAYSLIP */
+.payslip-section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.payslip-line-row{display:grid;grid-template-columns:1fr 120px 32px;gap:8px;align-items:end;margin-bottom:8px}
+.payslip-total{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;margin-bottom:6px;background:var(--surface2)}
+.payslip-total .label{font-size:12px;color:var(--muted)}
+.payslip-total .val{font-size:17px;font-family:'DM Serif Display',serif}
+
+/* BUTTONS */
+.btn-save{width:100%;padding:14px;background:var(--green);color:#0d0f14;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-bottom:8px}
+.btn-save:hover{background:#2dbd87}
+.btn-secondary{width:100%;padding:11px;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all 0.2s}
+.btn-secondary:hover{border-color:var(--red);color:var(--red)}
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+/* TRANSACTIONS */
+.tx-item{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.tx-item:last-child{border-bottom:none}
+.tx-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.tx-body{flex:1;min-width:0}
+.tx-payee{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.tx-amount{font-size:14px;font-weight:600;flex-shrink:0}
+.tx-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:0 4px;flex-shrink:0}
+.receipt-pill{font-size:10px;padding:2px 6px;border-radius:8px;font-weight:500;display:inline-block;margin-top:3px}
+.rp-attached{background:rgba(52,211,153,0.12);color:var(--green)}
+.rp-pending{background:rgba(251,191,36,0.12);color:var(--yellow)}
+.rp-deductible{background:rgba(124,106,247,0.12);color:var(--accent2)}
+
+/* IR PANEL */
+.ir-kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.ir-kpi-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px}
+.ir-kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:6px}
+.ir-kpi-value{font-family:'DM Serif Display',serif;font-size:22px}
+.ir-pending-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.ir-pending-item:last-child{border-bottom:none}
+.ir-cat-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px}
+.ir-cat-row:last-child{border-bottom:none}
+.attach-btn{font-size:11px;padding:4px 10px;border-radius:6px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:var(--yellow);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+.attach-btn:hover{background:rgba(251,191,36,0.2)}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:36px 20px;color:var(--muted)}
+.empty-state .big{font-size:30px;margin-bottom:8px}
+
+/* TOAST */
+.toast{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:#0d0f14;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all 0.3s;z-index:1000;white-space:nowrap;max-width:90vw;text-align:center}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* RECORRENTES */
+.rec-item{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+.rec-item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.rec-title{font-size:15px;font-weight:600}
+.rec-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.rec-badge{font-size:10px;padding:3px 8px;border-radius:10px;font-weight:600}
+.rec-badge.daily{background:rgba(248,113,113,0.15);color:var(--red)}
+.rec-badge.weekly{background:rgba(251,191,36,0.15);color:var(--yellow)}
+.rec-badge.monthly{background:rgba(79,142,247,0.15);color:var(--accent)}
+.rec-badge.yearly{background:rgba(52,211,153,0.15);color:var(--green)}
+.rec-amount{font-family:'DM Serif Display',serif;font-size:18px}
+.rec-actions{display:flex;gap:8px;margin-top:10px}
+.rec-btn{flex:1;padding:8px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s}
+.rec-btn.launch{background:rgba(52,211,153,0.15);color:var(--green)}
+.rec-btn.launch:hover{background:rgba(52,211,153,0.25)}
+.rec-btn.edit{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+.rec-btn.del{background:rgba(248,113,113,0.1);color:var(--red)}
+.due-soon{border-color:rgba(251,191,36,0.4)!important;background:rgba(251,191,36,0.04)!important}
+.due-today{border-color:rgba(52,211,153,0.4)!important;background:rgba(52,211,153,0.04)!important}
+.overdue{border-color:rgba(248,113,113,0.4)!important;background:rgba(248,113,113,0.04)!important}
+.rec-next{font-size:11px;font-weight:500;margin-top:4px}
+.rec-next.ok{color:var(--muted)}.rec-next.soon{color:var(--yellow)}.rec-next.today{color:var(--green)}.rec-next.late{color:var(--red)}
+.split-preview{margin-top:8px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:11px;color:var(--muted)}
+.split-preview-line{display:flex;justify-content:space-between;padding:2px 0}
+
+/* SYNC */
+.sync-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.btn-sync{padding:10px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.2s;text-align:center;border:1px solid}
+.btn-exp{background:rgba(79,142,247,0.1);border-color:rgba(79,142,247,0.3);color:var(--accent)}
+.btn-imp{background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.3);color:var(--green)}
+</style>
+</head>
+<body>
+
+<div class="install-banner" id="installBanner" style="display:none">
+  📱 <span>Adicione à tela inicial: toque em <strong>⎋ Compartilhar</strong> → <strong>Adicionar à tela de início</strong></span>
+  <button onclick="document.getElementById('installBanner').style.display='none'">OK</button>
+</div>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="#" class="active">Lançamentos</a>
+  </nav>
+</header>
+
+<div class="main">
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="setTab('normal',this)"><span class="tab-icon">📝</span>Normal</button>
+    <button class="tab-btn" onclick="setTab('split',this)"><span class="tab-icon">✂️</span>Dividido</button>
+    <button class="tab-btn" onclick="setTab('payslip',this)"><span class="tab-icon">💼</span>Holerite</button>
+    <button class="tab-btn" onclick="setTab('ir',this)"><span class="tab-icon">🧾</span>IR</button>
+    <button class="tab-btn" onclick="setTab('recorrentes',this)"><span class="tab-icon">🔁</span>Recorrentes</button>
+    <button class="tab-btn" onclick="setTab('history',this)"><span class="tab-icon">📋</span>Histórico</button>
+  </div>
+
+  <!-- ======= NORMAL ======= -->
+  <div id="tab-normal">
+    <!-- UPLOAD -->
+    <div class="card">
+      <div class="card-title">📷 Comprovante</div>
+      <div class="upload-zone" id="nUploadZone" onclick="document.getElementById('nFileInput').click()" ondrop="handleDrop('n',event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="nFileInput" accept="image/*" capture="environment" onchange="handleFile('n',event)">
+        <img id="nPreviewImg" alt="">
+        <div id="nUploadPlaceholder">
+          <div class="upload-icon">📄</div>
+          <div class="upload-title">Toque para foto ou selecionar</div>
+          <div class="upload-sub">JPG, PNG · câmera ou galeria</div>
+        </div>
+      </div>
+      <button class="btn-analyze" id="nBtnAnalyze" onclick="analyzeImage('n')" disabled>
+        <span id="nAnalyzeIcon">✨</span><span id="nAnalyzeText">Ler com IA</span>
+      </button>
+      <div class="ai-status" id="nAiStatus"></div>
+    </div>
+
+    <!-- FORM -->
+    <div class="card">
+      <div class="card-title">Dados do lançamento</div>
+
+      <div class="type-toggle">
+        <button class="type-btn active expense" onclick="setType('n','expense',this)">↑ Despesa</button>
+        <button class="type-btn income" onclick="setType('n','income',this)">↓ Receita</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Valor <span class="ai-badge" id="nAmtBadge" style="display:none">IA</span></label>
+        <div class="amount-wrap">
+          <span class="amount-prefix">R$</span>
+          <input type="text" inputmode="decimal" class="form-input neg" id="nAmount" placeholder="0,00" oninput="updateInstallmentPreview()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Parcelas</label>
+          <select class="form-select" id="nInstallments" onchange="updateInstallmentPreview()">
+            <option value="1">À vista</option>
+            <option value="2">2×</option><option value="3">3×</option><option value="4">4×</option>
+            <option value="5">5×</option><option value="6">6×</option><option value="7">7×</option>
+            <option value="8">8×</option><option value="9">9×</option><option value="10">10×</option>
+            <option value="11">11×</option><option value="12">12×</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">1ª Parcela</label>
+          <input type="month" class="form-input" id="nFirstMonth">
+        </div>
+      </div>
+
+      <div class="installment-preview" id="nInstallPreview"></div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Data <span class="ai-badge" id="nDateBadge" style="display:none">IA</span></label>
+          <input type="date" class="form-input" id="nDate">
+        </div>
+        <div>
+          <label class="form-label">Conta / Cartão</label>
+          <select class="form-select" id="nAccount">
+            <option value="">Selecionar...</option>
+            <optgroup label="Santander">
+              <option value="santander-unique-visa">Santander Unique Visa</option>
+              <option value="santander-unique-master">Santander Unique Master</option>
+              <option value="santander-cc">Santander CC</option>
+            </optgroup>
+            <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
+            <optgroup label="Outros">
+              <option value="xp">XP Investimentos</option>
+              <option value="daycoval">Daycoval</option>
+              <option value="wise">Wise</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Fornecedor / Pagador <span class="ai-badge" id="nPayeeBadge" style="display:none">IA</span></label>
+        <input type="text" class="form-input" id="nPayee" placeholder="Nome do estabelecimento">
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Categoria <span class="ai-badge" id="nCatBadge" style="display:none">IA</span></label>
+          <select class="form-select" id="nCategory" onchange="onCatChange('n')">
+            <option value="">Selecionar...</option>
+            <optgroup label="Despesas">
+              <option value="aluguel">Aluguel</option><option value="animais">Animais de Estimação</option>
+              <option value="arranjos">Arranjos Domésticos</option><option value="automovel">Automóvel</option>
+              <option value="contas">Contas</option><option value="despesas-trabalho">Desp. Trabalho</option>
+              <option value="doacoes">Doações</option><option value="educacao">Educação</option>
+              <option value="hobbies">Hobbies e Lazer</option><option value="impostos">Impostos</option>
+              <option value="juros">Juros</option><option value="outras-despesas">Outras Despesas</option>
+              <option value="saude">Saúde e Fitness</option><option value="seguros">Seguros</option>
+              <option value="taxas-bancarias">Taxas Bancárias</option><option value="utilitarios">Utilitários</option>
+              <option value="vestuario">Vestuário</option><option value="viagens">Viagens</option>
+            </optgroup>
+            <optgroup label="Receitas">
+              <option value="salario">Salários</option><option value="bonus">Bônus</option>
+              <option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entradas</option>
+            </optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Subcategoria</label>
+          <select class="form-select" id="nSubcat"><option value="">Selecionar...</option></select>
+        </div>
+      </div>
+
+      <!-- DEDUCTIBLE NOTICE -->
+      <div id="nDeductibleBadge" class="deductible-badge" style="display:none">⭐ Categoria dedutível no IR</div>
+
+      <!-- RECEIPT STATUS -->
+      <div id="nReceiptSection">
+        <label class="form-label">Status do Comprovante</label>
+        <div class="receipt-status">
+          <button class="rs-btn active attached" id="nRs-attached" onclick="setReceiptStatus('n','attached',this)">✓ Anexado</button>
+          <button class="rs-btn pending" id="nRs-pending" onclick="setReceiptStatus('n','pending',this)">⏳ Aguardando</button>
+          <button class="rs-btn na" id="nRs-na" onclick="setReceiptStatus('n','na',this)">— N/A</button>
+        </div>
+      </div>
+
+      <!-- FILE SAVE SUGGESTION -->
+      <div class="file-suggestion" id="nFileSuggestion">
+        <div style="font-weight:500;margin-bottom:4px">📁 Salvar comprovante em:</div>
+        <code class="path" id="nFilePath"></code>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Nome sugerido: <span id="nSuggestedName" style="color:var(--text)"></span></div>
+        <button class="btn-download-receipt" onclick="downloadReceipt('n')">⬇ Baixar comprovante para salvar no iCloud</button>
+      </div>
+
+      <div class="form-group" style="margin-top:8px">
+        <label class="form-label">Observação</label>
+        <textarea class="form-textarea" id="nMemo" placeholder="Detalhe opcional..."></textarea>
+      </div>
+
+      <div class="confidence" id="nConfidence" style="display:none">
+        <div class="conf-dot" id="nConfDot"></div><span id="nConfText"></span>
+      </div>
+
+      <button class="btn-save" onclick="saveNormal()">✓ Confirmar e Salvar</button>
+      <button class="btn-secondary" onclick="clearNormal()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- ======= SPLIT ======= -->
+  <div id="tab-split" style="display:none">
+
+    <!-- UPLOAD SPLIT -->
+    <div class="card">
+      <div class="card-title">📷 Comprovante do Split</div>
+      <div class="upload-zone" id="sUploadZone" onclick="document.getElementById('sFileInput').click()" ondrop="handleDrop('s',event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="sFileInput" accept="image/*" capture="environment" onchange="handleFile('s',event)">
+        <img id="sPreviewImg" alt="">
+        <div id="sUploadPlaceholder">
+          <div class="upload-icon">📄</div>
+          <div class="upload-title">Toque para foto ou selecionar</div>
+          <div class="upload-sub">Comprovante do lançamento dividido</div>
+        </div>
+      </div>
+      <button class="btn-analyze" id="sBtnAnalyze" onclick="analyzeImage('s')" disabled>
+        <span id="sAnalyzeIcon">✨</span><span id="sAnalyzeText">Ler com IA (sugere split)</span>
+      </button>
+      <div class="ai-status" id="sAiStatus"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">✂️ Lançamento Dividido</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Um comprovante com múltiplas categorias. O total deve bater com o valor do comprovante.</p>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Valor total</label>
+          <div class="amount-wrap">
+            <span class="amount-prefix">R$</span>
+            <input type="text" inputmode="decimal" class="form-input neg" id="sTotalAmt" placeholder="0,00" oninput="checkSplitTotal()">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Data</label>
+          <input type="date" class="form-input" id="sDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Fornecedor</label>
+          <input type="text" class="form-input" id="sPayee" placeholder="Nome">
+        </div>
+        <div>
+          <label class="form-label">Conta / Cartão</label>
+          <select class="form-select" id="sAccount">
+            <option value="">Selecionar...</option>
+            <optgroup label="Santander">
+              <option value="santander-unique-visa">Santander Unique Visa</option>
+              <option value="santander-unique-master">Santander Unique Master</option>
+              <option value="santander-cc">Santander CC</option>
+            </optgroup>
+            <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
+            <optgroup label="Outros">
+              <option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="split-total-row">
+        <span class="card-title" style="margin-bottom:0">Linhas do split</span>
+        <span class="split-check" id="splitCheck"></span>
+      </div>
+
+      <div id="splitLinesContainer"></div>
+      <button class="btn-add-line" onclick="addSplitLine()">+ Adicionar linha</button>
+
+      <button class="btn-save" onclick="saveSplit()">✓ Salvar Split</button>
+      <button class="btn-secondary" onclick="clearSplit()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- ======= PAYSLIP ======= -->
+  <div id="tab-payslip" style="display:none">
+
+    <!-- UPLOAD PAYSLIP -->
+    <div class="card">
+      <div class="card-title">📷 Holerite / Recibo</div>
+      <div class="upload-zone" id="pUploadZone" onclick="document.getElementById('pFileInput').click()" ondrop="handleDrop('p',event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+        <input type="file" id="pFileInput" accept="image/*" capture="environment" onchange="handleFile('p',event)">
+        <img id="pPreviewImg" alt="">
+        <div id="pUploadPlaceholder">
+          <div class="upload-icon">💼</div>
+          <div class="upload-title">Foto do holerite</div>
+          <div class="upload-sub">A IA vai preencher os valores automaticamente</div>
+        </div>
+      </div>
+      <button class="btn-analyze" id="pBtnAnalyze" onclick="analyzeImage('p')" disabled>
+        <span id="pAnalyzeIcon">✨</span><span id="pAnalyzeText">Ler holerite com IA</span>
+      </button>
+      <div class="ai-status" id="pAiStatus"></div>
+
+      <!-- FILE SAVE SUGGESTION FOR PAYSLIP -->
+      <div class="file-suggestion" id="pFileSuggestion" style="margin-top:10px">
+        <div style="font-weight:500;margin-bottom:4px">📁 Salvar holerite em:</div>
+        <code class="path">Financas JR/Comprovantes/Entradas/Dedutíveis/</code>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Nome sugerido: <span id="pSuggestedName" style="color:var(--text)"></span></div>
+        <button class="btn-download-receipt" onclick="downloadReceipt('p')">⬇ Baixar para salvar no iCloud</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💼 Holerite</div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Mês de referência</label>
+          <input type="month" class="form-input" id="pMonth">
+        </div>
+        <div>
+          <label class="form-label">Conta</label>
+          <select class="form-select" id="pAccount">
+            <option value="santander-cc">Santander CC</option>
+            <option value="santander-unique-visa">Santander Unique Visa</option>
+            <option value="xp">XP Investimentos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="payslip-section-title" style="color:var(--green)">↓ Entradas</div>
+      <div id="pIncomeLines"></div>
+      <button class="btn-add-line" onclick="addPayslipLine('income')" style="margin-bottom:14px">+ Entrada</button>
+
+      <div class="payslip-section-title" style="color:var(--red)">↑ Descontos</div>
+      <div id="pDeductionLines"></div>
+      <button class="btn-add-line" onclick="addPayslipLine('deduction')" style="margin-bottom:14px">+ Desconto</button>
+
+      <div class="divider"></div>
+      <div class="payslip-total"><span class="label">Total Bruto</span><span class="val pos" id="pGross">R$ 0,00</span></div>
+      <div class="payslip-total"><span class="label">Total Descontos</span><span class="val neg" id="pDeductions">R$ 0,00</span></div>
+      <div class="payslip-total" style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.15)">
+        <span class="label" style="color:var(--accent);font-weight:600">Líquido</span>
+        <span class="val" style="color:var(--accent)" id="pNet">R$ 0,00</span>
+      </div>
+
+      <button class="btn-save" style="margin-top:14px" onclick="savePayslip()">✓ Registrar Holerite</button>
+      <button class="btn-secondary" style="margin-top:8px" onclick="clearPayslip()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- ======= IR PANEL ======= -->
+  <div id="tab-ir" style="display:none">
+    <div class="card">
+      <div class="card-title">🧾 Painel Imposto de Renda <span id="irYear" style="text-transform:none;font-weight:400;color:var(--muted)"></span></div>
+      <div class="ir-kpi" id="irKpis"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="color:var(--yellow)">⏳ Comprovantes Pendentes</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Despesas dedutíveis sem comprovante anexado. Providencie antes do prazo do IR.</p>
+      <div id="irPendingList"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Despesas Dedutíveis por Categoria</div>
+      <div id="irByCategory"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Rendimentos Tributáveis</div>
+      <div id="irIncome"></div>
+    </div>
+  </div>
+
+  <!-- ======= RECORRENTES ======= -->
+  <div id="tab-recorrentes" style="display:none">
+
+    <!-- ALERTS BANNER -->
+    <div id="recAlertBanner" style="display:none;margin-bottom:12px"></div>
+
+    <!-- ADD FORM -->
+    <div class="card">
+      <div class="card-title" id="recFormTitle">🔁 Nova Despesa/Receita Recorrente</div>
+
+      <div class="type-toggle">
+        <button class="type-btn active expense" onclick="setRecType('expense',this)">↑ Despesa</button>
+        <button class="type-btn income" onclick="setRecType('income',this)">↓ Receita</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <input type="text" class="form-input" id="recName" placeholder="Ex: Condomínio, Vacina do cachorro...">
+      </div>
+
+      <!-- IS SPLIT? -->
+      <div class="form-group">
+        <label class="form-label">Tipo de lançamento</label>
+        <select class="form-select" id="recLaunchType" onchange="toggleRecSplit()">
+          <option value="simple">Simples (uma categoria)</option>
+          <option value="split">Dividido (múltiplas categorias)</option>
+        </select>
+      </div>
+
+      <!-- SIMPLE FIELDS -->
+      <div id="recSimpleFields">
+        <div class="form-row">
+          <div>
+            <label class="form-label">Valor</label>
+            <div class="amount-wrap">
+              <span class="amount-prefix">R$</span>
+              <input type="text" inputmode="decimal" class="form-input neg" id="recAmount" placeholder="0,00">
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Conta / Cartão</label>
+            <select class="form-select" id="recAccount">
+              <option value="">Selecionar...</option>
+              <optgroup label="Santander">
+                <option value="santander-unique-visa">Santander Unique Visa</option>
+                <option value="santander-unique-master">Santander Unique Master</option>
+                <option value="santander-cc">Santander CC</option>
+              </optgroup>
+              <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
+              <optgroup label="Outros">
+                <option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label class="form-label">Categoria</label>
+            <select class="form-select" id="recCategory" onchange="updateRecSubcat()">
+              <option value="">Selecionar...</option>
+              <optgroup label="Despesas">
+                <option value="aluguel">Aluguel</option><option value="animais">Animais de Estimação</option>
+                <option value="arranjos">Arranjos Domésticos</option><option value="automovel">Automóvel</option>
+                <option value="contas">Contas</option><option value="despesas-trabalho">Desp. Trabalho</option>
+                <option value="doacoes">Doações</option><option value="educacao">Educação</option>
+                <option value="hobbies">Hobbies e Lazer</option><option value="impostos">Impostos</option>
+                <option value="juros">Juros</option><option value="outras-despesas">Outras Despesas</option>
+                <option value="saude">Saúde e Fitness</option><option value="seguros">Seguros</option>
+                <option value="taxas-bancarias">Taxas Bancárias</option><option value="utilitarios">Utilitários</option>
+                <option value="vestuario">Vestuário</option><option value="viagens">Viagens</option>
+              </optgroup>
+              <optgroup label="Receitas">
+                <option value="salario">Salários</option><option value="bonus">Bônus</option>
+                <option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entradas</option>
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Subcategoria</label>
+            <select class="form-select" id="recSubcat"><option value="">Selecionar...</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPLIT FIELDS -->
+      <div id="recSplitFields" style="display:none">
+        <div class="form-row">
+          <div>
+            <label class="form-label">Valor total</label>
+            <div class="amount-wrap">
+              <span class="amount-prefix">R$</span>
+              <input type="text" inputmode="decimal" class="form-input neg" id="recSplitTotal" placeholder="0,00">
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Conta / Cartão</label>
+            <select class="form-select" id="recSplitAccount">
+              <option value="">Selecionar...</option>
+              <optgroup label="Santander">
+                <option value="santander-unique-visa">Santander Unique Visa</option>
+                <option value="santander-unique-master">Santander Unique Master</option>
+                <option value="santander-cc">Santander CC</option>
+              </optgroup>
+              <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
+              <optgroup label="Outros">
+                <option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+        <div id="recSplitLines"></div>
+        <button class="btn-add-line" onclick="addRecSplitLine()">+ Adicionar linha</button>
+      </div>
+
+      <!-- FREQUENCY -->
+      <div class="form-row">
+        <div>
+          <label class="form-label">Frequência</label>
+          <select class="form-select" id="recFrequency" onchange="updateRecNextDate()">
+            <option value="daily">Diária</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly" selected>Mensal</option>
+            <option value="yearly">Anual</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Próximo vencimento</label>
+          <input type="date" class="form-input" id="recNextDate">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">Alertar com antecedência</label>
+          <select class="form-select" id="recAlertDays">
+            <option value="0">No dia</option>
+            <option value="1">1 dia antes</option>
+            <option value="3" selected>3 dias antes</option>
+            <option value="7">7 dias antes</option>
+            <option value="15">15 dias antes</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Observação</label>
+          <input type="text" class="form-input" id="recMemo" placeholder="Opcional">
+        </div>
+      </div>
+
+      <input type="hidden" id="recEditId">
+      <button class="btn-save" onclick="saveRecorrente()">✓ Salvar Recorrente</button>
+      <button class="btn-secondary" onclick="clearRecForm()">Limpar</button>
+    </div>
+
+    <!-- LIST -->
+    <div class="card">
+      <div class="card-title">Cadastradas <span id="recCount" style="color:var(--accent);text-transform:none;font-weight:400"></span></div>
+      <div id="recList">
+        <div class="empty-state"><div class="big">🔁</div><div>Nenhuma recorrente cadastrada ainda</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= HISTORY ======= -->
+  <div id="tab-history" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div class="card-title" style="margin-bottom:0">Lançamentos <span id="histCount" style="color:var(--accent);text-transform:none;font-weight:400"></span></div>
+        <input type="text" placeholder="Buscar..." id="histSearch" oninput="renderHistory()" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;width:160px">
+      </div>
+      <div id="historyContainer"></div>
+      <div class="sync-row">
+        <button class="btn-sync btn-exp" onclick="exportData()">⬇ Exportar JSON</button>
+        <button class="btn-sync btn-imp" onclick="document.getElementById('importInput').click()">⬆ Importar JSON</button>
+      </div>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA & CONSTANTS
+// ============================================================
+let txs = [];
+let state = { nType:'expense', nReceiptStatus:'na', nImageB64:null, nImageMime:null, sImageB64:null, sImageMime:null, pImageB64:null, pImageMime:null, splitCount:0 };
+
+const TODAY = new Date().toISOString().split('T')[0];
+const THIS_MONTH = TODAY.slice(0,7);
+const THIS_YEAR = TODAY.slice(0,4);
+
+// Deductible categories for IR
+const DEDUCTIBLE = new Set(['saude','educacao','previdencia-privada','seguros','impostos','salario','bonus','dividendos','outras-entradas']);
+const DEDUCTIBLE_CATS = { saude:'Saúde e Fitness', educacao:'Educação', seguros:'Seguros (Prev. Privada)', impostos:'Impostos (IR/INSS)' };
+const INCOME_CATS = new Set(['salario','bonus','dividendos','outras-entradas']);
+
+const SUBCATS = {
+  aluguel:['Condomínio','Mensalidade'], animais:['Veterinário','Ração e Petshop','Outros'],
+  arranjos:['Cuidados Domésticos','Manutenção','Móveis e Utensílios'],
+  automovel:['Combustível','Estacionamento','Manutenção','Multas de Trânsito','Seguro'],
+  contas:['Apartamento','Comestíveis','Internet','Mãe/Pai','Restaurantes','Supermercado','Telefone Celular','TV a Cabo','Transporte Público'],
+  'despesas-trabalho':['Não Reembolsáveis','Reembolsáveis'], doacoes:['Doações'],
+  educacao:['Livros/Apostilas','Mensalidade'],
+  hobbies:['Cinema','Diversão','Eventos Culturais','Jogos e Brinquedos'],
+  impostos:['IR Retido (Folha)','INSS (Folha)','IPTU','IPVA','Outros Impostos'],
+  juros:['Juros sobre Empréstimos','Juros sobre Pagamentos'],
+  'outras-despesas':['Cuidados Pessoais','Materiais de Escritório','Presentes','Taxas de Associação'],
+  saude:['Academia','Dentista e Odontologia','Materiais Esportivos','Medicamentos','Médicos e Assistência','Nutricionistas/Psicólogos/Fisioterapeutas'],
+  seguros:['Automóvel','Casa/Apartamento','Previdência Privada','Vida'],
+  'taxas-bancarias':['Taxas Bancárias'], utilitarios:['Água','Eletricidade','Gás Natural'],
+  vestuario:['Vestuário'], viagens:['Acomodação','Alimentação','Transporte'],
+  salario:['13° Salário','Salário Bruto'], bonus:['Bônus'],
+  dividendos:['Dividendos Recebidos','JCP Recebidos'], 'outras-entradas':['Outros Créditos']
+};
+const CAT_LABELS = { aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde e Fitness',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações' };
+const ACCT_LABELS = { 'santander-unique-visa':'Santander Unique Visa','santander-unique-master':'Santander Unique Master','santander-cc':'Santander CC','porto-visa':'Porto Visa Infinite','xp':'XP','daycoval':'Daycoval','wise':'Wise' };
+
+// ============================================================
+// INIT
+// ============================================================
+// init handled by safeInit()
+
+// ============================================================
+// TABS
+// ============================================================
+function setTab(tab, btn) {
+  ['normal','split','payslip','ir','history'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (tab === 'ir') renderIR();
+  if (tab === 'history') renderHistory();
+  if (tab === 'recorrentes') renderRecorrentes();
+}
+
+// ============================================================
+// UPLOAD (shared by n=normal, s=split, p=payslip)
+// ============================================================
+function handleFile(prefix, e) { const f = e.target.files[0]; if(f) loadPreview(prefix, f); }
+function handleDrop(prefix, e) { e.preventDefault(); const f = e.dataTransfer.files[0]; if(f) loadPreview(prefix, f); }
+function handleDragOver(e) { e.preventDefault(); }
+function handleDragLeave(e) { }
+
+function loadPreview(prefix, file) {
+  const r = new FileReader();
+  r.onload = ev => {
+    const d = ev.target.result;
+    state[prefix+'ImageB64'] = d.split(',')[1];
+    state[prefix+'ImageMime'] = file.type || 'image/jpeg';
+    const img = document.getElementById(prefix+'PreviewImg');
+    img.src = d; img.style.display = 'block';
+    document.getElementById(prefix+'UploadPlaceholder').style.display = 'none';
+    document.getElementById(prefix+'UploadZone').classList.add('has-image');
+    document.getElementById(prefix+'BtnAnalyze').disabled = false;
+
+    // For normal mode: set receipt status to attached and show save suggestion
+    if (prefix === 'n') {
+      setReceiptStatus('n','attached', document.getElementById('nRs-attached'));
+      updateFileSuggestion('n');
+    }
+    if (prefix === 'p') {
+      updatePayslipFileSuggestion();
+    }
+  };
+  r.readAsDataURL(file);
+}
+
+// ============================================================
+// AI ANALYSIS
+// ============================================================
+async function analyzeImage(prefix) {
+  const b64 = state[prefix+'ImageB64'];
+  const mime = state[prefix+'ImageMime'];
+  if (!b64) return;
+
+  const btnIcon = document.getElementById(prefix+'AnalyzeIcon');
+  const btnText = document.getElementById(prefix+'AnalyzeText');
+  const btn = document.getElementById(prefix+'BtnAnalyze');
+  const status = document.getElementById(prefix+'AiStatus');
+
+  btn.disabled = true;
+  btnIcon.innerHTML = '<div class="spinner"></div>';
+  btnText.textContent = 'Lendo...';
+  status.style.display = 'block'; status.className = 'ai-status reading'; status.textContent = '🤖 Analisando com IA...';
+
+  const isPayslip = prefix === 'p';
+  const isSplit = prefix === 's';
+
+  const sys = isPayslip
+    ? `Você é assistente financeiro de José Roberto. Analise este holerite/contracheque brasileiro. Retorne SOMENTE JSON sem markdown:
+{"month":"YYYY-MM","income":[{"label":"Salário Bruto","amount":0},{"label":"13° Salário","amount":0}],"deductions":[{"label":"IR Retido na Fonte","amount":0},{"label":"INSS","amount":0}],"net":0,"confidence":"high|medium|low"}
+Inclua apenas campos com valor > 0. Use null para campos não encontrados.`
+    : isSplit
+    ? `Você é assistente financeiro de José Roberto. Analise este comprovante e sugira como dividir em múltiplas categorias. Retorne SOMENTE JSON sem markdown:
+{"total":0,"date":"YYYY-MM-DD","payee":"nome","lines":[{"category":"categoria","subcategory":"sub","amount":0,"memo":"desc"}],"confidence":"high|medium|low"}
+Categorias: aluguel|animais|arranjos|automovel|contas|despesas-trabalho|doacoes|educacao|hobbies|impostos|juros|outras-despesas|saude|seguros|taxas-bancarias|utilitarios|vestuario|viagens`
+    : `Você é assistente financeiro de José Roberto, brasileiro. Analise este comprovante. Retorne SOMENTE JSON sem markdown:
+{"amount":"125.90","date":"YYYY-MM-DD","payee":"nome","type":"expense|income","category":"aluguel|animais|arranjos|automovel|contas|despesas-trabalho|doacoes|educacao|hobbies|impostos|juros|outras-despesas|saude|seguros|taxas-bancarias|utilitarios|vestuario|viagens|salario|bonus|dividendos|outras-entradas","subcategory":"sub","memo":"desc","confidence":"high|medium|low","installments":1}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1200, system:sys,
+        messages:[{role:"user",content:[
+          {type:"image",source:{type:"base64",media_type:mime,data:b64}},
+          {type:"text",text:"Analise este documento."}
+        ]}]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content.map(i=>i.text||'').join('');
+    const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+
+    if (isPayslip) fillPayslipFromAI(parsed);
+    else if (isSplit) fillSplitFromAI(parsed);
+    else fillNormalFromAI(parsed);
+
+    status.className = 'ai-status done'; status.textContent = '✓ Lido com sucesso! Revise os campos.';
+  } catch(err) {
+    console.error(err);
+    status.className = 'ai-status error'; status.textContent = '✕ Não consegui ler. Preencha manualmente.';
+  }
+  btn.disabled = false; btnIcon.textContent = '✨'; btnText.textContent = isPayslip ? 'Ler holerite com IA' : isSplit ? 'Ler com IA (sugere split)' : 'Ler com IA';
+}
+
+function showBadge(id) { const el=document.getElementById(id); if(el) el.style.display='inline'; }
+
+function fillNormalFromAI(d) {
+  if (d.amount) { document.getElementById('nAmount').value = fmtAmt(parseFloat(d.amount)); showBadge('nAmtBadge'); updateInstallmentPreview(); }
+  if (d.date) { document.getElementById('nDate').value = d.date; showBadge('nDateBadge'); }
+  if (d.payee) { document.getElementById('nPayee').value = d.payee; showBadge('nPayeeBadge'); }
+  if (d.type) setType('n', d.type);
+  if (d.category) { document.getElementById('nCategory').value = d.category; onCatChange('n'); showBadge('nCatBadge'); }
+  if (d.memo) document.getElementById('nMemo').value = d.memo;
+  if (d.installments > 1) { document.getElementById('nInstallments').value = d.installments; updateInstallmentPreview(); }
+  showConfidence('n', d.confidence, d.confidence_reason);
+  updateFileSuggestion('n');
+}
+
+function fillSplitFromAI(d) {
+  if (d.total) document.getElementById('sTotalAmt').value = fmtAmt(d.total);
+  if (d.date) document.getElementById('sDate').value = d.date;
+  if (d.payee) document.getElementById('sPayee').value = d.payee;
+  // Clear and repopulate split lines
+  if (d.lines && d.lines.length) {
+    document.getElementById('splitLinesContainer').innerHTML = '';
+    state.splitCount = 0;
+    d.lines.forEach(l => addSplitLine(l));
+  }
+  checkSplitTotal();
+}
+
+function fillPayslipFromAI(d) {
+  if (d.month) document.getElementById('pMonth').value = d.month;
+  // Fill income lines
+  if (d.income) {
+    document.getElementById('pIncomeLines').innerHTML = '';
+    d.income.forEach(item => {
+      if (item.amount > 0) addPayslipLine('income', item.label, item.amount);
+    });
+  }
+  // Fill deduction lines
+  if (d.deductions) {
+    document.getElementById('pDeductionLines').innerHTML = '';
+    d.deductions.forEach(item => {
+      if (item.amount > 0) addPayslipLine('deduction', item.label, item.amount);
+    });
+  }
+  updatePayslipTotals();
+  updatePayslipFileSuggestion();
+  document.getElementById('pFileSuggestion').style.display = 'block';
+}
+
+function showConfidence(prefix, conf, reason) {
+  const row = document.getElementById(prefix+'Confidence');
+  const dot = document.getElementById(prefix+'ConfDot');
+  const txt = document.getElementById(prefix+'ConfText');
+  if (!row) return;
+  row.style.display = 'flex';
+  if (conf==='high') { dot.className='conf-dot conf-high'; txt.textContent='Alta confiança'; }
+  else if (conf==='medium') { dot.className='conf-dot conf-med'; txt.textContent='Confiança média — revise'; }
+  else { dot.className='conf-dot conf-low'; txt.textContent='Baixa confiança — verifique tudo'; }
+}
+
+// ============================================================
+// CATEGORY CHANGE → DEDUCTIBLE + SUBCATS
+// ============================================================
+function onCatChange(prefix) {
+  const cat = document.getElementById(prefix+'Category').value;
+  const sub = document.getElementById(prefix+'Subcat');
+  // Update subcats
+  sub.innerHTML = '<option value="">Selecionar...</option>';
+  (SUBCATS[cat]||[]).forEach(s => {
+    const o=document.createElement('option'); o.value=s.toLowerCase().replace(/[^a-z0-9]/g,'_'); o.textContent=s; sub.appendChild(o);
+  });
+  // Deductible badge
+  const badge = document.getElementById(prefix+'DeductibleBadge');
+  if (badge) badge.style.display = DEDUCTIBLE.has(cat) ? 'inline-flex' : 'none';
+  // Receipt status: if deductible expense and no receipt → pending
+  if (prefix === 'n') {
+    const isDeductibleExpense = DEDUCTIBLE.has(cat) && !INCOME_CATS.has(cat);
+    if (isDeductibleExpense && !state.nImageB64 && state.nReceiptStatus === 'na') {
+      setReceiptStatus('n','pending', document.getElementById('nRs-pending'));
+    }
+    updateFileSuggestion('n');
+  }
+}
+
+// ============================================================
+// RECEIPT STATUS
+// ============================================================
+function setReceiptStatus(prefix, status, btn) {
+  state[prefix+'ReceiptStatus'] = status;
+  document.querySelectorAll(`#${prefix}Rs-attached,#${prefix}Rs-pending,#${prefix}Rs-na`).forEach(b=>{
+    b.classList.remove('active','attached','pending','na');
+  });
+  btn.classList.add('active', status);
+}
+
+// ============================================================
+// FILE SAVE SUGGESTION
+// ============================================================
+function getFilePath(type, cat) {
+  const isIncome = INCOME_CATS.has(cat);
+  const isDeductible = DEDUCTIBLE.has(cat);
+  if (isIncome) return isDeductible ? 'Financas JR/Comprovantes/Entradas/Dedutíveis/' : 'Financas JR/Comprovantes/Entradas/Não Dedutíveis/';
+  return isDeductible ? 'Financas JR/Comprovantes/Saídas/Dedutíveis/' : 'Financas JR/Comprovantes/Saídas/Não Dedutíveis/';
+}
+
+function getSuggestedName(payee, date, cat) {
+  const d = date || TODAY;
+  const p = (payee||'comprovante').replace(/[^a-zA-Z0-9À-ú ]/g,'').trim().substring(0,30).replace(/ /g,'_');
+  const c = (CAT_LABELS[cat]||cat).replace(/ /g,'_');
+  return `${d}_${c}_${p}.jpg`;
+}
+
+function updateFileSuggestion(prefix) {
+  const sugg = document.getElementById(prefix+'FileSuggestion');
+  const pathEl = document.getElementById(prefix+'FilePath');
+  const nameEl = document.getElementById(prefix+'SuggestedName');
+  if (!sugg || !state[prefix+'ImageB64']) { if(sugg) sugg.style.display='none'; return; }
+  const cat = document.getElementById(prefix+'Category')?.value || '';
+  const payee = document.getElementById(prefix+'Payee')?.value || '';
+  const date = document.getElementById(prefix+'Date')?.value || TODAY;
+  sugg.style.display = 'block';
+  if(pathEl) pathEl.textContent = getFilePath(document.getElementById(prefix+'Type')==='income' ? 'income':'expense', cat);
+  if(nameEl) nameEl.textContent = getSuggestedName(payee, date, cat);
+}
+
+function updatePayslipFileSuggestion() {
+  const month = document.getElementById('pMonth').value || THIS_MONTH;
+  const nameEl = document.getElementById('pSuggestedName');
+  if(nameEl) nameEl.textContent = `Holerite_${month}.jpg`;
+  if (state.pImageB64) document.getElementById('pFileSuggestion').style.display = 'block';
+}
+
+function downloadReceipt(prefix) {
+  const b64 = state[prefix+'ImageB64'];
+  const mime = state[prefix+'ImageMime'] || 'image/jpeg';
+  const name = prefix === 'p'
+    ? (document.getElementById('pSuggestedName')?.textContent || 'holerite.jpg')
+    : (document.getElementById(prefix+'SuggestedName')?.textContent || 'comprovante.jpg');
+  if (!b64) return;
+  const a = document.createElement('a');
+  a.href = `data:${mime};base64,${b64}`;
+  a.download = name; a.click();
+  showToast('✓ Comprovante baixado! Salve na pasta correta do iCloud.', 'var(--accent)', 'white');
+}
+
+// ============================================================
+// INSTALLMENTS
+// ============================================================
+function updateInstallmentPreview() {
+  const n = parseInt(document.getElementById('nInstallments').value) || 1;
+  const amt = parseFloat(document.getElementById('nAmount').value.replace(',','.')) || 0;
+  const preview = document.getElementById('nInstallPreview');
+  if (n <= 1 || !amt) { preview.style.display = 'none'; return; }
+  preview.style.display = 'block';
+  const firstMonth = document.getElementById('nFirstMonth').value || THIS_MONTH;
+  const parcel = amt / n;
+  let html = '';
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(firstMonth + '-01');
+    d.setMonth(d.getMonth() + i - 1);
+    const lbl = d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+    if (i <= 4 || i === n) {
+      html += `<div class="installment-row"><span>${i}/${n} — ${lbl}</span><span>R$ ${parcel.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>`;
+    } else if (i === 5) {
+      html += `<div class="installment-row" style="color:var(--muted);justify-content:center">···</div>`;
+    }
+  }
+  html += `<div class="installment-row"><span>Total</span><span>R$ ${amt.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>`;
+  preview.innerHTML = html;
+}
+
+// ============================================================
+// TYPE TOGGLE
+// ============================================================
+function setType(prefix, type, btn) {
+  state[prefix+'Type'] = type;
+  const btns = document.querySelectorAll(`#tab-${prefix==='n'?'normal':prefix} .type-btn`);
+  btns.forEach(b => b.classList.remove('active','expense','income'));
+  const target = btn || (type==='expense' ? btns[0] : btns[1]);
+  if (target) target.classList.add('active', type);
+  const amt = document.getElementById(prefix+'Amount');
+  if (amt) { amt.className = 'form-input ' + (type==='income' ? 'pos' : 'neg'); }
+}
+
+// ============================================================
+// SAVE NORMAL
+// ============================================================
+function saveNormal() {
+  const amount = parseFloat(document.getElementById('nAmount').value.replace(',','.'));
+  const date = document.getElementById('nDate').value;
+  const payee = document.getElementById('nPayee').value;
+  const account = document.getElementById('nAccount').value;
+  const category = document.getElementById('nCategory').value;
+  const installments = parseInt(document.getElementById('nInstallments').value) || 1;
+  const firstMonth = document.getElementById('nFirstMonth').value || THIS_MONTH;
+
+  if (!amount||!date||!payee||!account||!category) { showToast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14'); return; }
+
+  const groupId = Date.now();
+  const parcel = amount / installments;
+  const type = state.nType || 'expense';
+  const receiptStatus = state.nReceiptStatus || 'na';
+  const isDeductible = DEDUCTIBLE.has(category);
+
+  for (let i = 0; i < installments; i++) {
+    const d = new Date(firstMonth + '-01');
+    d.setMonth(d.getMonth() + i);
+    const txDate = i===0 ? date : d.toISOString().split('T')[0].slice(0,7)+'-01';
+    txs.unshift({
+      id: groupId+i, type, amount: parcel, date: txDate, payee,
+      payeeDisplay: installments>1 ? `${payee} (${i+1}/${installments})` : payee,
+      account, category, subcategory: document.getElementById('nSubcat').value,
+      memo: document.getElementById('nMemo').value,
+      receiptStatus: i===0 ? receiptStatus : 'na',
+      isDeductible, installments, installmentNum:i+1, groupId,
+      createdAt: new Date().toISOString()
+    });
+  }
+
+  save(); renderHistory();
+  const msg = installments>1 ? `✓ ${installments} parcelas salvas!` : '✓ Lançamento salvo!';
+  showToast(msg,'var(--green)','#0d0f14');
+  clearNormal();
+}
+
+function clearNormal() {
+  ['nAmount','nPayee','nMemo'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('nDate').value = TODAY;
+  document.getElementById('nAccount').value = '';
+  document.getElementById('nCategory').value = '';
+  document.getElementById('nSubcat').innerHTML = '<option value="">Selecionar...</option>';
+  document.getElementById('nInstallments').value = '1';
+  document.getElementById('nFirstMonth').value = THIS_MONTH;
+  document.getElementById('nInstallPreview').style.display = 'none';
+  document.getElementById('nConfidence').style.display = 'none';
+  document.getElementById('nDeductibleBadge').style.display = 'none';
+  document.getElementById('nFileSuggestion').style.display = 'none';
+  document.getElementById('nAiStatus').style.display = 'none';
+  ['nAmtBadge','nDateBadge','nPayeeBadge','nCatBadge'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  state.nImageB64=null; state.nImageMime=null;
+  document.getElementById('nPreviewImg').style.display='none';
+  document.getElementById('nUploadPlaceholder').style.display='block';
+  document.getElementById('nUploadZone').classList.remove('has-image');
+  document.getElementById('nBtnAnalyze').disabled=true;
+  setReceiptStatus('n','na',document.getElementById('nRs-na'));
+  setType('n','expense');
+}
+
+// ============================================================
+// SPLIT
+// ============================================================
+function initSplitLines() { addSplitLine(); addSplitLine(); }
+
+function addSplitLine(prefill) {
+  state.splitCount++;
+  const n = state.splitCount;
+  const div = document.createElement('div');
+  div.className = 'split-line'; div.id = 'sl-'+n;
+  div.innerHTML = `
+    <div class="split-line-header">
+      <span class="split-line-num">Linha ${n}</span>
+      <button class="btn-remove" onclick="document.getElementById('sl-${n}').remove();checkSplitTotal()">×</button>
+    </div>
+    <div class="split-fields">
+      <div>
+        <label class="form-label" style="font-size:10px">Categoria</label>
+        <select class="form-select" id="slCat-${n}" onchange="updateSplitSubcat(${n})" style="font-size:13px">
+          <option value="">Selecionar...</option>
+          <optgroup label="Despesas">
+            <option value="aluguel">Aluguel</option><option value="animais">Animais</option>
+            <option value="arranjos">Arranjos Dom.</option><option value="automovel">Automóvel</option>
+            <option value="contas">Contas</option><option value="despesas-trabalho">Desp.Trabalho</option>
+            <option value="doacoes">Doações</option><option value="educacao">Educação</option>
+            <option value="hobbies">Hobbies</option><option value="impostos">Impostos</option>
+            <option value="juros">Juros</option><option value="outras-despesas">Outras Desp.</option>
+            <option value="saude">Saúde</option><option value="seguros">Seguros</option>
+            <option value="taxas-bancarias">Taxas</option><option value="utilitarios">Utilitários</option>
+            <option value="vestuario">Vestuário</option><option value="viagens">Viagens</option>
+          </optgroup>
+          <optgroup label="Receitas">
+            <option value="salario">Salários</option><option value="bonus">Bônus</option>
+            <option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entr.</option>
+          </optgroup>
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px">Subcategoria</label>
+        <select class="form-select" id="slSub-${n}" style="font-size:13px"><option value="">Sub...</option></select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-bottom:8px">
+      <div>
+        <label class="form-label" style="font-size:10px">Valor R$</label>
+        <input type="text" inputmode="decimal" class="form-input" id="slAmt-${n}" placeholder="0,00" style="font-size:15px" oninput="checkSplitTotal()">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px">Observação</label>
+        <input type="text" class="form-input" id="slMemo-${n}" placeholder="Opcional" style="font-size:13px">
+      </div>
+    </div>`;
+  document.getElementById('splitLinesContainer').appendChild(div);
+  // Prefill from AI
+  if (prefill) {
+    if(prefill.category) { document.getElementById('slCat-'+n).value=prefill.category; updateSplitSubcat(n); }
+    if(prefill.amount) document.getElementById('slAmt-'+n).value=fmtAmt(prefill.amount);
+    if(prefill.memo) document.getElementById('slMemo-'+n).value=prefill.memo;
+  }
+}
+
+function updateSplitSubcat(n) {
+  const cat=document.getElementById('slCat-'+n).value, sel=document.getElementById('slSub-'+n);
+  sel.innerHTML='<option value="">Sub...</option>';
+  (SUBCATS[cat]||[]).forEach(s=>{const o=document.createElement('option');o.value=s.toLowerCase().replace(/[^a-z0-9]/g,'_');o.textContent=s;sel.appendChild(o);});
+}
+
+function getSplitLines() {
+  const lines=[];
+  document.querySelectorAll('.split-line').forEach(el=>{
+    const id=el.id.replace('sl-','');
+    const cat=document.getElementById('slCat-'+id)?.value;
+    const sub=document.getElementById('slSub-'+id)?.value;
+    const amt=parseFloat(document.getElementById('slAmt-'+id)?.value?.replace(',','.'))||0;
+    const memo=document.getElementById('slMemo-'+id)?.value||'';
+    if(cat&&amt) lines.push({category:cat,subcategory:sub,amount:amt,memo});
+  });
+  return lines;
+}
+
+function checkSplitTotal() {
+  const total=parseFloat(document.getElementById('sTotalAmt').value.replace(',','.'))||0;
+  const sum=getSplitLines().reduce((s,l)=>s+l.amount,0);
+  const el=document.getElementById('splitCheck');
+  if(!total||!sum){el.textContent='';return;}
+  const diff=Math.abs(total-sum);
+  if(diff<0.02){el.textContent='✓ Confere';el.className='split-check ok';}
+  else if(sum>total){el.textContent=`✕ Excede R$ ${fmtAmt(sum-total)}`;el.className='split-check over';}
+  else{el.textContent=`⚠ Faltam R$ ${fmtAmt(total-sum)}`;el.className='split-check under';}
+}
+
+function saveSplit() {
+  const totalAmt=parseFloat(document.getElementById('sTotalAmt').value.replace(',','.'));
+  const date=document.getElementById('sDate').value;
+  const payee=document.getElementById('sPayee').value;
+  const account=document.getElementById('sAccount').value;
+  const lines=getSplitLines();
+  if(!totalAmt||!date||!payee||!account||!lines.length){showToast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
+  if(Math.abs(totalAmt-lines.reduce((s,l)=>s+l.amount,0))>0.05){showToast('⚠ Total das linhas não confere','#fbbf24','#0d0f14');return;}
+  const groupId=Date.now();
+  lines.forEach((l,i)=>txs.unshift({
+    id:groupId+i,type:'expense',amount:l.amount,date,payee,account,
+    category:l.category,subcategory:l.subcategory,memo:l.memo,
+    isDeductible:DEDUCTIBLE.has(l.category),
+    receiptStatus:state.sImageB64?'attached':'na',
+    isSplit:true,splitTotal:totalAmt,createdAt:new Date().toISOString()
+  }));
+  save(); renderHistory();
+  showToast(`✓ ${lines.length} linhas de split salvas!`,'var(--green)','#0d0f14');
+  clearSplit();
+}
+
+function clearSplit() {
+  document.getElementById('sTotalAmt').value='';
+  document.getElementById('sDate').value=TODAY;
+  document.getElementById('sPayee').value='';
+  document.getElementById('sAccount').value='';
+  document.getElementById('splitLinesContainer').innerHTML='';
+  state.splitCount=0;
+  state.sImageB64=null;state.sImageMime=null;
+  document.getElementById('sPreviewImg').style.display='none';
+  document.getElementById('sUploadPlaceholder').style.display='block';
+  document.getElementById('sUploadZone').classList.remove('has-image');
+  document.getElementById('sBtnAnalyze').disabled=true;
+  document.getElementById('sAiStatus').style.display='none';
+  document.getElementById('splitCheck').textContent='';
+  addSplitLine();addSplitLine();
+}
+
+// ============================================================
+// PAYSLIP
+// ============================================================
+function initPayslipLines() {
+  addPayslipLine('income','Salário Bruto');
+  addPayslipLine('deduction','IR Retido na Fonte');
+  addPayslipLine('deduction','INSS');
+}
+
+const INCOME_OPTIONS = ['Salário Bruto','13° Salário','Bônus','Férias','Outras Entradas'];
+const DEDUCT_OPTIONS = ['IR Retido na Fonte','INSS','Plano de Saúde','Vale Transporte','Previdência Privada','Outros Descontos'];
+
+function addPayslipLine(type, label, value) {
+  const container=document.getElementById(type==='income'?'pIncomeLines':'pDeductionLines');
+  const isIncome=type==='income';
+  const options=(isIncome?INCOME_OPTIONS:DEDUCT_OPTIONS).map(o=>`<option value="${o}"${label&&o===label?' selected':''}>${o}</option>`).join('');
+  const div=document.createElement('div');
+  div.className='payslip-line-row';
+  div.innerHTML=`
+    <div><select class="form-select" style="font-size:13px">${options}</select></div>
+    <div><div class="amount-wrap"><span class="amount-prefix" style="font-size:14px">R$</span>
+      <input type="text" inputmode="decimal" class="form-input ${isIncome?'pos':'neg'}" style="padding-left:30px;font-size:16px" placeholder="0,00" value="${value?fmtAmt(value):''}" oninput="updatePayslipTotals()">
+    </div></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn-remove" onclick="this.closest('.payslip-line-row').remove();updatePayslipTotals()">×</button></div>`;
+  container.appendChild(div);
+  if(value) updatePayslipTotals();
+}
+
+function updatePayslipTotals() {
+  let gross=0,ded=0;
+  document.querySelectorAll('#pIncomeLines .form-input').forEach(i=>gross+=parseFloat(i.value.replace(',','.'))||0);
+  document.querySelectorAll('#pDeductionLines .form-input').forEach(i=>ded+=parseFloat(i.value.replace(',','.'))||0);
+  const f=v=>'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('pGross').textContent=f(gross);
+  document.getElementById('pDeductions').textContent='- '+f(ded);
+  document.getElementById('pNet').textContent=f(gross-ded);
+}
+
+function savePayslip() {
+  const month=document.getElementById('pMonth').value;
+  const account=document.getElementById('pAccount').value;
+  if(!month){showToast('⚠ Selecione o mês','#fbbf24','#0d0f14');return;}
+  const date=month+'-05';
+  const groupId=Date.now();let idx=0;
+  const label='Holerite '+fmtMonth(month);
+  const DEDUCT_MAP={'IR Retido na Fonte':'impostos','INSS':'impostos','Plano de Saúde':'saude','Vale Transporte':'contas','Previdência Privada':'seguros','Outros Descontos':'outras-despesas'};
+  const INCOME_MAP={'Salário Bruto':'salario','13° Salário':'salario','Bônus':'bonus','Férias':'salario','Outras Entradas':'outras-entradas'};
+  document.querySelectorAll('#pIncomeLines .payslip-line-row').forEach(row=>{
+    const lbl=row.querySelector('select').value;
+    const amt=parseFloat(row.querySelector('input').value.replace(',','.'))||0;
+    if(amt>0) txs.unshift({id:groupId+(idx++),type:'income',amount:amt,date,payee:label,account,category:INCOME_MAP[lbl]||'salario',subcategory:lbl,memo:label,isDeductible:true,receiptStatus:state.pImageB64?'attached':'pending',isPayslip:true,payslipMonth:month,createdAt:new Date().toISOString()});
+  });
+  document.querySelectorAll('#pDeductionLines .payslip-line-row').forEach(row=>{
+    const lbl=row.querySelector('select').value;
+    const amt=parseFloat(row.querySelector('input').value.replace(',','.'))||0;
+    if(amt>0) txs.unshift({id:groupId+(idx++),type:'expense',amount:amt,date,payee:label,account,category:DEDUCT_MAP[lbl]||'outras-despesas',subcategory:lbl,memo:label,isDeductible:true,receiptStatus:state.pImageB64?'attached':'pending',isPayslip:true,payslipMonth:month,createdAt:new Date().toISOString()});
+  });
+  if(idx===0){showToast('⚠ Preencha pelo menos um valor','#fbbf24','#0d0f14');return;}
+  save(); renderHistory();
+  showToast(`✓ Holerite de ${fmtMonth(month)} registrado! (${idx} lançamentos)`,'var(--green)','#0d0f14');
+  clearPayslip();
+}
+
+function clearPayslip() {
+  document.getElementById('pMonth').value=THIS_MONTH;
+  document.getElementById('pIncomeLines').innerHTML='';
+  document.getElementById('pDeductionLines').innerHTML='';
+  state.pImageB64=null;state.pImageMime=null;
+  document.getElementById('pPreviewImg').style.display='none';
+  document.getElementById('pUploadPlaceholder').style.display='block';
+  document.getElementById('pUploadZone').classList.remove('has-image');
+  document.getElementById('pBtnAnalyze').disabled=true;
+  document.getElementById('pAiStatus').style.display='none';
+  document.getElementById('pFileSuggestion').style.display='none';
+  initPayslipLines(); updatePayslipTotals();
+}
+
+// ============================================================
+// IR PANEL
+// ============================================================
+function renderIR() {
+  const yearTxs = txs.filter(t => t.date && t.date.startsWith(THIS_YEAR));
+  const deductExp = yearTxs.filter(t => t.type==='expense' && t.isDeductible);
+  const deductInc = yearTxs.filter(t => t.type==='income' && t.isDeductible);
+  const pending = yearTxs.filter(t => t.isDeductible && t.receiptStatus==='pending');
+  const totalDeductExp = deductExp.reduce((s,t)=>s+t.amount,0);
+  const totalDeductInc = deductInc.reduce((s,t)=>s+t.amount,0);
+  document.getElementById('irKpis').innerHTML=`
+    <div class="ir-kpi-card"><div class="ir-kpi-label">Despesas Dedutíveis</div><div class="ir-kpi-value neg">-R$ ${totalDeductExp.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${deductExp.length} lançamentos</div></div>
+    <div class="ir-kpi-card"><div class="ir-kpi-label">Rendimentos Tributáveis</div><div class="ir-kpi-value pos">+R$ ${totalDeductInc.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${deductInc.length} lançamentos</div></div>
+    <div class="ir-kpi-card" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.2)"><div class="ir-kpi-label" style="color:var(--yellow)">Comprovantes Pendentes</div><div class="ir-kpi-value" style="color:var(--yellow)">${pending.length}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">a providenciar</div></div>
+    <div class="ir-kpi-card" style="background:rgba(52,211,153,0.06);border-color:rgba(52,211,153,0.2)"><div class="ir-kpi-label" style="color:var(--green)">Com Comprovante</div><div class="ir-kpi-value" style="color:var(--green)">${deductExp.filter(t=>t.receiptStatus==='attached').length + deductInc.filter(t=>t.receiptStatus==='attached').length}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">documentados</div></div>`;
+  // Pending list
+  const pendingEl = document.getElementById('irPendingList');
+  if (!pending.length) { pendingEl.innerHTML='<div class="empty-state" style="padding:20px"><div class="big">✅</div><div>Nenhum comprovante pendente!</div></div>'; }
+  else { pendingEl.innerHTML = pending.slice(0,20).map(t=>`
+    <div class="ir-pending-item">
+      <div>
+        <div style="font-size:13px;font-weight:500">${t.payee}</div>
+        <div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CAT_LABELS[t.category]||t.category}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:600;color:var(--red)">-R$ ${t.amount.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+        <button class="attach-btn" onclick="markAttached(${t.id})">Marcar OK</button>
+      </div>
+    </div>`).join(''); }
+  // By category
+  const byCat = {};
+  deductExp.forEach(t => { if(!byCat[t.category]) byCat[t.category]=0; byCat[t.category]+=t.amount; });
+  const catEl = document.getElementById('irByCategory');
+  const sorted = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  catEl.innerHTML = sorted.length ? sorted.map(([cat,amt])=>`
+    <div class="ir-cat-row">
+      <span>${CAT_LABELS[cat]||cat}</span>
+      <span style="font-weight:600;color:var(--red)">-R$ ${amt.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:13px;padding:12px 0">Nenhuma despesa dedutível registrada</div>';
+  // Income
+  const incEl = document.getElementById('irIncome');
+  const incByCat = {};
+  deductInc.forEach(t => { if(!incByCat[t.category]) incByCat[t.category]=0; incByCat[t.category]+=t.amount; });
+  const incSorted = Object.entries(incByCat).sort((a,b)=>b[1]-a[1]);
+  incEl.innerHTML = incSorted.length ? incSorted.map(([cat,amt])=>`
+    <div class="ir-cat-row">
+      <span>${CAT_LABELS[cat]||cat}</span>
+      <span style="font-weight:600;color:var(--green)">+R$ ${amt.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+    </div>`).join('') : '<div style="color:var(--muted);font-size:13px;padding:12px 0">Nenhum rendimento registrado ainda</div>';
+}
+
+function markAttached(id) {
+  const t = txs.find(t=>t.id===id);
+  if(t) { t.receiptStatus='attached'; save(); renderIR(); showToast('✓ Marcado como documentado','var(--green)','#0d0f14'); }
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+function renderHistory() {
+  const q = document.getElementById('histSearch')?.value?.toLowerCase()||'';
+  let list = txs;
+  if(q) list = list.filter(t => (t.payee||'').toLowerCase().includes(q)||(t.memo||'').toLowerCase().includes(q)||(CAT_LABELS[t.category]||'').toLowerCase().includes(q));
+  document.getElementById('histCount').textContent = `(${txs.length} total)`;
+  const container = document.getElementById('historyContainer');
+  if(!list.length){container.innerHTML='<div class="empty-state"><div class="big">📋</div><div>Nenhum lançamento</div></div>';return;}
+  container.innerHTML = list.slice(0,50).map(t=>{
+    const isPos=t.type==='income';
+    const tags=[CAT_LABELS[t.category]||t.category, ACCT_LABELS[t.account]||t.account, t.isSplit?'Split':'', t.isPayslip?'Holerite':'', t.installments>1?`${t.installmentNum}/${t.installments}×`:''].filter(Boolean).join(' · ');
+    const receiptBadge = t.isDeductible ? (t.receiptStatus==='attached'?'<span class="receipt-pill rp-attached">✓ Comprovante</span>':t.receiptStatus==='pending'?'<span class="receipt-pill rp-pending">⏳ Aguardando</span>':'') : '';
+    const dedBadge = t.isDeductible ? '<span class="receipt-pill rp-deductible">IR</span> ' : '';
+    return `<div class="tx-item">
+      <div class="tx-dot" style="background:${isPos?'var(--green)':'var(--red)'}"></div>
+      <div class="tx-body">
+        <div class="tx-payee">${t.payeeDisplay||t.payee}</div>
+        <div class="tx-meta">${fmtDate(t.date)} · ${tags}</div>
+        ${t.memo?`<div class="tx-meta">${t.memo}</div>`:''}
+        <div style="margin-top:3px">${dedBadge}${receiptBadge}</div>
+      </div>
+      <div class="tx-amount ${isPos?'pos':'neg'}">${isPos?'+':'-'}R$ ${t.amount.toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>
+      <button class="tx-del" onclick="deleteTx(${t.id})">×</button>
+    </div>`;
+  }).join('');
+  if(list.length>50) container.innerHTML+=`<div style="text-align:center;padding:12px;font-size:12px;color:var(--muted)">Mostrando 50 de ${list.length} lançamentos</div>`;
+  const totalExp=list.reduce((s,t)=>t.type==='expense'?s+t.amount:s,0);
+  const totalInc=list.reduce((s,t)=>t.type==='income'?s+t.amount:s,0);
+  container.innerHTML+=`<div class="divider"></div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 4px"><span>${list.length} lançamento(s)</span><span style="color:var(--red)">-R$ ${totalExp.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span><span style="color:var(--green)">+R$ ${totalInc.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span></div>`;
+}
+
+function deleteTx(id) {
+  if(!confirm('Remover?'))return;
+  txs=txs.filter(t=>t.id!==id); save(); renderHistory();
+  showToast('Removido','var(--red)','white');
+}
+
+// ============================================================
+// EXPORT / IMPORT
+// ============================================================
+function exportData() {
+  const blob=new Blob([JSON.stringify({version:3,exportedAt:new Date().toISOString(),transactions:txs},null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download='financas_jr_'+TODAY+'.json'; a.click(); URL.revokeObjectURL(url);
+  showToast('✓ Exportado! Salve no iCloud Drive.','var(--accent)','white');
+}
+
+function importData(e) {
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const imported=data.transactions||data;
+      if(!Array.isArray(imported))throw new Error();
+      const ids=new Set(txs.map(t=>t.id));
+      const newOnes=imported.filter(t=>!ids.has(t.id));
+      txs=[...newOnes,...txs].sort((a,b)=>new Date(b.date)-new Date(a.date));
+      save(); renderHistory();
+      showToast(`✓ ${newOnes.length} lançamento(s) importado(s)!`,'var(--green)','#0d0f14');
+    }catch{showToast('✕ Erro ao importar','var(--red)','white');}
+  };
+  r.readAsText(file); e.target.value='';
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function save(){
+  try{localStorage.setItem('jr_txs',JSON.stringify(txs));}
+  catch(e){console.warn('Storage unavailable:',e);}
+}
+function loadTxs(){
+  try{return JSON.parse(localStorage.getItem('jr_txs')||'[]');}
+  catch(e){return[];}
+}
+function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function fmtAmt(v){return v.toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fmtMonth(ym){const[y,m]=ym.split('-');const ms=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];return ms[parseInt(m)-1]+'/'+y.slice(2);}
+function showToast(msg,bg,color){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=color;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+
+// ============================================================
+// RECORRENTES
+// ============================================================
+let recorrentes = [];
+let recType = 'expense';
+let recSplitCount = 0;
+
+function loadRecorrentes() {
+  try { recorrentes = JSON.parse(localStorage.getItem('jr_recorrentes') || '[]'); } catch(e) { recorrentes = []; }
+}
+function saveRecorrentes() {
+  try { localStorage.setItem('jr_recorrentes', JSON.stringify(recorrentes)); } catch(e) {}
+}
+
+function setRecType(type, btn) {
+  recType = type;
+  document.querySelectorAll('#tab-recorrentes .type-btn').forEach(b => b.classList.remove('active','expense','income'));
+  btn.classList.add('active', type);
+  const amt = document.getElementById('recAmount');
+  if(amt) amt.className = 'form-input ' + (type==='income'?'pos':'neg');
+  const splitAmt = document.getElementById('recSplitTotal');
+  if(splitAmt) splitAmt.className = 'form-input ' + (type==='income'?'pos':'neg');
+}
+
+function toggleRecSplit() {
+  const isSplit = document.getElementById('recLaunchType').value === 'split';
+  document.getElementById('recSimpleFields').style.display = isSplit ? 'none' : 'block';
+  document.getElementById('recSplitFields').style.display = isSplit ? 'block' : 'none';
+}
+
+function updateRecSubcat() {
+  const cat = document.getElementById('recCategory').value;
+  const sel = document.getElementById('recSubcat');
+  sel.innerHTML = '<option value="">Selecionar...</option>';
+  (SUBCATS[cat]||[]).forEach(s=>{const o=document.createElement('option');o.value=s.toLowerCase().replace(/[^a-z0-9]/g,'_');o.textContent=s;sel.appendChild(o);});
+}
+
+function updateRecNextDate() {
+  const freq = document.getElementById('recFrequency').value;
+  const d = new Date();
+  if(freq==='daily') d.setDate(d.getDate()+1);
+  else if(freq==='weekly') d.setDate(d.getDate()+7);
+  else if(freq==='monthly') d.setMonth(d.getMonth()+1);
+  else if(freq==='yearly') d.setFullYear(d.getFullYear()+1);
+  document.getElementById('recNextDate').value = d.toISOString().split('T')[0];
+}
+
+function addRecSplitLine(prefill) {
+  recSplitCount++;
+  const n = recSplitCount;
+  const container = document.getElementById('recSplitLines');
+  const div = document.createElement('div');
+  div.className = 'split-line'; div.id = 'rsl-'+n;
+  const catOptions = ['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${prefill&&prefill.category===c?' selected':''}>${CAT_LABELS[c]||c}</option>`).join('');
+  div.innerHTML = `
+    <div class="split-line-header">
+      <span class="split-line-num">Linha ${n}</span>
+      <button class="btn-remove" onclick="document.getElementById('rsl-${n}').remove()">×</button>
+    </div>
+    <div class="split-fields">
+      <div>
+        <label class="form-label" style="font-size:10px">Categoria</label>
+        <select class="form-select" id="rslCat-${n}" style="font-size:13px"><option value="">...</option>${catOptions}</select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:10px">Valor R$</label>
+        <input type="text" inputmode="decimal" class="form-input" id="rslAmt-${n}" placeholder="0,00" style="font-size:15px" value="${prefill&&prefill.amount?fmtAmt(prefill.amount):''}">
+      </div>
+    </div>
+    <div>
+      <label class="form-label" style="font-size:10px">Descrição</label>
+      <input type="text" class="form-input" id="rslDesc-${n}" placeholder="Ex: Água, Gás..." style="font-size:13px" value="${prefill&&prefill.desc?prefill.desc:''}">
+    </div>`;
+  container.appendChild(div);
+}
+
+function getRecSplitLines() {
+  const lines = [];
+  document.querySelectorAll('[id^="rsl-"]').forEach(el => {
+    const id = el.id.replace('rsl-','');
+    const cat = document.getElementById('rslCat-'+id)?.value;
+    const amt = parseFloat(document.getElementById('rslAmt-'+id)?.value?.replace(',','.')) || 0;
+    const desc = document.getElementById('rslDesc-'+id)?.value || '';
+    if(cat && amt) lines.push({category:cat, amount:amt, desc});
+  });
+  return lines;
+}
+
+function saveRecorrente() {
+  const name = document.getElementById('recName').value.trim();
+  const frequency = document.getElementById('recFrequency').value;
+  const nextDate = document.getElementById('recNextDate').value;
+  const alertDays = parseInt(document.getElementById('recAlertDays').value);
+  const memo = document.getElementById('recMemo').value;
+  const launchType = document.getElementById('recLaunchType').value;
+  const editId = document.getElementById('recEditId').value;
+
+  if(!name || !nextDate) { showToast('⚠ Preencha descrição e vencimento','#fbbf24','#0d0f14'); return; }
+
+  let rec = { name, type: recType, frequency, nextDate, alertDays, memo, launchType, updatedAt: new Date().toISOString() };
+
+  if(launchType === 'split') {
+    const total = parseFloat(document.getElementById('recSplitTotal').value.replace(',','.'));
+    const account = document.getElementById('recSplitAccount').value;
+    const lines = getRecSplitLines();
+    if(!total || !account || !lines.length) { showToast('⚠ Preencha total, conta e linhas do split','#fbbf24','#0d0f14'); return; }
+    rec.amount = total; rec.account = account; rec.splitLines = lines;
+  } else {
+    const amount = parseFloat(document.getElementById('recAmount').value.replace(',','.'));
+    const account = document.getElementById('recAccount').value;
+    const category = document.getElementById('recCategory').value;
+    if(!amount || !account || !category) { showToast('⚠ Preencha valor, conta e categoria','#fbbf24','#0d0f14'); return; }
+    rec.amount = amount; rec.account = account; rec.category = category;
+    rec.subcategory = document.getElementById('recSubcat').value;
+  }
+
+  if(editId) {
+    const idx = recorrentes.findIndex(r=>r.id==editId);
+    if(idx>=0) { rec.id = recorrentes[idx].id; rec.launchHistory = recorrentes[idx].launchHistory||[]; recorrentes[idx] = rec; }
+  } else {
+    rec.id = Date.now(); rec.launchHistory = [];
+    recorrentes.unshift(rec);
+  }
+
+  saveRecorrentes(); renderRecorrentes(); clearRecForm();
+  showToast('✓ Recorrente salva!','var(--green)','#0d0f14');
+}
+
+function clearRecForm() {
+  document.getElementById('recName').value='';
+  document.getElementById('recAmount').value='';
+  document.getElementById('recAccount').value='';
+  document.getElementById('recCategory').value='';
+  document.getElementById('recSubcat').innerHTML='<option value="">Selecionar...</option>';
+  document.getElementById('recSplitTotal').value='';
+  document.getElementById('recSplitAccount').value='';
+  document.getElementById('recSplitLines').innerHTML='';
+  document.getElementById('recMemo').value='';
+  document.getElementById('recLaunchType').value='simple';
+  document.getElementById('recEditId').value='';
+  document.getElementById('recFormTitle').textContent='🔁 Nova Despesa/Receita Recorrente';
+  recSplitCount=0;
+  toggleRecSplit();
+  updateRecNextDate();
+  setRecType('expense', document.querySelectorAll('#tab-recorrentes .type-btn')[0]);
+}
+
+function getDaysUntil(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const target = new Date(dateStr+'T00:00:00'); target.setHours(0,0,0,0);
+  return Math.round((target-today)/(1000*60*60*24));
+}
+
+function getNextDateAfter(rec, fromDate) {
+  const d = new Date(fromDate+'T00:00:00');
+  if(rec.frequency==='daily') d.setDate(d.getDate()+1);
+  else if(rec.frequency==='weekly') d.setDate(d.getDate()+7);
+  else if(rec.frequency==='monthly') d.setMonth(d.getMonth()+1);
+  else if(rec.frequency==='yearly') d.setFullYear(d.getFullYear()+1);
+  return d.toISOString().split('T')[0];
+}
+
+function freqLabel(f) { return {daily:'Diária',weekly:'Semanal',monthly:'Mensal',yearly:'Anual'}[f]||f; }
+
+function renderRecorrentes() {
+  loadRecorrentes();
+  const list = document.getElementById('recList');
+  const count = document.getElementById('recCount');
+  count.textContent = `(${recorrentes.length})`;
+
+  // Alert banner
+  const alerts = recorrentes.filter(r => getDaysUntil(r.nextDate) <= r.alertDays);
+  const banner = document.getElementById('recAlertBanner');
+  if(alerts.length) {
+    banner.style.display='block';
+    banner.innerHTML=`<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--yellow)">⚠ <strong>${alerts.length} recorrente(s) vencem em breve:</strong> ${alerts.map(r=>r.name).join(', ')}</div>`;
+  } else { banner.style.display='none'; }
+
+  if(!recorrentes.length) {
+    list.innerHTML='<div class="empty-state"><div class="big">🔁</div><div>Nenhuma recorrente cadastrada ainda</div><div style="font-size:12px;margin-top:6px">Cadastre despesas como condomínio, vacinas, assinaturas...</div></div>'; return;
+  }
+
+  list.innerHTML = recorrentes.map(rec => {
+    const days = getDaysUntil(rec.nextDate);
+    let statusClass='', nextClass='ok', nextText='';
+    if(days<0){ statusClass='overdue'; nextClass='late'; nextText=`Venceu há ${Math.abs(days)} dia(s)`; }
+    else if(days===0){ statusClass='due-today'; nextClass='today'; nextText='Vence hoje!'; }
+    else if(days<=rec.alertDays){ statusClass='due-soon'; nextClass='soon'; nextText=`Vence em ${days} dia(s)`; }
+    else { nextText=`Próximo: ${fmtDate(rec.nextDate)} (${days} dias)`; }
+
+    const isIncome = rec.type==='income';
+    const freqBadge = `<span class="rec-badge ${rec.frequency}">${freqLabel(rec.frequency)}</span>`;
+
+    let splitPreview = '';
+    if(rec.launchType==='split' && rec.splitLines) {
+      splitPreview = `<div class="split-preview">${rec.splitLines.map(l=>`<div class="split-preview-line"><span>${CAT_LABELS[l.category]||l.category}${l.desc?' · '+l.desc:''}</span><span>R$ ${fmtAmt(l.amount)}</span></div>`).join('')}</div>`;
+    }
+
+    return `<div class="rec-item ${statusClass}">
+      <div class="rec-item-header">
+        <div>
+          <div class="rec-title">${rec.name}</div>
+          <div class="rec-meta">${freqBadge} ${rec.account?'· '+(ACCT_LABELS[rec.account]||rec.account):''} ${rec.category?'· '+(CAT_LABELS[rec.category]||rec.category):''}</div>
+          <div class="rec-next ${nextClass}">${nextText}</div>
+        </div>
+        <div class="rec-amount ${isIncome?'pos':'neg'}">${isIncome?'+':'-'}R$ ${fmtAmt(rec.amount)}</div>
+      </div>
+      ${splitPreview}
+      ${rec.memo?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${rec.memo}</div>`:''}
+      <div class="rec-actions">
+        <button class="rec-btn launch" onclick="launchRecorrente(${rec.id})">▶ Lançar agora</button>
+        <button class="rec-btn edit" onclick="editRecorrente(${rec.id})">✎ Editar</button>
+        <button class="rec-btn del" onclick="deleteRecorrente(${rec.id})">✕</button>
+      </div>
+      ${rec.launchHistory&&rec.launchHistory.length?`<div style="font-size:10px;color:var(--muted);margin-top:6px">Último lançamento: ${fmtDate(rec.launchHistory[rec.launchHistory.length-1])}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function launchRecorrente(id) {
+  const rec = recorrentes.find(r=>r.id===id);
+  if(!rec) return;
+
+  const groupId = Date.now();
+  const date = rec.nextDate;
+
+  if(rec.launchType==='split' && rec.splitLines) {
+    rec.splitLines.forEach((l,i) => {
+      txs.unshift({
+        id:groupId+i, type:rec.type, amount:l.amount, date, payee:rec.name,
+        account:rec.account, category:l.category, subcategory:'',
+        memo:l.desc||rec.memo, isDeductible:DEDUCTIBLE.has(l.category),
+        receiptStatus:'na', isSplit:true, splitTotal:rec.amount,
+        fromRecorrente:true, createdAt:new Date().toISOString()
+      });
+    });
+  } else {
+    txs.unshift({
+      id:groupId, type:rec.type, amount:rec.amount, date, payee:rec.name,
+      account:rec.account, category:rec.category, subcategory:rec.subcategory,
+      memo:rec.memo, isDeductible:DEDUCTIBLE.has(rec.category||''),
+      receiptStatus: DEDUCTIBLE.has(rec.category||'') ? 'pending' : 'na',
+      fromRecorrente:true, createdAt:new Date().toISOString()
+    });
+  }
+
+  // Update next date and launch history
+  rec.launchHistory = rec.launchHistory || [];
+  rec.launchHistory.push(date);
+  rec.nextDate = getNextDateAfter(rec, date);
+  save(); saveRecorrentes(); renderRecorrentes();
+  showToast(`✓ "${rec.name}" lançado! Próximo: ${fmtDate(rec.nextDate)}`,'var(--green)','#0d0f14');
+}
+
+function editRecorrente(id) {
+  const rec = recorrentes.find(r=>r.id===id);
+  if(!rec) return;
+  document.getElementById('recName').value = rec.name;
+  document.getElementById('recFrequency').value = rec.frequency;
+  document.getElementById('recNextDate').value = rec.nextDate;
+  document.getElementById('recAlertDays').value = rec.alertDays;
+  document.getElementById('recMemo').value = rec.memo||'';
+  document.getElementById('recLaunchType').value = rec.launchType||'simple';
+  document.getElementById('recEditId').value = rec.id;
+  document.getElementById('recFormTitle').textContent = '✎ Editar Recorrente';
+  toggleRecSplit();
+  setRecType(rec.type, document.querySelectorAll('#tab-recorrentes .type-btn')[rec.type==='income'?1:0]);
+
+  if(rec.launchType==='split') {
+    document.getElementById('recSplitTotal').value = fmtAmt(rec.amount);
+    document.getElementById('recSplitAccount').value = rec.account||'';
+    document.getElementById('recSplitLines').innerHTML=''; recSplitCount=0;
+    (rec.splitLines||[]).forEach(l=>addRecSplitLine(l));
+  } else {
+    document.getElementById('recAmount').value = fmtAmt(rec.amount);
+    document.getElementById('recAccount').value = rec.account||'';
+    document.getElementById('recCategory').value = rec.category||'';
+    updateRecSubcat();
+    document.getElementById('recSubcat').value = rec.subcategory||'';
+  }
+  // Scroll to form
+  document.getElementById('tab-recorrentes').querySelector('.card').scrollIntoView({behavior:'smooth'});
+}
+
+function deleteRecorrente(id) {
+  if(!confirm('Remover esta recorrente?')) return;
+  recorrentes = recorrentes.filter(r=>r.id!==id);
+  saveRecorrentes(); renderRecorrentes();
+  showToast('Recorrente removida','var(--red)','white');
+}
+
+function checkRecorrentesAlerts() {
+  loadRecorrentes();
+  return recorrentes.filter(r => getDaysUntil(r.nextDate) <= r.alertDays);
+}
+
+// ============================================================
+// SAFE INIT — runs after all functions defined & DOM ready
+// ============================================================
+function safeInit() {
+  txs = loadTxs();
+  try {
+    document.getElementById('nDate').value = TODAY;
+    document.getElementById('sDate').value = TODAY;
+    document.getElementById('nFirstMonth').value = THIS_MONTH;
+    document.getElementById('pMonth').value = THIS_MONTH;
+    document.getElementById('irYear').textContent = THIS_YEAR;
+  } catch(e){}
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone) {
+    try{document.getElementById('installBanner').style.display = 'flex';}catch(e){}
+  }
+  initSplitLines();
+  initPayslipLines();
+  try{setReceiptStatus('n','na',document.getElementById('nRs-na'));}catch(e){}
+  try{loadRecorrentes();}catch(e){}
+  try{updateRecNextDate();}catch(e){}
+  // Check alerts on load
+  try{
+    const alerts = checkRecorrentesAlerts();
+    if(alerts.length) {
+      const msg = alerts.length===1 ? `⚠ "${alerts[0].name}" vence em breve!` : `⚠ ${alerts.length} recorrentes vencem em breve!`;
+      setTimeout(()=>showToast(msg,'#fbbf24','#0d0f14'),800);
+    }
+  }catch(e){}
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', safeInit);
+} else {
+  safeInit();
+}
+
+</script>
+</body>
+</html>

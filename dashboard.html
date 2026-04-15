@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finanças JR · Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e29;
+    --border: #252a38;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4f8ef7;
+    --accent2: #7c6af7;
+    --green: #34d399;
+    --red: #f87171;
+    --yellow: #fbbf24;
+    --orange: #fb923c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,15,20,0.95);
+    backdrop-filter: blur(12px);
+  }
+  .logo { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+  nav { display: flex; gap: 4px; }
+  nav button {
+    background: none; border: none; color: var(--muted);
+    padding: 7px 16px; border-radius: 8px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    transition: all 0.2s;
+  }
+  nav button.active, nav button:hover { background: var(--surface2); color: var(--text); }
+  nav button.active { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .date-badge { font-size: 12px; color: var(--muted); background: var(--surface); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); }
+
+  /* LAYOUT */
+  .page { display: none; padding: 28px 32px; max-width: 1600px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* GRID */
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+  .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 20px; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title .badge {
+    font-size: 10px; padding: 3px 8px; border-radius: 20px;
+    background: var(--surface2); color: var(--muted); text-transform: none; letter-spacing: 0;
+  }
+
+  /* KPI CARDS */
+  .kpi-value { font-family: 'DM Serif Display', serif; font-size: 28px; color: var(--text); line-height: 1; margin-bottom: 6px; }
+  .kpi-sub { font-size: 12px; color: var(--muted); }
+  .kpi-delta { font-size: 12px; font-weight: 500; margin-left: 6px; }
+  .kpi-delta.up { color: var(--green); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-bar { height: 3px; border-radius: 2px; background: var(--surface2); margin-top: 14px; overflow: hidden; }
+  .kpi-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+
+  /* SECTION TITLE */
+  .section-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 14px; margin-top: 6px;
+  }
+
+  /* CHART CONTAINERS */
+  .chart-wrap { position: relative; }
+  canvas { max-width: 100%; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: var(--muted); text-align: left; padding: 0 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  .tr-hover:hover { background: var(--surface2); }
+  .text-right { text-align: right; }
+  .text-green { color: var(--green); }
+  .text-red { color: var(--red); }
+  .text-muted { color: var(--muted); }
+  .text-yellow { color: var(--yellow); }
+
+  /* PILLS */
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .pill-green { background: rgba(52,211,153,0.12); color: var(--green); }
+  .pill-red { background: rgba(248,113,113,0.12); color: var(--red); }
+  .pill-yellow { background: rgba(251,191,36,0.12); color: var(--yellow); }
+  .pill-blue { background: rgba(79,142,247,0.12); color: var(--accent); }
+
+  /* PROGRESS BARS */
+  .progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .progress-label { flex: 0 0 160px; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .progress-val { flex: 0 0 80px; text-align: right; font-size: 12px; color: var(--muted); }
+  .progress-pct { flex: 0 0 44px; text-align: right; font-size: 12px; font-weight: 500; }
+
+  /* INVESTMENT TABLE ROWS */
+  .inv-account { font-weight: 600; color: var(--accent); font-size: 12px; }
+  .inv-sub { color: var(--muted); font-size: 11px; padding-left: 12px !important; }
+
+  /* BUDGET TABLE */
+  .budget-diff.over { color: var(--red); }
+  .budget-diff.ok { color: var(--green); }
+  .budget-diff.warn { color: var(--yellow); }
+
+  /* PAYEE LIST */
+  .payee-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .payee-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .payee-name { flex: 1; font-size: 13px; }
+  .payee-bar-wrap { flex: 0 0 80px; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+  .payee-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .payee-val { flex: 0 0 90px; text-align: right; font-size: 13px; font-weight: 500; }
+
+  /* TABS within card */
+  .inner-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .inner-tab { padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--muted); border: none; background: none; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+  .inner-tab.active { background: var(--surface2); color: var(--text); }
+
+  /* NET WORTH AREA */
+  .nw-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+  .nw-big { font-family: 'DM Serif Display', serif; font-size: 42px; line-height: 1; }
+  .nw-detail { text-align: right; }
+  .nw-detail-item { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-bottom: 4px; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* UPCOMING BILLS */
+  .bill-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .bill-name { font-size: 13px; }
+  .bill-account { font-size: 11px; color: var(--muted); }
+  .bill-amount { font-size: 14px; font-weight: 600; color: var(--red); }
+  .bill-date { font-size: 11px; color: var(--muted); text-align: right; }
+  .bill-date.soon { color: var(--yellow); }
+  .bill-date.today { color: var(--green); }
+
+  /* SCROLLABLE */
+  .scrollable { max-height: 340px; overflow-y: auto; }
+  .scrollable::-webkit-scrollbar { width: 4px; }
+  .scrollable::-webkit-scrollbar-track { background: transparent; }
+  .scrollable::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* DIVIDER */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* RESPONSIVENESS */
+  @media (max-width: 1100px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-2-1, .grid-1-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <button class="active" onclick="showPage('dashboard')">Dashboard</button>
+    <button onclick="showPage('investimentos')">Investimentos</button>
+    <button onclick="showPage('budget')">Budget</button>
+    <button onclick="showPage('despesas')">Despesas</button>
+  </nav>
+  <div class="header-right">
+    <div class="date-badge">Atualizado: 13 abr 2026</div>
+  </div>
+</header>
+
+<!-- ===================== DASHBOARD ===================== -->
+<div class="page active" id="page-dashboard">
+
+  <!-- KPIs -->
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Patrimônio Líquido</div>
+      <div class="kpi-value">R$ 2.100.491</div>
+      <div class="kpi-sub">Ativos: R$ 2.255.931 &nbsp;|&nbsp; Passivos: <span style="color:var(--red)">-R$ 155.440</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:93%;background:var(--accent)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Investimentos (Brokerage)</div>
+      <div class="kpi-value">R$ 455.131</div>
+      <div class="kpi-sub">4 carteiras · 30 ativos <span class="kpi-delta up">+R$ 4.654 / 1m</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:72%;background:var(--green)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Investimentos (Investing)</div>
+      <div class="kpi-value">R$ 1.072.103</div>
+      <div class="kpi-sub">Inclui Previdência Privada <span class="kpi-delta up">+0,0% hoje</span></div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:85%;background:var(--accent2)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resultado Mensal (Abr/26)</div>
+      <div class="kpi-value" style="color:var(--green)">+R$ 58.618</div>
+      <div class="kpi-sub">Receita: R$ 68.804 · Despesa: -R$ 10.186</div>
+      <div class="kpi-bar"><div class="kpi-bar-fill" style="width:85%;background:var(--green)"></div></div>
+    </div>
+  </div>
+
+  <!-- Patrimônio + Income/Expense -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Evolução do Patrimônio Líquido <span class="badge">Últimos 12 meses</span></div>
+      <div class="nw-header">
+        <div>
+          <div class="nw-big">R$ 2,1M</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px">Hoje, 13/04/2026</div>
+        </div>
+        <div class="nw-detail">
+          <div class="nw-detail-item"><div class="dot" style="background:var(--green)"></div><span>Ativos R$ 2.255.931</span></div>
+          <div class="nw-detail-item"><div class="dot" style="background:var(--red)"></div><span>Passivos -R$ 155.440</span></div>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:180px">
+        <canvas id="chartNetWorth"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Receita vs Despesa <span class="badge">Últimos 12 meses</span></div>
+      <div style="display:flex;gap:20px;margin-bottom:12px">
+        <div><div style="font-size:11px;color:var(--muted)">Total Receita</div><div style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--green)">R$ 669.637</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Total Despesa</div><div style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--red)">-R$ 708.059</div></div>
+        <div><div style="font-size:11px;color:var(--muted)">Resultado</div><div style="font-size:20px;font-family:'DM Serif Display',serif;color:var(--red)">-R$ 38.421</div></div>
+      </div>
+      <div class="chart-wrap" style="height:178px">
+        <canvas id="chartIncomeExpense"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gastos por Categoria + Top Payees + Contas a pagar -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Gastos por Categoria <span class="badge">Últ. 12 meses</span></div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <div style="width:150px;height:150px;flex-shrink:0">
+          <canvas id="chartCateg"></canvas>
+        </div>
+        <div style="flex:1">
+          <div class="progress-row"><div class="progress-label">Contas</div><div class="progress-track"><div class="progress-fill" style="width:42%;background:#4f8ef7"></div></div><div class="progress-pct" style="color:#4f8ef7">42,2%</div></div>
+          <div class="progress-row"><div class="progress-label">Impostos</div><div class="progress-track"><div class="progress-fill" style="width:17%;background:#fbbf24"></div></div><div class="progress-pct" style="color:#fbbf24">16,8%</div></div>
+          <div class="progress-row"><div class="progress-label">Saúde e Fitness</div><div class="progress-track"><div class="progress-fill" style="width:9%;background:#a78bfa"></div></div><div class="progress-pct" style="color:#a78bfa">9,1%</div></div>
+          <div class="progress-row"><div class="progress-label">Viagens</div><div class="progress-track"><div class="progress-fill" style="width:7%;background:#34d399"></div></div><div class="progress-pct" style="color:#34d399">7,0%</div></div>
+          <div class="progress-row"><div class="progress-label">Arranjos Domést.</div><div class="progress-track"><div class="progress-fill" style="width:5.8%;background:#fb923c"></div></div><div class="progress-pct" style="color:#fb923c">5,8%</div></div>
+          <div class="progress-row"><div class="progress-label">Outras Despesas</div><div class="progress-track"><div class="progress-fill" style="width:5.5%;background:#f87171"></div></div><div class="progress-pct" style="color:#f87171">5,5%</div></div>
+          <div class="progress-row"><div class="progress-label">Animais de Est.</div><div class="progress-track"><div class="progress-fill" style="width:4.2%;background:#38bdf8"></div></div><div class="progress-pct" style="color:#38bdf8">4,2%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Top Fornecedores <span class="badge">Últ. 12 meses</span></div>
+      <div class="scrollable">
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(79,142,247,0.12);color:var(--accent)">🏠</div>
+          <div class="payee-name">Henrique Castelli</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:100%"></div></div>
+          <div class="payee-val">R$ 221.726</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(52,211,153,0.12);color:var(--green)">👤</div>
+          <div class="payee-name">Jose Roberto de Oliv...</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:8%"></div></div>
+          <div class="payee-val">R$ 18.657</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(251,191,36,0.12);color:var(--yellow)">🏨</div>
+          <div class="payee-name">Hotels.com</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:7%"></div></div>
+          <div class="payee-val">R$ 15.894</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(167,139,250,0.12);color:#a78bfa">🏢</div>
+          <div class="payee-name">Residencial Varandas...</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:7%"></div></div>
+          <div class="payee-val">R$ 15.559</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(248,113,113,0.12);color:var(--red)">👩</div>
+          <div class="payee-name">Marildete</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:6%"></div></div>
+          <div class="payee-val">R$ 14.201</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(56,189,248,0.12);color:#38bdf8">🏛️</div>
+          <div class="payee-name">Prefeitura da Cidade...</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:6%"></div></div>
+          <div class="payee-val">R$ 13.912</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(79,142,247,0.1);color:var(--accent)">💊</div>
+          <div class="payee-name">Raia Drogasil S.A.</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:5.9%"></div></div>
+          <div class="payee-val">R$ 13.015</div>
+        </div>
+        <div class="payee-item">
+          <div class="payee-icon" style="background:rgba(251,146,60,0.12);color:var(--orange)">✈️</div>
+          <div class="payee-name">Lufthansa</div>
+          <div class="payee-bar-wrap"><div class="payee-bar-fill" style="width:4.1%"></div></div>
+          <div class="payee-val">R$ 9.211</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Contas a Pagar <span class="badge">Próx. 30 dias</span></div>
+      <div class="scrollable">
+        <div class="bill-item">
+          <div><div class="bill-name">Cintia Souza Bodemeier</div><div class="bill-account">Banco Santander Real</div></div>
+          <div style="text-align:right"><div class="bill-amount">-R$ 1.200</div><div class="bill-date" style="color:var(--red)">27 Mar 2026</div></div>
+        </div>
+        <div class="bill-item">
+          <div><div class="bill-name">LinkedIn Inc.</div><div class="bill-account">Porto Visa Infinite</div></div>
+          <div style="text-align:right"><div class="bill-amount">-R$ 24,99</div><div class="bill-date today">13 Abr 2026</div></div>
+        </div>
+        <div class="bill-item">
+          <div><div class="bill-name">Marildete</div><div class="bill-account">Banco Santander Real</div></div>
+          <div style="text-align:right"><div class="bill-amount">-R$ 270</div><div class="bill-date soon">14 Abr 2026</div></div>
+        </div>
+        <div class="bill-item">
+          <div><div class="bill-name">Raia Drogasil S.A.</div><div class="bill-account">Santander Unique Mastercard</div></div>
+          <div style="text-align:right"><div class="bill-amount">-R$ 24,02</div><div class="bill-date soon">15 Abr 2026</div></div>
+        </div>
+        <div class="bill-item">
+          <div><div class="bill-name">Banco Santander Brasil</div><div class="bill-account">Santander Unique Visa Infinite</div></div>
+          <div style="text-align:right"><div class="bill-amount">-R$ 10,51</div><div class="bill-date soon">12 Abr 2026</div></div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span class="text-muted">40 lançamentos previstos</span>
+        <span style="color:var(--accent);cursor:pointer">Ver todos →</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== INVESTIMENTOS ===================== -->
+<div class="page" id="page-investimentos">
+
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Total Investido (Brokerage)</div>
+      <div class="kpi-value">R$ 455.131</div>
+      <div class="kpi-sub">Custo: R$ 408.436 <span class="kpi-delta up">+11,4% total</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Investing (Total)</div>
+      <div class="kpi-value">R$ 1.072.103</div>
+      <div class="kpi-sub">Inclui previdência privada</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Ganho/Perda 1 Mês</div>
+      <div class="kpi-value" style="color:var(--green)">+R$ 4.654</div>
+      <div class="kpi-sub">Brokerage <span class="kpi-delta up">+1,03%</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Ganho/Perda 12 Meses</div>
+      <div class="kpi-value" style="color:var(--green)">+R$ 39.391</div>
+      <div class="kpi-sub">Brokerage <span class="kpi-delta up">+9,65%</span></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Alocação por Carteira</div>
+      <div style="display:flex;gap:20px;align-items:center">
+        <div style="width:200px;height:200px;flex-shrink:0"><canvas id="chartAlloc"></canvas></div>
+        <div style="flex:1">
+          <div class="progress-row"><div class="progress-label">Carteira Santander</div><div class="progress-track"><div class="progress-fill" style="width:45%;background:#4f8ef7"></div></div><div class="progress-pct" style="color:#4f8ef7">45,5%</div></div>
+          <div class="progress-row"><div class="progress-label">Carteira XP</div><div class="progress-track"><div class="progress-fill" style="width:28.6%;background:#7c6af7"></div></div><div class="progress-pct" style="color:#7c6af7">28,6%</div></div>
+          <div class="progress-row"><div class="progress-label">Carteira Daycoval</div><div class="progress-track"><div class="progress-fill" style="width:25.3%;background:#34d399"></div></div><div class="progress-pct" style="color:#34d399">25,3%</div></div>
+          <div class="progress-row"><div class="progress-label">Aplicações (XP)</div><div class="progress-track"><div class="progress-fill" style="width:0.6%;background:#fbbf24"></div></div><div class="progress-pct" style="color:#fbbf24">0,6%</div></div>
+          <div class="divider"></div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Investing (separado)</div>
+          <div class="progress-row"><div class="progress-label">XP PGBL Sulamérica</div><div class="progress-track"><div class="progress-fill" style="width:23.8%;background:#fb923c"></div></div><div class="progress-pct" style="color:#fb923c">23,8%</div></div>
+          <div class="progress-row"><div class="progress-label">XP JGP Crédito Prev</div><div class="progress-track"><div class="progress-fill" style="width:23.6%;background:#f87171"></div></div><div class="progress-pct" style="color:#f87171">23,6%</div></div>
+          <div class="progress-row"><div class="progress-label">Santander Tesouro Selic</div><div class="progress-track"><div class="progress-fill" style="width:12.9%;background:#38bdf8"></div></div><div class="progress-pct" style="color:#38bdf8">12,9%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Evolução Brokerage <span class="badge">Histórico</span></div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="chartBrokerage"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabela detalhada -->
+  <div class="card">
+    <div class="card-title">Portfolio Detalhado — Brokerage</div>
+    <div class="scrollable">
+      <table>
+        <thead>
+          <tr>
+            <th>Ativo</th>
+            <th class="text-right">Preço</th>
+            <th class="text-right">Cotas</th>
+            <th class="text-right">Custo</th>
+            <th class="text-right">Valor Mercado</th>
+            <th class="text-right">G/P 1M</th>
+            <th class="text-right">G/P 3M</th>
+            <th class="text-right">G/P 12M</th>
+            <th class="text-right">G/P Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="9" style="padding:10px 8px;"><span class="inv-account">📁 Aplicações (XP)</span></td></tr>
+          <tr class="tr-hover"><td class="inv-sub">XP Absolute Vertex Advisory FIC FIM</td><td class="text-right text-muted">2,21</td><td class="text-right text-muted">825,5</td><td class="text-right">R$ 1.481</td><td class="text-right">R$ 1.821</td><td class="text-right text-green">+R$ 44 (2,5%)</td><td class="text-right text-green">+3,6%</td><td class="text-right text-green">+10,6%</td><td class="text-right text-green">+23,0%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">XP PETROBRAS PN N2</td><td class="text-right text-muted">49,06</td><td class="text-right text-muted">8</td><td class="text-right">R$ 307</td><td class="text-right">R$ 392</td><td class="text-right text-green">+R$ 36 (10,0%)</td><td class="text-right text-green">+62,5%</td><td class="text-right text-green">+54,2%</td><td class="text-right text-green">+28,0%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">XP VALE ON NM</td><td class="text-right text-muted">85,65</td><td class="text-right text-muted">5</td><td class="text-right">R$ 362</td><td class="text-right">R$ 428</td><td class="text-right text-green">+R$ 38 (9,6%)</td><td class="text-right text-green">+17,1%</td><td class="text-right text-green">+59,4%</td><td class="text-right text-green">+18,3%</td></tr>
+
+          <tr><td colspan="9" style="padding:10px 8px;"><span class="inv-account">📁 Carteira Daycoval</span> <span class="text-muted" style="font-size:12px">— Total: R$ 115.272 (+0,5% 1m)</span></td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Daycoval CDB Banco Daycoval</td><td class="text-right text-muted">1,1007</td><td class="text-right text-muted">7.541,3</td><td class="text-right">R$ 7.765</td><td class="text-right">R$ 8.301</td><td class="text-right text-green">+R$ 89 (1,1%)</td><td class="text-right text-green">+3,9%</td><td class="text-right text-green">+6,9%</td><td class="text-right text-green">+6,9%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Daycoval CRA — MINERVA</td><td class="text-right text-muted">1.199,72</td><td class="text-right text-muted">13,16</td><td class="text-right">R$ 13.878</td><td class="text-right">R$ 15.790</td><td class="text-right text-red">-R$ 71 (-0,4%)</td><td class="text-right text-green">+2,7%</td><td class="text-right text-green">+13,8%</td><td class="text-right text-green">+13,8%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Daycoval Debentures Hedge FI Infra</td><td class="text-right text-muted">1,2724</td><td class="text-right text-muted">20.175,4</td><td class="text-right">R$ 24.500</td><td class="text-right">R$ 25.671</td><td class="text-right text-green">+R$ 109 (0,4%)</td><td class="text-right text-green">+3,3%</td><td class="text-right text-green">+4,8%</td><td class="text-right text-green">+4,8%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Daycoval LCA Pré-fixado 14.3%</td><td class="text-right text-muted">1,1509</td><td class="text-right text-muted">29.192,7</td><td class="text-right">R$ 29.183</td><td class="text-right">R$ 33.598</td><td class="text-right text-green">+R$ 337 (1,0%)</td><td class="text-right text-green">+3,6%</td><td class="text-right text-green">+14,2%</td><td class="text-right text-green">+15,1%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Daycoval LCA Pré-fixado 14.6%</td><td class="text-right text-muted">1,1711</td><td class="text-right text-muted">11.080,8</td><td class="text-right">R$ 11.081</td><td class="text-right">R$ 12.976</td><td class="text-right text-green">+R$ 133 (1,0%)</td><td class="text-right text-green">+3,7%</td><td class="text-right text-green">+14,5%</td><td class="text-right text-green">+17,1%</td></tr>
+
+          <tr><td colspan="9" style="padding:10px 8px;"><span class="inv-account">📁 Carteira Santander</span> <span class="text-muted" style="font-size:12px">— Total: R$ 207.080 (+1,0% 1m)</span></td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Santander Tesouro Selic 2028</td><td class="text-right text-muted">18.755,27</td><td class="text-right text-muted">7,37</td><td class="text-right">R$ 133.348</td><td class="text-right">R$ 138.226</td><td class="text-right text-green">+R$ 1.459 (1,1%)</td><td class="text-right text-green">+3,1%</td><td class="text-right text-green">+3,7%</td><td class="text-right text-green">+3,7%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Santander CDB DI</td><td class="text-right text-muted">1,1268</td><td class="text-right text-muted">22.000</td><td class="text-right">R$ 22.000</td><td class="text-right">R$ 24.789</td><td class="text-right text-green">+R$ 255 (1,0%)</td><td class="text-right text-green">+3,7%</td><td class="text-right text-green">+12,7%</td><td class="text-right text-green">+12,7%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Santander Tesouro IPCA+ 2029</td><td class="text-right text-muted">3.703,44</td><td class="text-right text-muted">2,98</td><td class="text-right">R$ 9.525</td><td class="text-right">R$ 11.036</td><td class="text-right text-green">+R$ 192 (1,8%)</td><td class="text-right text-green">+4,2%</td><td class="text-right text-green">+12,5%</td><td class="text-right text-green">+15,9%</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">Santander Tesouro Prefixado 2027</td><td class="text-right text-muted">910,62</td><td class="text-right text-muted">7,6</td><td class="text-right">R$ 5.745</td><td class="text-right">R$ 6.921</td><td class="text-right text-green">+R$ 58 (0,8%)</td><td class="text-right text-green">+3,5%</td><td class="text-right text-green">+14,7%</td><td class="text-right text-green">+20,5%</td></tr>
+
+          <tr><td colspan="9" style="padding:10px 8px;"><span class="inv-account">📁 Carteira XP</span> <span class="text-muted" style="font-size:12px">— Total: R$ 130.137 (+1,6% 1m)</span></td></tr>
+          <tr class="tr-hover"><td class="inv-sub">XP CDB FACTA FINANCEIRA</td><td class="text-right text-muted">1.261,14</td><td class="text-right text-muted">38</td><td class="text-right">R$ 47.923</td><td class="text-right">R$ 47.923</td><td class="text-right text-muted">—</td><td class="text-right text-muted">—</td><td class="text-right text-muted">—</td><td class="text-right text-muted">—</td></tr>
+          <tr class="tr-hover"><td class="inv-sub">XP Tesouro Selic 2031</td><td class="text-right text-muted">18.697,–</td><td class="text-right text-muted">0,68</td><td class="text-right">—</td><td class="text-right">R$ 12.714</td><td class="text-right text-muted">0,0%</td><td class="text-right text-muted">0,0%</td><td class="text-right text-muted">0,0%</td><td class="text-right text-muted">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== BUDGET ===================== -->
+<div class="page" id="page-budget">
+
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Budget YTD (Jan–Abr)</div>
+      <div class="kpi-value">R$ 102.489</div>
+      <div class="kpi-sub">Gasto real acumulado</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Orçado YTD</div>
+      <div class="kpi-value">R$ 84.274</div>
+      <div class="kpi-sub">Total orçado Jan–Abr</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Diferença YTD</div>
+      <div class="kpi-value" style="color:var(--red)">-R$ 18.215</div>
+      <div class="kpi-sub">Acima do orçamento <span class="pill pill-red">21,6%</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Receita Jan (real)</div>
+      <div class="kpi-value" style="color:var(--green)">R$ 93.083</div>
+      <div class="kpi-sub">Orçado: R$ 128.847</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Real vs Orçado por Mês <span class="badge">2026</span></div>
+      <div class="chart-wrap" style="height:240px">
+        <canvas id="chartBudgetMonths"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resumo Budget por Categoria <span class="badge">YTD Jan–Abr</span></div>
+      <div class="scrollable" style="max-height:240px">
+        <table>
+          <thead>
+            <tr>
+              <th>Categoria</th>
+              <th class="text-right">Real</th>
+              <th class="text-right">Orçado</th>
+              <th class="text-right">Diferença</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="tr-hover"><td>Aluguel</td><td class="text-right">R$ 4.655</td><td class="text-right">R$ 4.476</td><td class="text-right budget-diff over">-R$ 179</td><td><span class="pill pill-yellow">⚠ Leve</span></td></tr>
+            <tr class="tr-hover"><td>Animais de Estimação</td><td class="text-right">R$ 7.776</td><td class="text-right">R$ 6.386</td><td class="text-right budget-diff over">-R$ 1.390</td><td><span class="pill pill-red">✕ Acima</span></td></tr>
+            <tr class="tr-hover"><td>Arranjos Domésticos</td><td class="text-right">R$ 11.134</td><td class="text-right">R$ 12.727</td><td class="text-right budget-diff ok">+R$ 1.593</td><td><span class="pill pill-green">✓ OK</span></td></tr>
+            <tr class="tr-hover"><td>Automóvel</td><td class="text-right">R$ 2.876</td><td class="text-right">R$ 3.450</td><td class="text-right budget-diff ok">+R$ 574</td><td><span class="pill pill-green">✓ OK</span></td></tr>
+            <tr class="tr-hover"><td>Contas</td><td class="text-right">R$ 16.562</td><td class="text-right">R$ 16.485</td><td class="text-right budget-diff over">-R$ 77</td><td><span class="pill pill-yellow">⚠ Leve</span></td></tr>
+            <tr class="tr-hover"><td>Educação</td><td class="text-right">R$ 620</td><td class="text-right">R$ 620</td><td class="text-right budget-diff ok">R$ 0</td><td><span class="pill pill-green">✓ OK</span></td></tr>
+            <tr class="tr-hover"><td>Hobbies e Lazer</td><td class="text-right">R$ 2.374</td><td class="text-right">R$ 1.104</td><td class="text-right budget-diff over">-R$ 1.270</td><td><span class="pill pill-red">✕ Acima</span></td></tr>
+            <tr class="tr-hover"><td>Impostos</td><td class="text-right">R$ 17.915</td><td class="text-right">R$ 13.258</td><td class="text-right budget-diff over">-R$ 4.657</td><td><span class="pill pill-red">✕ Acima</span></td></tr>
+            <tr class="tr-hover"><td>Juros</td><td class="text-right">R$ 2.722</td><td class="text-right">R$ 1.820</td><td class="text-right budget-diff over">-R$ 902</td><td><span class="pill pill-red">✕ Acima</span></td></tr>
+            <tr class="tr-hover"><td>Saúde e Fitness</td><td class="text-right">R$ 8.642</td><td class="text-right">R$ 8.180</td><td class="text-right budget-diff over">-R$ 462</td><td><span class="pill pill-yellow">⚠ Leve</span></td></tr>
+            <tr class="tr-hover"><td>Seguros</td><td class="text-right">R$ 4.212</td><td class="text-right">R$ 4.212</td><td class="text-right budget-diff ok">R$ 0</td><td><span class="pill pill-green">✓ OK</span></td></tr>
+            <tr class="tr-hover"><td>Vestuário</td><td class="text-right">R$ 1.800</td><td class="text-right">R$ 1.800</td><td class="text-right budget-diff ok">R$ 0</td><td><span class="pill pill-green">✓ OK</span></td></tr>
+            <tr class="tr-hover"><td>Viagens</td><td class="text-right">R$ 8.200</td><td class="text-right">R$ 5.000</td><td class="text-right budget-diff over">-R$ 3.200</td><td><span class="pill pill-red">✕ Acima</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Budget por mês detalhado - Abril -->
+  <div class="card">
+    <div class="card-title">Budget Abril 2026 — Detalhe</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div>
+        <div class="section-label">Receitas</div>
+        <table>
+          <thead><tr><th>Categoria</th><th class="text-right">Real</th><th class="text-right">Orçado</th></tr></thead>
+          <tbody>
+            <tr class="tr-hover"><td>FROM Aplicações</td><td class="text-right text-green">R$ 3.731</td><td class="text-right text-muted">R$ 0</td></tr>
+            <tr class="tr-hover"><td>FROM Carteira XP</td><td class="text-right text-green">R$ 64.432</td><td class="text-right text-muted">R$ 0</td></tr>
+            <tr class="tr-hover"><td>Outras Entradas</td><td class="text-right text-green">R$ 641</td><td class="text-right text-muted">R$ 320</td></tr>
+            <tr><td><b>Total</b></td><td class="text-right text-green"><b>R$ 68.804</b></td><td class="text-right text-muted"><b>R$ 320</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="section-label">Despesas — Fixas</div>
+        <table>
+          <thead><tr><th>Categoria</th><th class="text-right">Real</th><th class="text-right">Orçado</th></tr></thead>
+          <tbody>
+            <tr class="tr-hover"><td>Aluguel / Condomínio</td><td class="text-right">R$ 1.193</td><td class="text-right text-muted">R$ 1.200</td></tr>
+            <tr class="tr-hover"><td>Educação</td><td class="text-right">R$ 155</td><td class="text-right text-muted">R$ 155</td></tr>
+            <tr class="tr-hover"><td>Impostos</td><td class="text-right text-red">R$ 1.570</td><td class="text-right text-muted">R$ 1.550</td></tr>
+            <tr class="tr-hover"><td>Seguros</td><td class="text-right">—</td><td class="text-right text-muted">R$ 1.040</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="section-label">Despesas — Variáveis</div>
+        <table>
+          <thead><tr><th>Categoria</th><th class="text-right">Real</th><th class="text-right">Orçado</th></tr></thead>
+          <tbody>
+            <tr class="tr-hover"><td>Animais de Est.</td><td class="text-right text-red">R$ 1.468</td><td class="text-right text-muted">R$ 1.500</td></tr>
+            <tr class="tr-hover"><td>Contas</td><td class="text-right text-red">R$ 1.753</td><td class="text-right text-muted">R$ 4.776</td></tr>
+            <tr class="tr-hover"><td>Arranjos Domést.</td><td class="text-right">R$ 917</td><td class="text-right text-muted">R$ 2.390</td></tr>
+            <tr class="tr-hover"><td>Automóvel</td><td class="text-right">R$ 31</td><td class="text-right text-muted">R$ 350</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== DESPESAS ===================== -->
+<div class="page" id="page-despesas">
+
+  <div class="grid-4">
+    <div class="card">
+      <div class="card-title">Total Despesas (Histórico)</div>
+      <div class="kpi-value">R$ 2.475.456</div>
+      <div class="kpi-sub">Desde 2016 · 107 categorias</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Maior Categoria (Hist.)</div>
+      <div class="kpi-value">R$ 795.744</div>
+      <div class="kpi-sub">Impostos (IR + INSS + IPTU + IPVA)</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Saúde e Fitness (Hist.)</div>
+      <div class="kpi-value">R$ 223.402</div>
+      <div class="kpi-sub">Academia, Médicos, Dentista, Medicamentos</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Viagens (Hist.)</div>
+      <div class="kpi-value">R$ 131.483</div>
+      <div class="kpi-sub">Acomodação + Alimentação + Transporte</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Despesas Históricas por Categoria</div>
+      <div class="chart-wrap" style="height:300px">
+        <canvas id="chartHistCateg"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Subcategorias — Saúde e Fitness</div>
+      <div style="margin-bottom:16px">
+        <div class="progress-row"><div class="progress-label">Dentista e Odonto</div><div class="progress-track"><div class="progress-fill" style="width:33%;background:#4f8ef7"></div></div><div class="progress-val">R$ 74.719</div><div class="progress-pct" style="color:#4f8ef7">33,5%</div></div>
+        <div class="progress-row"><div class="progress-label">Medicamentos</div><div class="progress-track"><div class="progress-fill" style="width:20.5%;background:#7c6af7"></div></div><div class="progress-val">R$ 45.881</div><div class="progress-pct" style="color:#7c6af7">20,5%</div></div>
+        <div class="progress-row"><div class="progress-label">Médicos e Assist.</div><div class="progress-track"><div class="progress-fill" style="width:20%;background:#34d399"></div></div><div class="progress-val">R$ 44.623</div><div class="progress-pct" style="color:#34d399">20,0%</div></div>
+        <div class="progress-row"><div class="progress-label">Nutricionistas etc.</div><div class="progress-track"><div class="progress-fill" style="width:15.2%;background:#fbbf24"></div></div><div class="progress-val">R$ 33.941</div><div class="progress-pct" style="color:#fbbf24">15,2%</div></div>
+        <div class="progress-row"><div class="progress-label">Academia</div><div class="progress-track"><div class="progress-fill" style="width:9.5%;background:#fb923c"></div></div><div class="progress-val">R$ 21.310</div><div class="progress-pct" style="color:#fb923c">9,5%</div></div>
+        <div class="progress-row"><div class="progress-label">Materiais Esportivos</div><div class="progress-track"><div class="progress-fill" style="width:1.3%;background:#f87171"></div></div><div class="progress-val">R$ 2.927</div><div class="progress-pct" style="color:#f87171">1,3%</div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="card-title">Subcategorias — Contas</div>
+      <div class="progress-row"><div class="progress-label">Apartamento</div><div class="progress-track"><div class="progress-fill" style="width:56%;background:#4f8ef7"></div></div><div class="progress-val">R$ 246.521</div><div class="progress-pct" style="color:#4f8ef7">56,3%</div></div>
+      <div class="progress-row"><div class="progress-label">Restaurantes</div><div class="progress-track"><div class="progress-fill" style="width:11.9%;background:#34d399"></div></div><div class="progress-val">R$ 51.995</div><div class="progress-pct" style="color:#34d399">11,9%</div></div>
+      <div class="progress-row"><div class="progress-label">Supermercado</div><div class="progress-track"><div class="progress-fill" style="width:11.6%;background:#fbbf24"></div></div><div class="progress-val">R$ 50.594</div><div class="progress-pct" style="color:#fbbf24">11,6%</div></div>
+      <div class="progress-row"><div class="progress-label">TV a Cabo</div><div class="progress-track"><div class="progress-fill" style="width:4.9%;background:#a78bfa"></div></div><div class="progress-val">R$ 21.406</div><div class="progress-pct" style="color:#a78bfa">4,9%</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Receitas Históricas</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;">
+      <div><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Salário Bruto</div><div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--green)">R$ 2.857.563</div></div>
+      <div><div style="font-size:11px;color:var(--muted);margin-bottom:6px">13° Salário</div><div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--green)">R$ 192.555</div></div>
+      <div><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Bônus</div><div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--green)">R$ 206.376</div></div>
+      <div><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Outros Créditos</div><div style="font-family:'DM Serif Display',serif;font-size:24px;color:var(--green)">R$ 376.647</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== NAVIGATION =====================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ===================== CHART DEFAULTS =====================
+Chart.defaults.color = '#6b7280';
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+Chart.defaults.font.size = 11;
+
+const months = ['Abr/25','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez','Jan/26','Fev','Mar','Abr/26'];
+
+// NET WORTH CHART
+new Chart(document.getElementById('chartNetWorth'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      {
+        label: 'Ativos', data: [1980000,2020000,2050000,2080000,2100000,2150000,2180000,2200000,2220000,2240000,2250000,2255000,2255931],
+        borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.08)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4
+      },
+      {
+        label: 'Patrimônio Líquido', data: [1800000,1850000,1880000,1920000,1960000,2000000,2020000,2040000,2060000,2070000,2080000,2090000,2100491],
+        borderColor: '#4f8ef7', backgroundColor: 'rgba(79,142,247,0.08)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4
+      },
+      {
+        label: 'Passivos', data: [-180000,-170000,-170000,-160000,-160000,-150000,-160000,-160000,-160000,-170000,-170000,-165000,-155440],
+        borderColor: '#f87171', backgroundColor: 'rgba(248,113,113,0.05)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false }, ticks: { callback: v => 'R$' + (v/1000000).toFixed(1) + 'M' } }
+    }
+  }
+});
+
+// INCOME/EXPENSE CHART
+new Chart(document.getElementById('chartIncomeExpense'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Receita', data: [93083,29140,23905,68804,6198,0,0,10,0,0,0,0,0], backgroundColor: 'rgba(52,211,153,0.7)', borderRadius: 4 },
+      { label: 'Despesa', data: [-49172,-27394,-25737,-10186,0,0,0,0,0,0,0,0,0], backgroundColor: 'rgba(248,113,113,0.7)', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } } },
+    scales: {
+      x: { grid: { display: false }, border: { display: false } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false }, ticks: { callback: v => 'R$'+(Math.abs(v)/1000).toFixed(0)+'k' } }
+    }
+  }
+});
+
+// CATEGORY DONUT
+new Chart(document.getElementById('chartCateg'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Contas','Impostos','Saúde','Viagens','Arranjos Dom.','Outras','Animais','Restante'],
+    datasets: [{ data: [42.23,16.84,9.05,6.99,5.84,5.47,4.20,9.38], backgroundColor: ['#4f8ef7','#fbbf24','#a78bfa','#34d399','#fb923c','#f87171','#38bdf8','#6b7280'], borderWidth: 0 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, cutout: '72%' }
+});
+
+// ALLOCATION DONUT
+new Chart(document.getElementById('chartAlloc'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Carteira Santander','Carteira XP','Carteira Daycoval','Aplicações'],
+    datasets: [{ data: [45.5, 28.6, 25.3, 0.6], backgroundColor: ['#4f8ef7','#7c6af7','#34d399','#fbbf24'], borderWidth: 0 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } }, cutout: '65%' }
+});
+
+// BROKERAGE EVOLUTION
+new Chart(document.getElementById('chartBrokerage'), {
+  type: 'line',
+  data: {
+    labels: ['2017','2018','2019','2020','2021','2022','2023','2024','2025','2026'],
+    datasets: [{
+      label: 'Valor de Mercado', data: [320000,190000,200000,230000,270000,280000,300000,360000,620000,455131],
+      borderColor: '#4f8ef7', backgroundColor: 'rgba(79,142,247,0.12)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#4f8ef7'
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false }, ticks: { callback: v => 'R$'+(v/1000).toFixed(0)+'k' } }
+    }
+  }
+});
+
+// BUDGET MONTHS
+new Chart(document.getElementById('chartBudgetMonths'), {
+  type: 'bar',
+  data: {
+    labels: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
+    datasets: [
+      { label: 'Real', data: [49172,27394,25737,10186,0,0,0,0,0,0,0,0], backgroundColor: 'rgba(79,142,247,0.8)', borderRadius: 4 },
+      { label: 'Orçado', data: [36566,24372,23336,20250,17109,18949,18599,16381,15873,16055,15834,15284], backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 12 } } },
+    scales: {
+      x: { grid: { display: false }, border: { display: false } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false }, ticks: { callback: v => 'R$'+(v/1000).toFixed(0)+'k' } }
+    }
+  }
+});
+
+// HISTORICAL CATEGORIES
+new Chart(document.getElementById('chartHistCateg'), {
+  type: 'bar',
+  indexAxis: 'y',
+  data: {
+    labels: ['Impostos','Contas','Saúde e Fitness','Arranjos Dom.','Viagens','Seguros','Vestuário','Animais Est.','Automóvel','Hobbies e Lazer','Aluguel','Educação','Utilitários'],
+    datasets: [{
+      data: [795744,437685,223402,174966,131483,59221,31314,68509,48906,19976,165007,14265,27380],
+      backgroundColor: ['#fbbf24','#4f8ef7','#a78bfa','#fb923c','#34d399','#38bdf8','#f87171','#6366f1','#e879f9','#14b8a6','#7c6af7','#84cc16','#f472b6'],
+      borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false }, ticks: { callback: v => 'R$'+(v/1000).toFixed(0)+'k' } },
+      y: { grid: { display: false }, border: { display: false } }
+    }
+  }
+});
+</script>
+</body>
+</html>
