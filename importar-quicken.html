@@ -423,6 +423,8 @@ async function startImport() {
 
     if(onlyDed && !isDed) { skipped++; continue; }
 
+    // Store quicken original info in memo
+    const memoStr = [t.memo, t.rawCat ? '[' + t.rawCat + ']' : '', t.account ? '(' + t.account + ')' : ''].filter(Boolean).join(' ').trim();
     mapped.push({
       id: baseId++,
       type,
@@ -432,12 +434,9 @@ async function startImport() {
       account: mapAccount(t.account),
       category: cat,
       subcategory: null,
-      memo: t.memo || ('Quicken: ' + t.rawCat),
+      memo: memoStr || null,
       is_deductible: isDed,
       receipt_status: 'na',
-      from_quicken: true,
-      quicken_account: t.account,
-      quicken_category: t.rawCat,
     });
   }
 
