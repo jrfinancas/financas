@@ -183,69 +183,49 @@
   }
 
 /* LOGIN */
-.login-overlay {
-  position: fixed; inset: 0; z-index: 9999;
-  background: #0d0f14;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 40px 24px;
-  padding-top: calc(60px + env(safe-area-inset-top, 0px));
-}
-.login-logo { font-family: 'DM Serif Display', serif; font-size: 38px; letter-spacing: -1px; margin-bottom: 8px; }
-.login-logo span { color: #4f8ef7; }
-.login-sub { font-size: 13px; color: #6b7280; margin-bottom: 48px; }
-.login-box { width: 100%; max-width: 340px; }
-.login-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; color: #6b7280; margin-bottom: 8px; display: block; }
-.login-input {
-  width: 100%; background: #13161e; border: 1px solid #252a38;
-  border-radius: 12px; padding: 14px 16px; color: #e8eaf0;
-  font-family: 'DM Sans', sans-serif; font-size: 20px;
-  outline: none; text-align: center; letter-spacing: 4px;
-  margin-bottom: 12px; transition: border-color 0.2s;
-  -webkit-appearance: none;
-}
-.login-input:focus { border-color: #4f8ef7; }
-.login-input.error { border-color: #f87171; animation: shake 0.3s ease; }
-@keyframes shake {
-  0%,100%{transform:translateX(0)}
-  25%{transform:translateX(-8px)}
-  75%{transform:translateX(8px)}
-}
-.login-btn {
-  width: 100%; padding: 15px; background: #4f8ef7; color: white;
-  border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif;
-  font-size: 16px; font-weight: 700; cursor: pointer; transition: all 0.2s;
-}
-.login-btn:hover { background: #3b7de0; }
-.login-btn:active { transform: scale(0.98); }
-.login-error { color: #f87171; font-size: 13px; text-align: center; margin-top: 10px; min-height: 20px; }
-.login-hint { color: #374151; font-size: 11px; text-align: center; margin-top: 32px; }
+.login-overlay{position:fixed;inset:0;z-index:9999;background:#0d0f14;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px}
+.login-logo{font-family:'DM Serif Display',serif;font-size:38px;letter-spacing:-1px;margin-bottom:8px}.login-logo span{color:#4f8ef7}
+.login-sub{font-size:13px;color:#6b7280;margin-bottom:48px}
+.login-box{width:100%;max-width:340px}
+.login-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:8px;display:block}
+.login-input{width:100%;background:#13161e;border:1px solid #252a38;border-radius:12px;padding:14px 16px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:20px;outline:none;text-align:center;letter-spacing:4px;margin-bottom:12px;-webkit-appearance:none}
+.login-input:focus{border-color:#4f8ef7}
+.login-input.error{border-color:#f87171;animation:lshake 0.3s ease}
+@keyframes lshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.login-btn{width:100%;padding:15px;background:#4f8ef7;color:white;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:12px}
+.login-error{color:#f87171;font-size:13px;text-align:center;min-height:20px;margin-bottom:8px}
+.login-hint{color:#374151;font-size:11px;text-align:center}
+.login-reset-btn{width:100%;padding:10px;background:none;border:1px solid #252a38;border-radius:10px;color:#6b7280;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;margin-top:4px}
+.reset-panel{display:none;margin-top:12px;background:#13161e;border:1px solid #252a38;border-radius:12px;padding:16px}
+.reset-panel.show{display:block}
+.reset-panel p{font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5}
+.reset-input{width:100%;background:#1a1e29;border:1px solid #252a38;border-radius:8px;padding:11px 14px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:10px;-webkit-appearance:none}
+.reset-btn{width:100%;padding:11px;background:#4f8ef7;color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.reset-msg{font-size:12px;text-align:center;margin-top:8px;min-height:16px}
 
 </style>
 </head>
 <body>
 
-  <!-- LOGIN OVERLAY -->
   <div class="login-overlay" id="loginOverlay" style="display:none">
     <div class="login-logo">Finanças <span>JR</span></div>
     <div class="login-sub">Gestão Financeira Pessoal</div>
     <div class="login-box">
       <label class="login-label">PIN de acesso</label>
-      <input
-        type="password"
-        inputmode="numeric"
-        pattern="[0-9]*"
-        maxlength="8"
-        class="login-input"
-        id="loginPin"
-        placeholder="••••"
-        onkeydown="handleLoginKeydown(event)"
-        autocomplete="current-password"
-      >
-      <button class="login-btn" onclick="checkLogin()">Entrar</button>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+        class="login-input" id="loginPin" placeholder="••••"
+        onkeydown="if(event.key==='Enter')checkLogin()" autocomplete="current-password">
       <div class="login-error" id="loginError"></div>
+      <button class="login-btn" onclick="checkLogin()">Entrar</button>
+      <button class="login-reset-btn" onclick="toggleResetPanel()">🔑 Esqueci meu PIN</button>
+      <div class="reset-panel" id="resetPanel">
+        <p>Digite seu email para receber um link de redefinição. Funciona apenas com o email cadastrado no app.</p>
+        <input type="email" class="reset-input" id="resetEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')sendResetEmail()">
+        <button class="reset-btn" onclick="sendResetEmail()" id="resetBtn">Enviar link por email</button>
+        <div class="reset-msg" id="resetMsg"></div>
+      </div>
     </div>
-    <div class="login-hint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+    <div class="login-hint" id="loginHint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
   </div>
 
 
@@ -855,104 +835,109 @@ new Chart(document.getElementById('chartHistCateg'), {
 });
 
 // ============================================================
-// LOGIN / AUTH
+// AUTH — unified login system
 // ============================================================
-const AUTH_KEY = 'jr_auth';
-const SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
+const _AUTH_KEY = 'jr_auth_v2';
+const _SESSION_DURATION = 8 * 60 * 60 * 1000;
 
-// Hash function (simple but effective for this use case)
 async function hashPin(pin) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pin + 'jrfinancas_salt_2026');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Default PIN hash (1979) — change via settings
-const DEFAULT_HASH = 'a4f8c2e3b1d7f6a5c9e2b4d8f1a3c7e5b2d6f4a8c1e9b3d5f7a2c4e6b8d1f3'; 
-
-function getStoredHash() {
-  try { return localStorage.getItem('jr_pin_hash') || null; } catch(e) { return null; }
+  try {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(pin + 'jrfinancas_2026'));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  } catch(e) { return pin + '_jrfinancas_2026'; }
 }
 
 function isAuthenticated() {
   try {
-    const session = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
-    if (!session) return false;
-    if (Date.now() - session.time > SESSION_DURATION) {
-      localStorage.removeItem(AUTH_KEY);
-      return false;
-    }
+    const s = JSON.parse(localStorage.getItem(_AUTH_KEY)||'null');
+    if(!s) return false;
+    if(Date.now()-s.time > _SESSION_DURATION) { localStorage.removeItem(_AUTH_KEY); return false; }
     return true;
   } catch(e) { return false; }
 }
 
-function setAuthenticated() {
-  try { localStorage.setItem(AUTH_KEY, JSON.stringify({ time: Date.now() })); } catch(e) {}
-}
-
-function showLoginScreen() {
-  const overlay = document.getElementById('loginOverlay');
-  if (overlay) overlay.style.display = 'flex';
-  const input = document.getElementById('loginPin');
-  if (input) setTimeout(() => input.focus(), 100);
-}
-
-function hideLoginScreen() {
-  const overlay = document.getElementById('loginOverlay');
-  if (overlay) overlay.style.display = 'none';
-}
-
 async function checkLogin() {
   const pin = document.getElementById('loginPin').value.trim();
-  const errorEl = document.getElementById('loginError');
-  const input = document.getElementById('loginPin');
-
-  if (!pin) { errorEl.textContent = 'Digite o PIN'; return; }
-
+  const errEl = document.getElementById('loginError');
+  const inp = document.getElementById('loginPin');
+  if(!pin) { errEl.textContent='Digite o PIN'; return; }
   const hash = await hashPin(pin);
-  const storedHash = getStoredHash();
-
-  // First time: accept pin and store hash
-  const isFirstTime = !storedHash;
-  const isValid = isFirstTime || hash === storedHash;
-
-  if (isValid) {
-    if (isFirstTime) {
-      localStorage.setItem('jr_pin_hash', hash);
-    }
-    setAuthenticated();
-    hideLoginScreen();
-    errorEl.textContent = '';
-    input.value = '';
+  const stored = localStorage.getItem('jr_pin_hash');
+  if(!stored) {
+    localStorage.setItem('jr_pin_hash', hash);
+    localStorage.setItem(_AUTH_KEY, JSON.stringify({time:Date.now()}));
+    document.getElementById('loginOverlay').style.display='none';
+    startApp();
+  } else if(hash === stored) {
+    localStorage.setItem(_AUTH_KEY, JSON.stringify({time:Date.now()}));
+    document.getElementById('loginOverlay').style.display='none';
+    startApp();
   } else {
-    input.classList.add('error');
-    errorEl.textContent = 'PIN incorreto. Tente novamente.';
-    input.value = '';
-    setTimeout(() => input.classList.remove('error'), 400);
+    inp.classList.add('error'); errEl.textContent='PIN incorreto.'; inp.value='';
+    setTimeout(()=>inp.classList.remove('error'),400);
   }
 }
 
-function handleLoginKeydown(e) {
-  if (e.key === 'Enter') checkLogin();
+function toggleResetPanel() {
+  const panel = document.getElementById('resetPanel');
+  panel.classList.toggle('show');
+  if(panel.classList.contains('show')) setTimeout(()=>document.getElementById('resetEmail').focus(),100);
 }
 
-// Check on load
+async function sendResetEmail() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const msg = document.getElementById('resetMsg');
+  const btn = document.getElementById('resetBtn');
+  if(!email || !email.includes('@')) { msg.style.color='#f87171'; msg.textContent='Digite um email válido.'; return; }
+  btn.disabled=true; btn.textContent='Enviando...';
+  try {
+    const res = await fetch('https://tggtktjblunlbsjbhlls.supabase.co/auth/v1/magiclink', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o'},
+      body: JSON.stringify({email, options:{redirectTo: window.location.href + '?reset_pin=1'}})
+    });
+    msg.style.color='#34d399';
+    msg.textContent='✓ Link enviado! Verifique seu email para redefinir o PIN.';
+    document.getElementById('resetEmail').value='';
+  } catch(err) {
+    msg.style.color='#f87171'; msg.textContent='✕ Erro ao enviar. Tente novamente.';
+  }
+  btn.disabled=false; btn.textContent='Enviar link por email';
+}
+
+function checkResetFlow() {
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('reset_pin')==='1' || window.location.hash.includes('access_token')) {
+    localStorage.removeItem('jr_pin_hash');
+    localStorage.removeItem(_AUTH_KEY);
+    document.getElementById('loginOverlay').style.display='flex';
+    document.getElementById('loginHint').textContent='Email confirmado! Digite um novo PIN para cadastrar.';
+    window.history.replaceState({},'',window.location.pathname);
+    return true;
+  }
+  return false;
+}
+
 function checkAuth() {
-  if (!isAuthenticated()) {
-    showLoginScreen();
-    return false;
+  if(checkResetFlow()) return;
+  if(!isAuthenticated()) {
+    document.getElementById('loginOverlay').style.display='flex';
+    setTimeout(()=>{try{document.getElementById('loginPin').focus();}catch(e){}},100);
+  } else {
+    startApp();
   }
-  return true;
 }
 
-// Auth check
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", checkAuth);
-} else {
-  checkAuth();
+function startApp() {
+  // Dashboard specific init
+  if(typeof initCharts==='function') initCharts();
+  if(typeof renderDashboard==='function') renderDashboard();
 }
+
+
+// Call checkAuth on load
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',checkAuth);}else{checkAuth();}
 </script>
 </body>
 </html>

@@ -14,21 +14,6 @@
 html,body{height:100%}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;min-height:-webkit-fill-available;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom)}
 
-/* LOGIN */
-.login-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;padding-top:calc(60px + env(safe-area-inset-top,0px))}
-.login-logo{font-family:'DM Serif Display',serif;font-size:38px;letter-spacing:-1px;margin-bottom:8px}.login-logo span{color:var(--accent)}
-.login-sub{font-size:13px;color:var(--muted);margin-bottom:48px}
-.login-box{width:100%;max-width:340px}
-.login-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:8px;display:block}
-.login-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:20px;outline:none;text-align:center;letter-spacing:4px;margin-bottom:12px;transition:border-color 0.2s;-webkit-appearance:none}
-.login-input:focus{border-color:var(--accent)}
-.login-input.error{border-color:var(--red);animation:shake 0.3s ease}
-@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-.login-btn{width:100%;padding:15px;background:var(--accent);color:white;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s}
-.login-btn:active{transform:scale(0.98)}
-.login-error{color:var(--red);font-size:13px;text-align:center;margin-top:10px;min-height:20px}
-.login-hint{color:#374151;font-size:11px;text-align:center;margin-top:32px}
-
 /* HEADER */
 header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-0.5px}.logo span{color:var(--accent)}
@@ -229,14 +214,58 @@ nav a:hover,nav a.active{background:var(--surface2);color:var(--accent)}
 /* TOAST */
 .toast{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:#0d0f14;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all 0.3s;z-index:1000;white-space:nowrap;max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* LOGIN */
+.login-overlay{position:fixed;inset:0;z-index:9999;background:var(--bg,#0d0f14);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;padding-top:calc(60px + env(safe-area-inset-top,0px))}
+.login-logo{font-family:'DM Serif Display',serif;font-size:38px;letter-spacing:-1px;margin-bottom:8px}.login-logo span{color:#4f8ef7}
+.login-sub{font-size:13px;color:#6b7280;margin-bottom:48px}
+.login-box{width:100%;max-width:340px}
+.login-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.7px;color:#6b7280;margin-bottom:8px;display:block}
+.login-input{width:100%;background:#13161e;border:1px solid #252a38;border-radius:12px;padding:14px 16px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:20px;outline:none;text-align:center;letter-spacing:4px;margin-bottom:12px;transition:border-color 0.2s;-webkit-appearance:none}
+.login-input:focus{border-color:#4f8ef7}
+.login-input.error{border-color:#f87171;animation:lshake 0.3s ease}
+@keyframes lshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.login-btn{width:100%;padding:15px;background:#4f8ef7;color:white;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s;margin-bottom:12px}
+.login-btn:active{transform:scale(0.98)}
+.login-error{color:#f87171;font-size:13px;text-align:center;min-height:20px;margin-bottom:8px}
+.login-hint{color:#374151;font-size:11px;text-align:center;margin-top:16px}
+.login-reset-btn{width:100%;padding:10px;background:none;border:1px solid #252a38;border-radius:10px;color:#6b7280;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.login-reset-btn:hover{border-color:#4f8ef7;color:#4f8ef7}
+.reset-panel{display:none;margin-top:12px;background:#13161e;border:1px solid #252a38;border-radius:12px;padding:16px}
+.reset-panel.show{display:block}
+.reset-panel p{font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.5}
+.reset-input{width:100%;background:#1a1e29;border:1px solid #252a38;border-radius:8px;padding:11px 14px;color:#e8eaf0;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;margin-bottom:10px;transition:border-color 0.2s;-webkit-appearance:none}
+.reset-input:focus{border-color:#4f8ef7}
+.reset-btn{width:100%;padding:11px;background:#4f8ef7;color:white;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+.reset-success{color:#34d399;font-size:12px;text-align:center;margin-top:8px}
+
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
-<div class="login-overlay" id="loginOverlay" style="display:none">
-  <div class="login-logo">Finanças <span>JR</span></div>
-  <div class="login-sub">Gestão Financeira Pessoal</div>
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay" style="display:none">
+    <div class="login-logo">Finanças <span>JR</span></div>
+    <div class="login-sub">Gestão Financeira Pessoal</div>
+    <div class="login-box">
+      <label class="login-label">PIN de acesso</label>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8"
+        class="login-input" id="loginPin" placeholder="••••"
+        onkeydown="if(event.key==='Enter')checkLogin()" autocomplete="current-password">
+      <div class="login-error" id="loginError"></div>
+      <button class="login-btn" onclick="checkLogin()">Entrar</button>
+      <button class="login-reset-btn" onclick="toggleResetPanel()">🔑 Esqueci meu PIN</button>
+      <div class="reset-panel" id="resetPanel">
+        <p>Digite seu email para receber um link de redefinição de PIN. Só funciona com o email cadastrado.</p>
+        <input type="email" class="reset-input" id="resetEmail" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')sendResetEmail()">
+        <button class="reset-btn" onclick="sendResetEmail()">Enviar link por email</button>
+        <div class="reset-success" id="resetSuccess"></div>
+      </div>
+    </div>
+    <div class="login-hint" id="loginHint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+
+<div class="login-sub">Gestão Financeira Pessoal</div>
   <div class="login-box">
     <label class="login-label">PIN de acesso</label>
     <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="login-input" id="loginPin" placeholder="••••" onkeydown="if(event.key==='Enter')checkLogin()" autocomplete="current-password">
@@ -605,6 +634,123 @@ const SB_HEADERS = {
   'Prefer': 'return=representation'
 };
 
+
+// ============================================================
+// LOGIN / AUTH
+// ============================================================
+const AUTH_KEY = 'jr_auth_v2';
+const SESSION_DURATION = 8 * 60 * 60 * 1000;
+const _SB_URL = 'https://tggtktjblunlbsjbhlls.supabase.co';
+const _SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+
+async function hashPin(pin) {
+  try {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(pin + 'jrfinancas_2026'));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  } catch(e) { return pin + '_jrfinancas_2026_fallback'; }
+}
+
+function isAuthenticated() {
+  try {
+    const s = JSON.parse(localStorage.getItem(AUTH_KEY)||'null');
+    if(!s) return false;
+    if(Date.now()-s.time > SESSION_DURATION) { localStorage.removeItem(AUTH_KEY); return false; }
+    return true;
+  } catch(e) { return false; }
+}
+
+async function checkLogin() {
+  const pin = document.getElementById('loginPin').value.trim();
+  const errEl = document.getElementById('loginError');
+  const inp = document.getElementById('loginPin');
+  if(!pin) { errEl.textContent='Digite o PIN'; return; }
+  const hash = await hashPin(pin);
+  const stored = localStorage.getItem('jr_pin_hash');
+  if(!stored) {
+    localStorage.setItem('jr_pin_hash', hash);
+    localStorage.setItem(AUTH_KEY, JSON.stringify({time:Date.now()}));
+    document.getElementById('loginOverlay').style.display='none';
+    if(typeof onAppReady==='function') onAppReady();
+    else if(typeof initDashboard==='function') initDashboard();
+  } else if(hash === stored) {
+    localStorage.setItem(AUTH_KEY, JSON.stringify({time:Date.now()}));
+    document.getElementById('loginOverlay').style.display='none';
+    if(typeof onAppReady==='function') onAppReady();
+    else if(typeof initDashboard==='function') initDashboard();
+  } else {
+    inp.classList.add('error'); errEl.textContent='PIN incorreto.'; inp.value='';
+    setTimeout(()=>inp.classList.remove('error'),400);
+  }
+}
+
+function toggleResetPanel() {
+  const panel = document.getElementById('resetPanel');
+  panel.classList.toggle('show');
+  if(panel.classList.contains('show')) {
+    setTimeout(()=>document.getElementById('resetEmail').focus(), 100);
+  }
+}
+
+async function sendResetEmail() {
+  const email = document.getElementById('resetEmail').value.trim();
+  const successEl = document.getElementById('resetSuccess');
+  const resetBtn = document.querySelector('.reset-btn');
+  if(!email || !email.includes('@')) {
+    successEl.style.color='#f87171';
+    successEl.textContent='Digite um email válido.';
+    return;
+  }
+  resetBtn.disabled=true; resetBtn.textContent='Enviando...';
+  try {
+    // Send magic link via Supabase Auth
+    const res = await fetch(_SB_URL + '/auth/v1/magiclink', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': _SB_KEY },
+      body: JSON.stringify({ email, options: { redirectTo: window.location.href + '?reset_pin=1' } })
+    });
+    if(res.ok || res.status===200 || res.status===422) {
+      successEl.style.color='#34d399';
+      successEl.textContent='✓ Link enviado! Verifique seu email.';
+      document.getElementById('resetEmail').value='';
+    } else {
+      throw new Error('Email não cadastrado ou erro no servidor.');
+    }
+  } catch(err) {
+    successEl.style.color='#f87171';
+    successEl.textContent='✕ ' + err.message;
+  }
+  resetBtn.disabled=false; resetBtn.textContent='Enviar link por email';
+}
+
+// Handle magic link return (PIN reset flow)
+function checkResetFlow() {
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash;
+  if(params.get('reset_pin')==='1' || hash.includes('access_token')) {
+    // User came from reset email — clear PIN and let them set new one
+    localStorage.removeItem('jr_pin_hash');
+    localStorage.removeItem(AUTH_KEY);
+    document.getElementById('loginOverlay').style.display='flex';
+    document.getElementById('loginHint').textContent='Email confirmado! Digite um novo PIN para cadastrar.';
+    // Clean URL
+    window.history.replaceState({},'',window.location.pathname);
+    return true;
+  }
+  return false;
+}
+
+function checkAuth() {
+  if(checkResetFlow()) return;
+  if(!isAuthenticated()) {
+    document.getElementById('loginOverlay').style.display='flex';
+    setTimeout(()=>{ try{document.getElementById('loginPin').focus();}catch(e){} },100);
+  } else {
+    if(typeof onAppReady==='function') onAppReady();
+    else if(typeof initDashboard==='function') initDashboard();
+  }
+}
+
 // ============================================================
 // SUPABASE HELPERS
 // ============================================================
@@ -684,8 +830,6 @@ let fxActive = false;
 let histOffset = 0, histLimit = 30, histTotal = 0;
 let recorrentes = [];
 
-// ============================================================
-// LOGIN
 // ============================================================
 const AUTH_KEY = 'jr_auth_v2';
 const SESSION_DURATION = 8 * 60 * 60 * 1000;
