@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finanças JR · Importar Quicken</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg:#0d0f14; --surface:#13161e; --surface2:#1a1e29; --border:#252a38; --text:#e8eaf0; --muted:#6b7280; --accent:#4f8ef7; --green:#34d399; --red:#f87171; --yellow:#fbbf24; }
+body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; min-height:100vh; }
+header { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(13,15,20,.97); position:sticky; top:0; z-index:100; }
+.logo { font-family:'DM Serif Display',serif; font-size:20px; letter-spacing:-.5px; }
+.logo span { color:var(--accent); }
+nav a { text-decoration:none; color:var(--muted); padding:6px 10px; border-radius:8px; font-size:12px; font-weight:500; }
+nav a:hover { background:var(--surface2); color:var(--accent); }
+.main { max-width:800px; margin:0 auto; padding:24px 16px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px; margin-bottom:16px; }
+.card-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:16px; }
+.step { display:flex; gap:14px; margin-bottom:14px; align-items:flex-start; }
+.step-num { width:26px; height:26px; border-radius:50%; background:rgba(79,142,247,.15); color:var(--accent); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+.step-text { font-size:13px; color:var(--muted); line-height:1.5; }
+.step-text strong { color:var(--text); }
+.uzone { border:2px dashed var(--border); border-radius:12px; padding:32px; text-align:center; cursor:pointer; transition:all .3s; background:var(--surface2); }
+.uzone:hover, .uzone.drag { border-color:var(--accent); background:rgba(79,142,247,.05); }
+.uzone.has { border-color:var(--green); border-style:solid; }
+.ubig { font-size:32px; margin-bottom:8px; }
+.uprimary { font-size:14px; font-weight:600; margin-bottom:4px; }
+.usub { font-size:12px; color:var(--muted); }
+.uzone input { display:none; }
+.preview-box { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px; margin-top:12px; display:none; }
+.preview-title { font-size:12px; font-weight:600; color:var(--accent); margin-bottom:10px; }
+.preview-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.pstat { text-align:center; }
+.pstat-val { font-family:'DM Serif Display',serif; font-size:20px; }
+.pstat-lbl { font-size:10px; color:var(--muted); margin-top:2px; }
+.preview-sample { font-size:11px; color:var(--muted); }
+.preview-sample table { width:100%; border-collapse:collapse; }
+.preview-sample td, .preview-sample th { padding:5px 8px; border-bottom:1px solid rgba(255,255,255,.04); text-align:left; }
+.preview-sample th { color:var(--accent); font-size:10px; font-weight:600; }
+.btn-primary { width:100%; padding:14px; background:var(--green); color:#0d0f14; border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; cursor:pointer; transition:all .2s; }
+.btn-primary:disabled { background:var(--surface2); color:var(--muted); cursor:not-allowed; }
+.btn-sec { width:100%; padding:11px; background:none; border:1.5px solid var(--border); border-radius:10px; color:var(--muted); font-family:'DM Sans',sans-serif; font-size:13px; cursor:pointer; margin-top:8px; }
+.progress-box { display:none; margin-top:16px; }
+.prog-bar-wrap { height:8px; background:var(--surface2); border-radius:8px; overflow:hidden; margin-bottom:8px; }
+.prog-bar { height:100%; background:var(--accent); border-radius:8px; transition:width .3s; }
+.prog-text { font-size:12px; color:var(--muted); text-align:center; }
+.result-box { display:none; margin-top:16px; padding:16px; border-radius:10px; }
+.result-box.ok { background:rgba(52,211,153,.1); border:1px solid rgba(52,211,153,.2); }
+.result-box.err { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.2); }
+.result-title { font-size:14px; font-weight:700; margin-bottom:6px; }
+.result-detail { font-size:12px; color:var(--muted); line-height:1.6; }
+.cat-map { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:8px; }
+.cat-map-title { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.7px; color:var(--accent); margin-bottom:8px; }
+.cat-row { display:flex; justify-content:space-between; font-size:11px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+.cat-row:last-child { border-bottom:none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="lancamentos.html">Lançamentos</a>
+  </nav>
+</header>
+
+<div class="main">
+
+  <div class="card">
+    <div class="card-title">📥 Importar Histórico do Quicken</div>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">No Quicken, vá em <strong>Reports → Transaction Reports → Transactions by Account</strong></div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text">Em <strong>Date Range</strong> selecione <strong>All Dates</strong> · Em <strong>Accounts</strong> selecione <strong>All Accounts</strong></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">Clique em <strong>Export → Export to CSV file</strong> e salve o arquivo</div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-text">Selecione o arquivo abaixo e clique em <strong>Importar</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Arquivo CSV</div>
+    <div class="uzone" id="uzone" onclick="document.getElementById('csvFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)">
+      <input type="file" id="csvFile" accept=".csv,.txt" onchange="onFile(event)">
+      <div id="uzPh"><div class="ubig">📄</div><div class="uprimary">Clique ou arraste o CSV aqui</div><div class="usub">Quicken "Transactions by Account" · All Dates</div></div>
+      <div id="uzName" style="display:none;font-size:14px;font-weight:600;color:var(--green)"></div>
+    </div>
+    <div class="preview-box" id="previewBox">
+      <div class="preview-title">📊 Preview da importação</div>
+      <div class="preview-stats">
+        <div class="pstat"><div class="pstat-val" id="pTotal">0</div><div class="pstat-lbl">Transações</div></div>
+        <div class="pstat"><div class="pstat-val" id="pAccts">0</div><div class="pstat-lbl">Contas</div></div>
+        <div class="pstat"><div class="pstat-val" id="pYears">0</div><div class="pstat-lbl">Anos</div></div>
+      </div>
+      <div class="preview-sample">
+        <table>
+          <tr><th>Data</th><th>Conta</th><th>Fornecedor</th><th>Categoria</th><th>Valor</th></tr>
+          <tbody id="sampleRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Opções</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <input type="checkbox" id="skipExisting" checked style="width:16px;height:16px;accent-color:var(--accent)">
+      <label for="skipExisting" style="font-size:13px;cursor:pointer">Ignorar transações já importadas (evita duplicatas)</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <input type="checkbox" id="skipInvestments" checked style="width:16px;height:16px;accent-color:var(--accent)">
+      <label for="skipInvestments" style="font-size:13px;cursor:pointer">Ignorar transações de investimentos (Realized Gain/Loss, etc.)</label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="onlyDeductible" style="width:16px;height:16px;accent-color:var(--accent)">
+      <label for="onlyDeductible" style="font-size:13px;cursor:pointer">Importar apenas despesas dedutíveis no IR</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <button class="btn-primary" id="importBtn" onclick="startImport()" disabled>📥 Importar Transações</button>
+    <button class="btn-sec" onclick="window.location.href='lancamentos.html'">Cancelar</button>
+
+    <div class="progress-box" id="progressBox">
+      <div class="prog-bar-wrap"><div class="prog-bar" id="progBar" style="width:0%"></div></div>
+      <div class="prog-text" id="progText">Preparando...</div>
+    </div>
+
+    <div class="result-box" id="resultBox">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-detail" id="resultDetail"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH = { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json', 'Prefer':'return=representation' };
+
+// ============================================================
+// CATEGORY MAPPING (Quicken → Finanças JR)
+// ============================================================
+const CAT_MAP = {
+  // Income
+  'salary':          { cat:'salario',    type:'income' },
+  'salários':        { cat:'salario',    type:'income' },
+  'salario':         { cat:'salario',    type:'income' },
+  'bonus':           { cat:'bonus',      type:'income' },
+  'bônus':           { cat:'bonus',      type:'income' },
+  'dividends':       { cat:'dividendos', type:'income' },
+  'dividendos':      { cat:'dividendos', type:'income' },
+  'interest income': { cat:'dividendos', type:'income' },
+  'outros créditos': { cat:'outras-entradas', type:'income' },
+  'other income':    { cat:'outras-entradas', type:'income' },
+  'realized gain/loss': null, // skip if skipInvestments
+  // Expenses
+  'aluguel':         { cat:'aluguel',    type:'expense' },
+  'rent':            { cat:'aluguel',    type:'expense' },
+  'condomínio':      { cat:'aluguel',    type:'expense' },
+  'saúde':           { cat:'saude',      type:'expense' },
+  'health':          { cat:'saude',      type:'expense' },
+  'médicos':         { cat:'saude',      type:'expense' },
+  'dentista':        { cat:'saude',      type:'expense' },
+  'medicamentos':    { cat:'saude',      type:'expense' },
+  'academia':        { cat:'saude',      type:'expense' },
+  'plano de saúde':  { cat:'saude',      type:'expense' },
+  'educação':        { cat:'educacao',   type:'expense' },
+  'education':       { cat:'educacao',   type:'expense' },
+  'automóvel':       { cat:'automovel',  type:'expense' },
+  'auto':            { cat:'automovel',  type:'expense' },
+  'combustível':     { cat:'automovel',  type:'expense' },
+  'fuel':            { cat:'automovel',  type:'expense' },
+  'estacionamento':  { cat:'automovel',  type:'expense' },
+  'seguro auto':     { cat:'seguros',    type:'expense' },
+  'seguros':         { cat:'seguros',    type:'expense' },
+  'insurance':       { cat:'seguros',    type:'expense' },
+  'supermercado':    { cat:'contas',     type:'expense' },
+  'restaurantes':    { cat:'contas',     type:'expense' },
+  'alimentação':     { cat:'contas',     type:'expense' },
+  'food':            { cat:'contas',     type:'expense' },
+  'internet':        { cat:'utilitarios', type:'expense' },
+  'telefone':        { cat:'utilitarios', type:'expense' },
+  'utilities':       { cat:'utilitarios', type:'expense' },
+  'luz':             { cat:'utilitarios', type:'expense' },
+  'água':            { cat:'utilitarios', type:'expense' },
+  'gás':             { cat:'utilitarios', type:'expense' },
+  'tv a cabo':       { cat:'utilitarios', type:'expense' },
+  'viagens':         { cat:'viagens',    type:'expense' },
+  'travel':          { cat:'viagens',    type:'expense' },
+  'vestuário':       { cat:'vestuario',  type:'expense' },
+  'clothing':        { cat:'vestuario',  type:'expense' },
+  'impostos':        { cat:'impostos',   type:'expense' },
+  'taxes':           { cat:'impostos',   type:'expense' },
+  'ir (folha)':      { cat:'impostos',   type:'expense' },
+  'inss (folha)':    { cat:'impostos',   type:'expense' },
+  'outros impostos': { cat:'impostos',   type:'expense' },
+  'juros':           { cat:'juros',      type:'expense' },
+  'interest':        { cat:'juros',      type:'expense' },
+  'animais':         { cat:'animais',    type:'expense' },
+  'pets':            { cat:'animais',    type:'expense' },
+  'doações':         { cat:'doacoes',    type:'expense' },
+  'donations':       { cat:'doacoes',    type:'expense' },
+  'hobbies':         { cat:'hobbies',    type:'expense' },
+  'entertainment':   { cat:'hobbies',    type:'expense' },
+  'taxas bancárias': { cat:'taxas-bancarias', type:'expense' },
+  'bank fees':       { cat:'taxas-bancarias', type:'expense' },
+  'arranjos':        { cat:'arranjos',   type:'expense' },
+  'manutenção':      { cat:'arranjos',   type:'expense' },
+};
+
+const DEDUCTIBLE = new Set(['saude','educacao','seguros','impostos','salario','bonus','dividendos','outras-entradas']);
+const INCOME_CATS = new Set(['salario','bonus','dividendos','outras-entradas']);
+const SKIP_CATS = new Set(['realized gain/loss','unrealized gain/loss','market adjustment','portfolio value']);
+
+const ACCT_MAP = {
+  'santander':      'santander-cc',
+  'visa':           'santander-unique-visa',
+  'mastercard':     'santander-unique-master',
+  'unique visa':    'santander-unique-visa',
+  'unique master':  'santander-unique-master',
+  'porto':          'porto-visa',
+  'wise':           'wise',
+  'xp':             'xp',
+  'daycoval':       'daycoval',
+  'aplicações':     'xp',
+  'investimentos':  'xp',
+};
+
+// ============================================================
+// PARSE CSV
+// ============================================================
+let parsedTxs = [];
+
+function mapCategory(rawCat) {
+  if(!rawCat) return { cat:'outras-despesas', type:'expense' };
+  const lc = rawCat.toLowerCase().trim();
+  // Direct match
+  if(CAT_MAP[lc] !== undefined) return CAT_MAP[lc];
+  // Partial match
+  for(const [k,v] of Object.entries(CAT_MAP)) {
+    if(lc.includes(k) || k.includes(lc)) return v;
+  }
+  // Fallback by keyword
+  if(lc.includes('crédit')||lc.includes('receita')||lc.includes('income')||lc.includes('ganho')) return {cat:'outras-entradas',type:'income'};
+  return { cat:'outras-despesas', type:'expense' };
+}
+
+function mapAccount(acctName) {
+  if(!acctName) return 'santander-cc';
+  const lc = acctName.toLowerCase();
+  for(const [k,v] of Object.entries(ACCT_MAP)) {
+    if(lc.includes(k)) return v;
+  }
+  return 'santander-cc';
+}
+
+function parseDate(d) {
+  // Format: DD/MM/YY or DD/MM/YYYY
+  if(!d) return null;
+  const parts = d.trim().split('/');
+  if(parts.length !== 3) return null;
+  let [day, month, year] = parts;
+  if(year.length === 2) year = parseInt(year) > 50 ? '19'+year : '20'+year;
+  return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')}`;
+}
+
+function parseAmount(a) {
+  if(!a) return 0;
+  // Remove dots (thousands) and replace comma with dot (decimal)
+  const clean = a.trim().replace(/\./g,'').replace(',','.');
+  return Math.abs(parseFloat(clean)) || 0;
+}
+
+function parseCSV(text) {
+  const lines = text.split('\n');
+  const txs = [];
+  let currentAccount = '';
+  let headerFound = false;
+
+  for(let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if(!line) continue;
+
+    // Detect account header lines: "AccountName",,,,,
+    if(line.startsWith('"') && !line.includes('Date') && !line.includes('Payee')) {
+      const m = line.match(/^"([^"]+)"/);
+      if(m && !line.includes(',Date,') && !line.includes(',Payee,')) {
+        // Check if it looks like a section header (account name or category)
+        const candidate = m[1].trim();
+        if(!candidate.includes('Transactions') && !candidate.includes('Category') && !candidate.includes('Date')) {
+          currentAccount = candidate;
+          continue;
+        }
+      }
+    }
+
+    // Parse data rows: ,,DD/MM/YY,Payee,Category,Amount,Memo
+    const cols = parseCSVLine(line);
+    if(cols.length < 6) continue;
+
+    // Data rows have empty first col and date in col 2 or 3
+    let dateStr='', payee='', category='', amountStr='', memo='';
+
+    // Format: "Account",,Date,Payee,Category,Amount,Memo
+    // Data rows: ,,DD/MM/YY,Payee,Cat,Amount,Memo
+    if(cols[0]===''&&cols[1]===''&&cols[2]&&cols[2].match(/^\d{2}\/\d{2}\/\d{2}/)) {
+      dateStr=cols[2]; payee=cols[3]; category=cols[4]; amountStr=cols[5]; memo=cols[6]||'';
+    }
+    // Format with account in col 1: ,DD/MM/YY,...
+    else if(cols[0]===''&&cols[1]&&cols[1].match(/^\d{2}\/\d{2}\/\d{2}/)) {
+      dateStr=cols[1]; payee=cols[2]; category=cols[3]; amountStr=cols[4]; memo=cols[5]||'';
+    }
+    else continue;
+
+    const date = parseDate(dateStr);
+    if(!date) continue;
+    const amount = parseAmount(amountStr);
+    if(!amount) continue;
+
+    txs.push({ date, payee:payee.trim(), rawCat:category.trim(), amountStr:amountStr.trim(), amount, memo:memo.trim(), account:currentAccount });
+  }
+  return txs;
+}
+
+function parseCSVLine(line) {
+  const cols = []; let cur = ''; let inQ = false;
+  for(let i=0;i<line.length;i++) {
+    const c=line[i];
+    if(c==='"'){inQ=!inQ;}
+    else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+// ============================================================
+// FILE HANDLING
+// ============================================================
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uzone').classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f) processFile(f);
+}
+
+function onFile(e) { if(e.target.files[0]) processFile(e.target.files[0]); }
+
+function processFile(f) {
+  const r=new FileReader();
+  r.onload=ev=>{
+    const text=ev.target.result;
+    parsedTxs=parseCSV(text);
+    showPreview(f.name, parsedTxs);
+  };
+  r.readAsText(f,'utf-8');
+}
+
+function showPreview(name, txs) {
+  document.getElementById('uzone').classList.add('has');
+  document.getElementById('uzPh').style.display='none';
+  document.getElementById('uzName').style.display='block';
+  document.getElementById('uzName').textContent='✓ '+name+' ('+txs.length.toLocaleString()+' linhas lidas)';
+
+  const accts=new Set(txs.map(t=>t.account)).size;
+  const years=new Set(txs.map(t=>t.date.slice(0,4))).size;
+  document.getElementById('pTotal').textContent=txs.length.toLocaleString();
+  document.getElementById('pAccts').textContent=accts;
+  document.getElementById('pYears').textContent=years;
+
+  const sample=txs.slice(0,5);
+  document.getElementById('sampleRows').innerHTML=sample.map(t=>{
+    const m=mapCategory(t.rawCat);
+    return `<tr><td>${t.date}</td><td>${t.account}</td><td>${t.payee.slice(0,25)}</td><td>${t.rawCat.slice(0,20)}</td><td style="color:${m?.type==='income'?'var(--green)':'var(--red)'}">${m?.type==='income'?'+':'-'}R$ ${t.amount.toLocaleString('pt-BR',{minimumFractionDigits:2})}</td></tr>`;
+  }).join('');
+
+  document.getElementById('previewBox').style.display='block';
+  document.getElementById('importBtn').disabled=false;
+}
+
+// ============================================================
+// IMPORT
+// ============================================================
+async function startImport() {
+  if(!parsedTxs.length){alert('Selecione um arquivo CSV primeiro.');return;}
+
+  const skipInv=document.getElementById('skipInvestments').checked;
+  const onlyDed=document.getElementById('onlyDeductible').checked;
+
+  // Filter and map transactions
+  const mapped=[];
+  let skipped=0;
+  let baseId=Date.now();
+
+  for(const t of parsedTxs) {
+    const rawLc=(t.rawCat||'').toLowerCase().trim();
+
+    // Skip investment/transfer categories
+    if(skipInv && SKIP_CATS.has(rawLc)) { skipped++; continue; }
+    if(skipInv && (rawLc.includes('realized')|| rawLc.includes('unrealized')||rawLc.includes('transfer')||rawLc.includes('transferência'))) { skipped++; continue; }
+
+    const mapped_cat = mapCategory(t.rawCat);
+    if(!mapped_cat) { skipped++; continue; }
+
+    const { cat, type } = mapped_cat;
+    const isDed = DEDUCTIBLE.has(cat);
+
+    if(onlyDed && !isDed) { skipped++; continue; }
+
+    mapped.push({
+      id: baseId++,
+      type,
+      amount: t.amount,
+      date: t.date,
+      payee: t.payee || 'Importado',
+      account: mapAccount(t.account),
+      category: cat,
+      subcategory: null,
+      memo: t.memo || ('Quicken: ' + t.rawCat),
+      is_deductible: isDed,
+      receipt_status: 'na',
+      from_quicken: true,
+      quicken_account: t.account,
+      quicken_category: t.rawCat,
+    });
+  }
+
+  if(!mapped.length){
+    showResult(false,'Nenhuma transação para importar após os filtros.','Tente desmarcar as opções de filtro.');
+    return;
+  }
+
+  // Show progress
+  document.getElementById('progressBox').style.display='block';
+  document.getElementById('resultBox').style.display='none';
+  document.getElementById('importBtn').disabled=true;
+
+  // Insert in batches of 100
+  const BATCH=100;
+  let done=0; let errors=0;
+  const total=mapped.length;
+
+  for(let i=0;i<mapped.length;i+=BATCH) {
+    const batch=mapped.slice(i,i+BATCH);
+    try {
+      const r=await fetch(`${SB}/rest/v1/transactions`,{
+        method:'POST',
+        headers:{...SBH,'Prefer':'resolution=ignore-duplicates,return=representation'},
+        body:JSON.stringify(batch)
+      });
+      if(!r.ok) {
+        const err=await r.text();
+        console.error('Batch error:',err);
+        errors+=batch.length;
+      } else {
+        done+=batch.length;
+      }
+    } catch(e) {
+      errors+=batch.length;
+    }
+    const pct=Math.round((i+batch.length)/total*100);
+    document.getElementById('progBar').style.width=pct+'%';
+    document.getElementById('progText').textContent=`Importando... ${Math.min(i+BATCH,total).toLocaleString()} / ${total.toLocaleString()} (${pct}%)`;
+    // Small delay to not overwhelm
+    await new Promise(res=>setTimeout(res,50));
+  }
+
+  document.getElementById('progressBox').style.display='none';
+  showResult(errors===0||done>0,
+    errors===0?`✓ ${done.toLocaleString()} transações importadas com sucesso!`:`✓ ${done.toLocaleString()} importadas · ✕ ${errors} com erro`,
+    `Período: ${mapped[0]?.date} → ${mapped[mapped.length-1]?.date}\nIgnoradas (filtros): ${skipped.toLocaleString()}\nContas mapeadas: ${new Set(mapped.map(t=>t.account)).size}`
+  );
+  document.getElementById('importBtn').disabled=false;
+}
+
+function showResult(ok, title, detail) {
+  const box=document.getElementById('resultBox');
+  box.className='result-box '+(ok?'ok':'err');
+  box.style.display='block';
+  document.getElementById('resultTitle').textContent=title;
+  document.getElementById('resultDetail').textContent=detail;
+  box.scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
