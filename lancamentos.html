@@ -244,6 +244,7 @@ nav a:hover,nav a.active{background:var(--surface2);color:var(--accent)}
     <div class="login-error" id="loginError"></div>
   </div>
   <div class="login-hint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  <button onclick="resetPin()" style="margin-top:16px;background:none;border:none;color:#374151;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:underline">Esqueci meu PIN / Redefinir</button>
 </div>
 
 <!-- EDIT MODAL -->
@@ -688,6 +689,21 @@ let recorrentes = [];
 // ============================================================
 const AUTH_KEY = 'jr_auth_v2';
 const SESSION_DURATION = 8 * 60 * 60 * 1000;
+
+function resetPin() {
+  if(confirm('Isso vai apagar seu PIN atual e deixar você criar um novo. Confirmar?')) {
+    try {
+      localStorage.removeItem('jr_pin_hash');
+      localStorage.removeItem('jr_auth_v2');
+      localStorage.removeItem('jr_auth');
+    } catch(e) {}
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginPin').value = '';
+    document.getElementById('loginPin').placeholder = '••••';
+    document.querySelector('.login-hint').textContent = 'PIN resetado! Digite um novo PIN para cadastrar.';
+    document.getElementById('loginPin').focus();
+  }
+}
 
 async function hashPin(pin) {
   try {
