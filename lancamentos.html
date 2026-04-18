@@ -448,9 +448,14 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="nAmt" placeholder="0,00" oninput="calcInst()"></div>
       </div>
       <div class="fr">
-        <div><label class="fl">Parcelas</label><select class="fs" id="nInst" onchange="calcInst()">
-          <option value="1">À vista</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="5">5×</option><option value="6">6×</option><option value="7">7×</option><option value="8">8×</option><option value="9">9×</option><option value="10">10×</option><option value="11">11×</option><option value="12">12×</option>
-        </select></div>
+        <div><label class="fl">Parcelas</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="fs" id="nInst" onchange="onInstChange()" style="flex:1">
+              <option value="1">À vista</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option><option value="5">5×</option><option value="6">6×</option><option value="7">7×</option><option value="8">8×</option><option value="9">9×</option><option value="10">10×</option><option value="11">11×</option><option value="12">12×</option><option value="custom">Outro...</option>
+            </select>
+            <input type="number" class="fi" id="nInstCustom" min="2" max="360" placeholder="Nº" style="display:none;width:70px;font-size:14px" oninput="calcInst()">
+          </div>
+        </div>
         <div><label class="fl">1ª Parcela</label><input type="month" class="fi" id="nFirst"></div>
       </div>
       <div class="ipreview" id="nInstPrev"></div>
@@ -460,7 +465,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
           <option value="">Selecionar...</option>
           <optgroup label="Santander"><option value="santander-unique-visa">Santander Unique Visa</option><option value="santander-unique-master">Santander Unique Master</option><option value="santander-cc">Santander CC</option></optgroup>
           <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
-          <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option></optgroup>
+          <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option><option value="carteira">Carteira (Dinheiro)</option></optgroup>
         </select></div>
       </div>
       <div class="fg">
@@ -545,7 +550,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
           <option value="">Selecionar...</option>
           <optgroup label="Santander"><option value="santander-unique-visa">Santander Unique Visa</option><option value="santander-unique-master">Santander Unique Master</option><option value="santander-cc">Santander CC</option></optgroup>
           <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
-          <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option></optgroup>
+          <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option><option value="carteira">Carteira (Dinheiro)</option></optgroup>
         </select></div>
       </div>
       <div class="div"></div>
@@ -592,10 +597,27 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 
   <!-- ======== IR ======== -->
   <div id="tab-ir" style="display:none">
-    <div class="card"><div class="card-title">🧾 Painel IR <span id="irYear" style="text-transform:none;font-weight:400;color:var(--muted)"></span></div><div class="irkpi" id="irKpis"></div></div>
-    <div class="card"><div class="card-title" style="color:var(--yellow)">⏳ Pendentes</div><div id="irPend"></div></div>
-    <div class="card"><div class="card-title">Despesas Dedutíveis</div><div id="irCats"></div></div>
-    <div class="card"><div class="card-title">Rendimentos</div><div id="irInc"></div></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0">🧾 Painel IR</div>
+        <select class="fs" id="irYear" onchange="loadIR()" style="width:100px;font-size:13px"></select>
+      </div>
+      <div class="irkpi" id="irKpis"></div>
+    </div>
+    <div class="card"><div class="card-title" style="color:var(--yellow)">⏳ Pendentes de comprovante</div><div id="irPend"></div></div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:0">Despesas Dedutíveis</div>
+        <button onclick="exportIR()" style="font-size:11px;padding:5px 10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.3);border-radius:8px;color:var(--accent);cursor:pointer;font-family:'DM Sans',sans-serif">↓ Exportar CSV</button>
+      </div>
+      <div id="irCats"></div>
+      <div id="irDedDetail" style="margin-top:12px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Rendimentos</div>
+      <div id="irInc"></div>
+      <div id="irIncDetail" style="margin-top:12px"></div>
+    </div>
   </div>
 
   <!-- ======== RECORRENTES ======== -->
@@ -616,7 +638,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
             <option value="">Selecionar...</option>
             <optgroup label="Santander"><option value="santander-unique-visa">Santander Unique Visa</option><option value="santander-unique-master">Santander Unique Master</option><option value="santander-cc">Santander CC</option></optgroup>
             <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
-            <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option></optgroup>
+            <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option><option value="carteira">Carteira (Dinheiro)</option></optgroup>
           </select></div>
         </div>
         <div class="fr">
@@ -641,9 +663,19 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <div><label class="fl">Próximo vencimento</label><input type="date" class="fi" id="recNextDate"></div>
       </div>
       <div class="fr">
-        <div><label class="fl">Alertar com antecedência</label><select class="fs" id="recAlert"><option value="0">No dia</option><option value="1">1 dia antes</option><option value="3" selected>3 dias antes</option><option value="7">7 dias antes</option><option value="15">15 dias antes</option></select></div>
-        <div><label class="fl">Observação</label><input type="text" class="fi" id="recMemo" placeholder="Opcional"></div>
+        <div><label class="fl">Encerrar em <span style="color:var(--muted);font-weight:400;text-transform:none">(opcional)</span></label><input type="date" class="fi" id="recEndDate"></div>
+        <div><label class="fl">Alertar com antecedência</label><select class="fs" id="recAlertDays"><option value="0">No dia</option><option value="1">1 dia antes</option><option value="3" selected>3 dias antes</option><option value="7">7 dias antes</option><option value="15">15 dias antes</option></select></div>
       </div>
+      <div class="fg">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;background:var(--surface2);border-radius:8px;cursor:pointer" onclick="toggleEstimated()">
+          <input type="checkbox" id="recEstimated" style="width:16px;height:16px;accent-color:var(--accent)" onclick="event.stopPropagation();toggleEstimated()">
+          <label for="recEstimated" style="font-size:13px;cursor:pointer;flex:1">💡 Valor estimado — pode variar a cada lançamento</label>
+        </div>
+        <div id="recEstNote" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px;font-size:12px;color:var(--yellow)">
+          ⚠ Ao lançar, o app vai pedir que você confirme o valor real antes de salvar.
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Observação</label><input type="text" class="fi" id="recMemo" placeholder="Opcional"></div>
       <input type="hidden" id="recEditId">
       <button class="bsave" onclick="saveRec()">✓ Salvar Recorrente</button>
       <button class="bclear" onclick="clearRec()">Limpar</button>
@@ -654,9 +686,44 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <!-- ======== HISTORY ======== -->
   <div id="tab-history" style="display:none">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="card-title" style="margin-bottom:0">Lançamentos <span id="histCount" style="color:var(--accent);text-transform:none;font-weight:400"></span></div>
-        <input type="text" placeholder="Buscar..." id="histQ" oninput="loadHist()" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;width:150px">
+        <button onclick="toggleHistFilters()" style="font-size:11px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif">⚙ Filtros</button>
+      </div>
+      <!-- Filtros avançados -->
+      <div id="histFilters" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div class="fr" style="margin-bottom:10px">
+          <div><label class="fl" style="font-size:10px">Buscar</label><input type="text" class="fi" id="histQ" placeholder="Fornecedor, memo..." oninput="resetHist()" style="font-size:13px"></div>
+          <div><label class="fl" style="font-size:10px">Tipo</label><select class="fs" id="histType" onchange="resetHist()" style="font-size:13px"><option value="">Todos</option><option value="expense">Despesas</option><option value="income">Receitas</option></select></div>
+        </div>
+        <div class="fr" style="margin-bottom:10px">
+          <div><label class="fl" style="font-size:10px">Data de</label><input type="date" class="fi" id="histFrom" onchange="resetHist()"></div>
+          <div><label class="fl" style="font-size:10px">Data até</label><input type="date" class="fi" id="histTo" onchange="resetHist()"></div>
+        </div>
+        <div class="fr" style="margin-bottom:10px">
+          <div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="histCat" onchange="resetHist()" style="font-size:13px">
+            <option value="">Todas</option>
+            <optgroup label="Despesas"><option value="aluguel">Aluguel</option><option value="animais">Animais</option><option value="arranjos">Arranjos Dom.</option><option value="automovel">Automóvel</option><option value="contas">Contas</option><option value="despesas-trabalho">Desp. Trabalho</option><option value="doacoes">Doações</option><option value="educacao">Educação</option><option value="hobbies">Hobbies</option><option value="impostos">Impostos</option><option value="juros">Juros</option><option value="outras-despesas">Outras Desp.</option><option value="saude">Saúde</option><option value="seguros">Seguros</option><option value="taxas-bancarias">Taxas</option><option value="utilitarios">Utilitários</option><option value="vestuario">Vestuário</option><option value="viagens">Viagens</option></optgroup>
+            <optgroup label="Receitas"><option value="salario">Salário</option><option value="bonus">Bônus</option><option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entr.</option></optgroup>
+          </select></div>
+          <div><label class="fl" style="font-size:10px">Conta</label><select class="fs" id="histAcct" onchange="resetHist()" style="font-size:13px">
+            <option value="">Todas</option>
+            <option value="santander-unique-visa">Santander Unique Visa</option>
+            <option value="santander-unique-master">Santander Unique Master</option>
+            <option value="santander-cc">Santander CC</option>
+            <option value="porto-visa">Porto Visa Infinite</option>
+            <option value="xp">XP</option><option value="daycoval">Daycoval</option>
+            <option value="wise">Wise</option><option value="carteira">Carteira</option>
+          </select></div>
+        </div>
+        <div class="fr">
+          <div><label class="fl" style="font-size:10px">Valor mín R$</label><input type="text" inputmode="decimal" class="fi" id="histMin" placeholder="0,00" oninput="resetHist()" style="font-size:13px"></div>
+          <div><label class="fl" style="font-size:10px">Valor máx R$</label><input type="text" inputmode="decimal" class="fi" id="histMax" placeholder="0,00" oninput="resetHist()" style="font-size:13px"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <span id="histFilterSum" style="font-size:12px;color:var(--muted)"></span>
+          <button onclick="clearHistFilters()" style="font-size:11px;padding:5px 12px;background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif">Limpar filtros</button>
+        </div>
       </div>
       <div id="histList"><div class="loading">⟳ Carregando...</div></div>
       <div style="text-align:center;margin-top:10px"><button id="histMore" onclick="loadMoreHist()" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px">Carregar mais</button></div>
@@ -997,8 +1064,26 @@ function setRS(v, btn) {
   if(btn) btn.classList.add('on',v);
 }
 
+function onInstChange() {
+  const sel=document.getElementById('nInst');
+  const custom=document.getElementById('nInstCustom');
+  if(sel.value==='custom') {
+    custom.style.display='block';
+    custom.focus();
+  } else {
+    custom.style.display='none';
+  }
+  calcInst();
+}
+
+function getInstCount() {
+  const sel=document.getElementById('nInst');
+  if(sel.value==='custom') return parseInt(document.getElementById('nInstCustom').value)||1;
+  return parseInt(sel.value)||1;
+}
+
 function calcInst() {
-  const n=parseInt(document.getElementById('nInst').value)||1;
+  const n=getInstCount();
   const a=parseFloat(document.getElementById('nAmt').value.replace(',','.'))||0;
   const prev=document.getElementById('nInstPrev');
   if(n<=1||!a){prev.style.display='none';return;}
@@ -1024,9 +1109,20 @@ async function saveNormal() {
   const payee=document.getElementById('nPay').value.trim();
   const acct=document.getElementById('nAcct').value;
   const cat=document.getElementById('nCat').value;
-  const inst=parseInt(document.getElementById('nInst').value)||1;
+  const inst=getInstCount();
   const fm=document.getElementById('nFirst').value||THIS_MONTH;
   if(!amt||!date||!payee||!acct||!cat){toast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
+  // Duplicate check
+  try {
+    const dupes=await sbGet('transactions',`date=eq.${date}&payee=ilike.*${encodeURIComponent(payee)}*&amount=eq.${amt}&limit=3`);
+    if(dupes.length>0) {
+      const msg=`⚠ Possível duplicata!
+"${payee}" R$ ${fmt(amt)} em ${fmtDate(date)} já existe.
+
+Continuar mesmo assim?`;
+      if(!confirm(msg)) return;
+    }
+  } catch(e) {}
   const btn=document.getElementById('nSaveBtn');
   btn.disabled=true; btn.textContent='Salvando...'; sync('busy');
   try {
@@ -1057,6 +1153,8 @@ function clearNormal() {
   document.getElementById('nCat').value='';
   document.getElementById('nSub').innerHTML='<option value="">—</option>';
   document.getElementById('nInst').value='1';
+  document.getElementById('nInstCustom').value='';
+  document.getElementById('nInstCustom').style.display='none';
   document.getElementById('nFirst').value=THIS_MONTH;
   document.getElementById('nInstPrev').style.display='none';
   document.getElementById('nDedBadge').style.display='none';
@@ -1234,16 +1332,56 @@ async function saveEdit() {
 // ============================================================
 // HISTORY
 // ============================================================
+function toggleHistFilters() {
+  const f=document.getElementById('histFilters');
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+
+function resetHist() { histOff=0; loadHist(); }
+
+function clearHistFilters() {
+  ['histQ','histFrom','histTo','histMin','histMax'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('histType').value='';
+  document.getElementById('histCat').value='';
+  document.getElementById('histAcct').value='';
+  resetHist();
+}
+
 async function loadHist() {
-  const q=document.getElementById('histQ')?.value?.toLowerCase()||'';
+  const q=(document.getElementById('histQ')?.value||'').trim();
+  const type=document.getElementById('histType')?.value||'';
+  const cat=document.getElementById('histCat')?.value||'';
+  const acct=document.getElementById('histAcct')?.value||'';
+  const from=document.getElementById('histFrom')?.value||'';
+  const to=document.getElementById('histTo')?.value||'';
+  const minV=parseFloat((document.getElementById('histMin')?.value||'').replace(',','.'))||0;
+  const maxV=parseFloat((document.getElementById('histMax')?.value||'').replace(',','.'))||0;
   const cont=document.getElementById('histList');
   if(histOff===0) cont.innerHTML='<div class="loading">⟳ Carregando...</div>';
   try {
-    let params=`order=date.desc,id.desc&limit=${histLim}&offset=${histOff}`;
-    if(q) params+=`&or=(payee.ilike.*${encodeURIComponent(q)}*,memo.ilike.*${encodeURIComponent(q)}*)`;
-    const countRes=await fetch(`${SB}/rest/v1/transactions?${q?`or=(payee.ilike.*${encodeURIComponent(q)}*,memo.ilike.*${encodeURIComponent(q)}*)`:''}&select=id`,{headers:{...SBH,'Prefer':'count=exact','Range':'0-0'}});
+    let filters=[];
+    if(q) filters.push(`or=(payee.ilike.*${encodeURIComponent(q)}*,memo.ilike.*${encodeURIComponent(q)}*)`);
+    if(type) filters.push(`type=eq.${type}`);
+    if(cat) filters.push(`category=eq.${cat}`);
+    if(acct) filters.push(`account=eq.${acct}`);
+    if(from) filters.push(`date=gte.${from}`);
+    if(to) filters.push(`date=lte.${to}`);
+    if(minV) filters.push(`amount=gte.${minV}`);
+    if(maxV) filters.push(`amount=lte.${maxV}`);
+    const fStr=filters.join('&');
+    const params=`order=date.desc,id.desc&limit=${histLim}&offset=${histOff}${fStr?'&'+fStr:''}`;
+    const countRes=await fetch(`${SB}/rest/v1/transactions?select=id,amount${fStr?'&'+fStr:''}`,{headers:{...SBH,'Prefer':'count=exact','Range':'0-0'}});
     const ch=countRes.headers.get('content-range');
     histTotal=ch?parseInt(ch.split('/')[1])||0:0;
+    // Get sum for filter summary
+    if(fStr) {
+      const sumRes=await fetch(`${SB}/rest/v1/transactions?select=amount,type${fStr?'&'+fStr:''}`,{headers:SBH});
+      const sumData=await sumRes.json();
+      const sumExp=sumData.filter(t=>t.type==='expense').reduce((s,t)=>s+parseFloat(t.amount),0);
+      const sumInc=sumData.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.amount),0);
+      const sumEl=document.getElementById('histFilterSum');
+      if(sumEl) sumEl.textContent=`Despesas: -R$ ${fmt(sumExp)} · Receitas: +R$ ${fmt(sumInc)}`;
+    }
     const txs=await sbGet('transactions',params);
     if(histOff===0) cont.innerHTML='';
     document.getElementById('histCount').textContent=`(${histTotal} total)`;
@@ -1284,9 +1422,19 @@ async function delTx(id) {
 // IR
 // ============================================================
 async function loadIR() {
-  document.getElementById('irYear').textContent=THIS_YEAR;
+  const sel=document.getElementById('irYear');
+  if(!sel.options.length) {
+    const curY=new Date().getFullYear();
+    for(let y=curY;y>=2016;y--) {
+      const o=document.createElement('option');
+      o.value=y; o.textContent=y;
+      if(y===curY) o.selected=true;
+      sel.appendChild(o);
+    }
+  }
+  const year=sel.value||THIS_YEAR;
   try {
-    const txs=await sbGet('transactions',`date=gte.${THIS_YEAR}-01-01&date=lte.${THIS_YEAR}-12-31&is_deductible=eq.true`);
+    const txs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true`);
     const de=txs.filter(t=>t.type==='expense'), di=txs.filter(t=>t.type==='income');
     const pend=txs.filter(t=>t.receipt_status==='pending');
     const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
@@ -1297,14 +1445,45 @@ async function loadIR() {
       <div class="irkpi-card" style="background:rgba(52,211,153,.06);border-color:rgba(52,211,153,.2)"><div class="irkpi-label" style="color:var(--green)">Documentados</div><div class="irkpi-val" style="color:var(--green)">${txs.filter(t=>t.receipt_status==='attached').length}</div></div>`;
     document.getElementById('irPend').innerHTML=pend.length?pend.slice(0,20).map(t=>`<div class="irpitem"><div><div style="font-size:13px;font-weight:500">${t.payee}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--red)">-R$ ${fmt(t.amount)}</div><button class="irbtn" onclick="markOK(${t.id})">Marcar OK</button></div></div>`).join(''):'<div class="empty" style="padding:16px"><div class="big">✅</div><div>Nenhum pendente!</div></div>';
     const bc={};de.forEach(t=>{if(!bc[t.category])bc[t.category]=0;bc[t.category]+=parseFloat(t.amount);});
-    document.getElementById('irCats').innerHTML=Object.entries(bc).sort((a,b)=>b[1]-a[1]).map(([c,a])=>`<div class="ircrow"><span>${CLABEL[c]||c}</span><span style="font-weight:600;color:var(--red)">-R$ ${fmt(a)}</span></div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhuma despesa dedutível</div>';
+    // By category with expandable detail
+    const sortedCats=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
+    document.getElementById('irCats').innerHTML=sortedCats.map(([cat,amt])=>{
+      const items=de.filter(t=>t.category===cat);
+      const rows=items.slice(0,5).map(t=>`<div class="ircrow" style="font-size:11px;padding:4px 0 4px 12px;color:var(--muted)"><span>${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--red)">-R$ ${fmt(t.amount)}</span></div>`).join('');
+      const more=items.length>5?`<div style="font-size:11px;color:var(--muted);padding:2px 0 2px 12px">+${items.length-5} mais...</div>`:'';
+      return `<div class="ircrow" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <span style="font-weight:600">${CLABEL[cat]||cat} <span style="font-size:10px;color:var(--muted)">(${items.length})</span></span>
+        <span style="font-weight:600;color:var(--red)">-R$ ${fmt(amt)}</span>
+      </div><div style="display:none">${rows}${more}</div>`;
+    }).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhuma despesa dedutível</div>';
     const bi={};di.forEach(t=>{if(!bi[t.category])bi[t.category]=0;bi[t.category]+=parseFloat(t.amount);});
-    document.getElementById('irInc').innerHTML=Object.entries(bi).sort((a,b)=>b[1]-a[1]).map(([c,a])=>`<div class="ircrow"><span>${CLABEL[c]||c}</span><span style="font-weight:600;color:var(--green)">+R$ ${fmt(a)}</span></div>`).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhum rendimento</div>';
+    const sortedInc=Object.entries(bi).sort((a,b)=>b[1]-a[1]);
+    document.getElementById('irInc').innerHTML=sortedInc.map(([cat,amt])=>{
+      const items=di.filter(t=>t.category===cat);
+      const rows=items.slice(0,5).map(t=>`<div class="ircrow" style="font-size:11px;padding:4px 0 4px 12px;color:var(--muted)"><span>${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--green)">+R$ ${fmt(t.amount)}</span></div>`).join('');
+      const more=items.length>5?`<div style="font-size:11px;color:var(--muted);padding:2px 0 2px 12px">+${items.length-5} mais...</div>`:'';
+      return `<div class="ircrow" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+        <span style="font-weight:600">${CLABEL[cat]||cat} <span style="font-size:10px;color:var(--muted)">(${items.length})</span></span>
+        <span style="font-weight:600;color:var(--green)">+R$ ${fmt(amt)}</span>
+      </div><div style="display:none">${rows}${more}</div>`;
+    }).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhum rendimento</div>';
   } catch(e){ console.error('IR:',e); }
 }
 
 async function markOK(id) {
   try { await sbUpd('transactions',id,{receipt_status:'attached'}); loadIR(); toast('✓ Marcado!','var(--green)','#0d0f14'); } catch(e){}
+}
+
+async function exportIR() {
+  const year=document.getElementById('irYear')?.value||THIS_YEAR;
+  const txs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true&order=date.asc`);
+  const rows=[['Data','Fornecedor','Categoria','Valor','Tipo','Comprovante','Observação']];
+  txs.forEach(t=>rows.push([t.date,t.payee_display||t.payee,CLABEL[t.category]||t.category,fmt(t.amount),t.type==='income'?'Receita':'Despesa',t.receipt_status==='attached'?'Sim':'Não',t.memo||'']));
+  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('
+');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`IR_${year}.csv`;a.click();
+  toast('✓ CSV exportado!','var(--green)','#0d0f14');
 }
 
 // ============================================================
@@ -1353,11 +1532,14 @@ async function saveRec() {
   const name=document.getElementById('recName').value.trim();
   const freq=document.getElementById('recFreq').value;
   const nd=document.getElementById('recNextDate').value;
-  const ad=parseInt(document.getElementById('recAlert').value);
+  const ad=parseInt(document.getElementById('recAlertDays').value);
+  const endDate=document.getElementById('recEndDate').value||null;
+  const estimated=document.getElementById('recEstimated').checked;
   const lt=document.getElementById('recLType').value;
   const eid=document.getElementById('recEditId').value;
   if(!name||!nd){toast('⚠ Preencha descrição e vencimento','#fbbf24','#0d0f14');return;}
-  let rec={name,type:recType==='exp'?'expense':'income',frequency:freq,next_date:nd,alert_days:ad,memo:document.getElementById('recMemo').value||null,launch_type:lt};
+  if(endDate&&endDate<nd){toast('⚠ Data final deve ser após o vencimento','#fbbf24','#0d0f14');return;}
+  let rec={name,type:recType==='exp'?'expense':'income',frequency:freq,next_date:nd,alert_days:ad,end_date:endDate,is_estimated:estimated,memo:document.getElementById('recMemo').value||null,launch_type:lt};
   if(lt==='split'){
     const tot=parseFloat(document.getElementById('recSTot').value.replace(',','.'));
     const ac=document.getElementById('recSAcct').value;
@@ -1384,13 +1566,20 @@ async function saveRec() {
   } catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
 }
 
+function toggleEstimated() {
+  const chk=document.getElementById('recEstimated').checked;
+  document.getElementById('recEstNote').style.display=chk?'block':'none';
+}
+
 function clearRec() {
-  ['recName','recAmt','recMemo','recSTot'].forEach(id=>document.getElementById(id).value='');
+  ['recName','recAmt','recMemo','recSTot','recEndDate'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('recAcct').value='';document.getElementById('recCat').value='';
   document.getElementById('recSub').innerHTML='<option value="">—</option>';
   document.getElementById('recSAcct').value='';
   document.getElementById('recSLines').innerHTML='';recSN=0;
   document.getElementById('recLType').value='simple';
+  document.getElementById('recEstimated').checked=false;
+  document.getElementById('recEstNote').style.display='none';
   document.getElementById('recEditId').value='';
   document.getElementById('recFormTitle').textContent='🔁 Nova Recorrente';
   toggleRecSplit();updRecDate();
@@ -1417,11 +1606,15 @@ function renderRecs() {
     else if(days<=r.alert_days){sc='soon';nc='soon';nt=`Vence em ${days} dia(s)`;}
     else nt=`Próximo: ${fmtDate(r.next_date)} (${days} dias)`;
     const pos=r.type==='income';
-    return `<div class="reccard ${sc}">
+    const endBadge=r.end_date?`<span style="font-size:10px;color:var(--muted);margin-left:6px">até ${fmtDate(r.end_date)}</span>`:'';
+    const estBadge=r.is_estimated?`<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(251,191,36,.12);color:var(--yellow);margin-left:4px">≈ estimado</span>`:'';
+    // Check if ended
+    if(r.end_date && r.end_date < TODAY) sc='ended';
+    return `<div class="reccard ${sc}" style="${sc==='ended'?'opacity:0.5':''}">
       <div class="rechd">
-        <div><div class="recname">${r.name}</div>
-          <div class="recmeta"><span class="recbadge ${r.frequency}">${FLAB[r.frequency]||r.frequency}</span> ${r.account?'· '+(ALABEL[r.account]||r.account):''} ${r.category?'· '+(CLABEL[r.category]||r.category):''}</div>
-          <div class="recnext ${nc}">${nt}</div>
+        <div><div class="recname">${r.name}${estBadge}</div>
+          <div class="recmeta"><span class="recbadge ${r.frequency}">${FLAB[r.frequency]||r.frequency}</span> ${r.account?'· '+(ALABEL[r.account]||r.account):''} ${r.category?'· '+(CLABEL[r.category]||r.category):''}${endBadge}</div>
+          <div class="recnext ${nc}">${sc==='ended'?'✓ Encerrada':''+nt}</div>
         </div>
         <div class="recamt ${pos?'pos':'neg'}">${pos?'+':'-'}R$ ${fmt(r.amount)}</div>
       </div>
@@ -1437,11 +1630,20 @@ function renderRecs() {
 
 async function launchRec(id) {
   const r=recs.find(x=>x.id===id);if(!r)return;
+  // If estimated, ask for real value
+  if(r.is_estimated && r.launch_type!=='split') {
+    const realAmt=prompt(`Valor estimado: R$ ${fmt(r.amount)}\nDigite o valor real (ou Enter para usar o estimado):`);
+    if(realAmt===null) return; // cancelled
+    if(realAmt.trim()) {
+      const v=parseFloat(realAmt.replace(',','.'));
+      if(!isNaN(v) && v>0) r._realAmt=v;
+    }
+  }
   const date=r.next_date;const gid=Date.now();const rows=[];
   if(r.launch_type==='split'&&r.split_lines){
     r.split_lines.forEach((l,i)=>rows.push({id:gid+i,type:r.type,amount:l.amount,date,payee:r.name,account:r.account,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:DED.has(l.category),receipt_status:'na',is_split:true,split_total:r.amount,from_recorrente:true}));
   } else {
-    rows.push({id:gid,type:r.type,amount:r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:r.memo||null,is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
+    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:r.memo||null,is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }
   sync('busy');
   try {
@@ -1462,6 +1664,10 @@ function editRec(id) {
   document.getElementById('recLType').value=r.launch_type||'simple';
   document.getElementById('recEditId').value=r.id;
   document.getElementById('recFormTitle').textContent='✎ Editar Recorrente';
+  document.getElementById('recEndDate').value=r.end_date||'';
+  document.getElementById('recAlertDays').value=r.alert_days||3;
+  document.getElementById('recEstimated').checked=r.is_estimated||false;
+  document.getElementById('recEstNote').style.display=(r.is_estimated)?'block':'none';
   toggleRecSplit();
   setRecType(r.type==='income'?'inc':'exp',document.querySelectorAll('#tab-recorrentes .ttype .tbtn')[r.type==='income'?1:0]);
   if(r.launch_type==='split'){
@@ -1581,7 +1787,7 @@ function init() {
     document.getElementById('sDate').value=TODAY;
     document.getElementById('nFirst').value=THIS_MONTH;
     document.getElementById('pMonth').value=THIS_MONTH;
-    document.getElementById('irYear').textContent=THIS_YEAR;
+    // irYear select populated on first loadIR call
   } catch(e){}
   // Init split default lines
   try { addSLine(); addSLine(); } catch(e){}

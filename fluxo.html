@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Finanças JR · Fluxo de Caixa</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0d0f14;--surface:#13161e;--surface2:#1a1e29;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+#loginOverlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--bg);z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.ll{font-family:'DM Serif Display',serif;font-size:36px;letter-spacing:-1px;margin-bottom:6px}.ll span{color:var(--accent)}
+.ls{font-size:13px;color:var(--muted);margin-bottom:44px}.lb{width:100%;max-width:320px}
+.ll2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;display:block}
+.li{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:22px;outline:none;text-align:center;letter-spacing:6px;margin-bottom:10px;-webkit-appearance:none}
+.li:focus{border-color:var(--accent)}.li.err{border-color:var(--red)}
+.lbtn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.lerr{color:var(--red);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px}
+.lhint{color:#374151;font-size:11px;text-align:center}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(14px + var(--st));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,.97);backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px}nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all .2s}
+nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
+.main{max-width:1000px;margin:0 auto;padding:20px 16px calc(20px + var(--sb))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+/* SALDO CONTAS */
+.saldo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+.saldo-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
+.saldo-nome{font-size:11px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saldo-val{font-family:'DM Serif Display',serif;font-size:18px}
+.saldo-total{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+/* ALERTA */
+.alerta-neg{background:rgba(248,113,113,.1);border:1.5px solid rgba(248,113,113,.4);border-radius:12px;padding:14px;margin-bottom:14px}
+.alerta-title{font-size:14px;font-weight:700;color:var(--red);margin-bottom:6px}
+.alerta-item{font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.alerta-item:last-child{border-bottom:none}
+/* PROJECAO */
+.proj-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px}
+.proj-row:last-child{border-bottom:none}
+.proj-data{font-size:12px;color:var(--muted);min-width:80px;flex-shrink:0}
+.proj-desc{flex:1;min-width:0}
+.proj-nome{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-cat{font-size:11px;color:var(--muted)}
+.proj-val{font-size:13px;font-weight:600;flex-shrink:0}
+.proj-saldo{font-size:11px;padding:3px 8px;border-radius:8px;flex-shrink:0;min-width:80px;text-align:right}
+.saldo-pos{background:rgba(52,211,153,.1);color:var(--green)}
+.saldo-neg{background:rgba(248,113,113,.1);color:var(--red)}
+.saldo-warn{background:rgba(251,191,36,.1);color:var(--yellow)}
+/* CHART */
+.chart-wrap{position:relative;height:220px;margin-top:14px}
+/* FILTROS */
+.filtros{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.fbt{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .2s}
+.fbt.on{background:rgba(79,142,247,.15);border-color:var(--accent);color:var(--accent)}
+#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div class="ll">Finanças <span>JR</span></div>
+  <div class="ls">Gestão Financeira Pessoal</div>
+  <div class="lb">
+    <label class="ll2">PIN de acesso</label>
+    <input type="password" inputmode="numeric" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="lerr" id="pinErr"></div>
+    <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <div class="lhint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="lancamentos.html">Lançamentos</a>
+    <a href="#" class="active">Fluxo de Caixa</a>
+  </nav>
+</header>
+
+<div class="main">
+
+  <!-- ALERTAS -->
+  <div id="alertaBox" style="display:none"></div>
+
+  <!-- SALDO ATUAL -->
+  <div class="card">
+    <div class="card-title">💰 Saldo Atual das Contas</div>
+    <div class="saldo-grid" id="saldoGrid"></div>
+    <div class="saldo-total">
+      <span style="font-size:13px;color:var(--muted)">Saldo Total</span>
+      <span style="font-family:'DM Serif Display',serif;font-size:24px" id="saldoTotal">R$ 0,00</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted)">* Baseado no saldo inicial cadastrado + transações registradas. Não inclui investimentos.</div>
+  </div>
+
+  <!-- PROJEÇÃO -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:0">📅 Projeção de Fluxo</div>
+      <div style="display:flex;gap:6px">
+        <button class="fbt on" onclick="setPeriodo(30,this)">30 dias</button>
+        <button class="fbt" onclick="setPeriodo(60,this)">60 dias</button>
+        <button class="fbt" onclick="setPeriodo(90,this)">90 dias</button>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="chartFluxo"></canvas></div>
+  </div>
+
+  <!-- LISTA PROJEÇÃO -->
+  <div class="card">
+    <div class="card-title">Eventos Projetados <span id="projCount" style="color:var(--accent);text-transform:none;font-weight:400"></span></div>
+    <div id="projList"><div style="text-align:center;padding:20px;color:var(--muted)">⟳ Carregando...</div></div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
+const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
+const ALABEL={'santander-unique-visa':'Santander Unique Visa','santander-unique-master':'Santander Unique Master','santander-cc':'Santander CC','porto-visa':'Porto Visa Infinite','xp':'XP','daycoval':'Daycoval','wise':'Wise','carteira':'Carteira'};
+const CLABEL={aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação','outras-despesas':'Outras Desp.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos'};
+
+async function hashPin(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+SALT));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return p+'_'+SALT;}}
+function isAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(!s)return false;if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(AUTH);return false;}return true;}catch(e){return false;}}
+async function doLogin(){const inp=document.getElementById('pinInput'),err=document.getElementById('pinErr');const pin=inp.value.trim();if(!pin){err.textContent='Digite o PIN';return;}const hash=await hashPin(pin),stored=localStorage.getItem('jr_pin_hash');if(!stored){localStorage.setItem('jr_pin_hash',hash);localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else if(hash===stored){localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else{inp.classList.add('err');err.textContent='PIN incorreto.';inp.value='';setTimeout(()=>inp.classList.remove('err'),400);}}
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';setTimeout(()=>{try{document.getElementById('pinInput').focus();}catch(e){}},100);}
+function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
+function checkAuth(){if(!isAuth())showLogin();else{hideLogin();startApp();}}
+async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+function addDays(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function addMonths(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);}
+function addYears(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setFullYear(d.getFullYear()+n);return d.toISOString().slice(0,10);}
+
+let dias=30, chartFluxo=null;
+const TODAY=new Date().toISOString().slice(0,10);
+
+// Contas que compõem saldo operacional (não investimentos)
+const CONTAS_SALDO=['santander-cc','carteira','wise'];
+
+async function startApp(){
+  await loadSaldos();
+  await loadFluxo();
+}
+
+async function loadSaldos(){
+  try {
+    // Get all contas
+    let contas=[];
+    try{contas=await sbGet('contas','ativo=eq.true&order=ordem.asc');}catch(e){}
+    if(!contas.length){
+      contas=[
+        {id:'santander-cc',nome:'Santander CC',tipo:'corrente',saldo_inicial:0},
+        {id:'carteira',nome:'Carteira',tipo:'dinheiro',saldo_inicial:0},
+        {id:'wise',nome:'Wise',tipo:'internacional',saldo_inicial:0},
+      ];
+    }
+    // Get transactions per account
+    const txs=await sbGet('transactions','select=account,type,amount');
+    const saldoMap={};
+    txs.forEach(t=>{const v=parseFloat(t.amount)||0;if(!saldoMap[t.account])saldoMap[t.account]=0;saldoMap[t.account]+=(t.type==='income'?v:-v);});
+    // Only show operational accounts (not cartao/investimento)
+    const opContas=contas.filter(c=>!['cartao','investimento'].includes(c.tipo));
+    let totalSaldo=0;
+    const grid=document.getElementById('saldoGrid');
+    grid.innerHTML=opContas.map(c=>{
+      const saldo=parseFloat(c.saldo_inicial||0)+(saldoMap[c.id]||0);
+      totalSaldo+=saldo;
+      const pos=saldo>=0;
+      return `<div class="saldo-item">
+        <div class="saldo-nome">${c.nome}</div>
+        <div class="saldo-val" style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('saldoTotal').textContent='R$ '+fmt(totalSaldo);
+    document.getElementById('saldoTotal').style.color=totalSaldo>=0?'var(--green)':'var(--red)';
+    window._saldoAtual=totalSaldo;
+    window._opContas=opContas;
+    window._saldoMap=saldoMap;
+  } catch(e) { console.error(e); }
+}
+
+async function loadFluxo(){
+  try {
+    const recs=await sbGet('recorrentes','order=next_date.asc');
+    const endDate=addDays(TODAY,dias);
+    // Generate projection events
+    const eventos=[];
+    for(const r of recs){
+      if(r.end_date && r.end_date<TODAY) continue; // ended
+      let d=r.next_date;
+      while(d<=endDate){
+        if(d>=TODAY){
+          eventos.push({
+            date:d, name:r.name, amount:r.amount,
+            type:r.type, category:r.category,
+            account:r.account, estimated:r.is_estimated,
+            freq:r.frequency
+          });
+        }
+        // Next occurrence
+        if(r.frequency==='daily') d=addDays(d,1);
+        else if(r.frequency==='weekly') d=addDays(d,7);
+        else if(r.frequency==='monthly') d=addMonths(d,1);
+        else if(r.frequency==='yearly') d=addYears(d,1);
+        else break;
+      }
+    }
+    // Sort by date
+    eventos.sort((a,b)=>a.date.localeCompare(b.date));
+    document.getElementById('projCount').textContent=`(${eventos.length} eventos)`;
+    // Calculate running balance
+    let saldo=parseFloat(window._saldoAtual||0);
+    const alertas=[];
+    const chartLabels=[], chartSaldos=[], chartColors=[];
+    // Add today marker
+    chartLabels.push('Hoje');chartSaldos.push(saldo);chartColors.push(saldo>=0?'rgba(52,211,153,.8)':'rgba(248,113,113,.8)');
+    // Process events day by day
+    const dayMap={};
+    eventos.forEach(e=>{if(!dayMap[e.date])dayMap[e.date]=[];dayMap[e.date].push(e);});
+    // Build chart data (weekly points)
+    let prevDate=TODAY;
+    for(let i=7;i<=dias;i+=7){
+      const d=addDays(TODAY,i);
+      // Sum all events between prevDate and d
+      Object.entries(dayMap).forEach(([date,evs])=>{
+        if(date>prevDate&&date<=d){
+          evs.forEach(e=>{saldo+=(e.type==='income'?parseFloat(e.amount):-parseFloat(e.amount));});
+        }
+      });
+      chartLabels.push(fmtDate(d).slice(0,5));
+      chartSaldos.push(saldo);
+      chartColors.push(saldo<0?'rgba(248,113,113,.8)':saldo<1000?'rgba(251,191,36,.8)':'rgba(52,211,153,.8)');
+      if(saldo<0) alertas.push({date:d,saldo});
+      prevDate=d;
+    }
+    // Render chart
+    if(chartFluxo)chartFluxo.destroy();
+    Chart.defaults.color='#6b7280';Chart.defaults.font.family="'DM Sans',sans-serif";
+    const ctx=document.getElementById('chartFluxo').getContext('2d');
+    chartFluxo=new Chart(ctx,{
+      type:'bar',
+      data:{labels:chartLabels,datasets:[{
+        label:'Saldo Projetado',data:chartSaldos,
+        backgroundColor:chartColors,
+        borderRadius:4
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>'R$ '+fmt(v.raw)}}},
+        scales:{
+          x:{ticks:{color:'#6b7280',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+          y:{ticks:{color:'#6b7280',font:{size:10},callback:v=>'R$'+(v>=1000||v<=-1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'rgba(255,255,255,.06)'},
+            afterDataLimits(scale){if(scale.min>-500)scale.min=-500;}
+          }
+        }
+      }
+    });
+    // Render alerts
+    const alertaBox=document.getElementById('alertaBox');
+    if(alertas.length){
+      alertaBox.style.display='block';
+      alertaBox.innerHTML=`<div class="alerta-neg">
+        <div class="alerta-title">⚠ Saldo pode ficar negativo!</div>
+        ${alertas.slice(0,5).map(a=>`<div class="alerta-item">📅 ${fmtDate(a.date)} — Saldo projetado: <strong style="color:var(--red)">R$ ${fmt(a.saldo)}</strong></div>`).join('')}
+        ${alertas.length>5?`<div class="alerta-item" style="color:var(--muted)">+${alertas.length-5} outros períodos negativos</div>`:''}
+      </div>`;
+    } else {alertaBox.style.display='none';}
+    // Render event list
+    if(!eventos.length){
+      document.getElementById('projList').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)"><div style="font-size:24px;margin-bottom:8px">🔁</div>Nenhuma recorrente cadastrada.<br><a href="lancamentos.html" style="color:var(--accent)">Cadastrar recorrentes →</a></div>';
+      return;
+    }
+    // Reset saldo for list
+    let saldoList=parseFloat(window._saldoAtual||0);
+    document.getElementById('projList').innerHTML=eventos.map(e=>{
+      saldoList+=(e.type==='income'?parseFloat(e.amount):-parseFloat(e.amount));
+      const pos=e.type==='income';
+      const saldoCls=saldoList<0?'saldo-neg':saldoList<500?'saldo-warn':'saldo-pos';
+      return `<div class="proj-row">
+        <div class="proj-data">${fmtDate(e.date)}</div>
+        <div class="proj-desc">
+          <div class="proj-nome">${e.name}${e.estimated?' <span style="font-size:10px;color:var(--yellow)">≈</span>':''}</div>
+          <div class="proj-cat">${CLABEL[e.category]||e.category||''} · ${ALABEL[e.account]||e.account||''}</div>
+        </div>
+        <div class="proj-val" style="color:${pos?'var(--green)':'var(--red)'}">${pos?'+':'-'}R$ ${fmt(e.amount)}</div>
+        <div class="proj-saldo ${saldoCls}">R$ ${fmt(saldoList)}</div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('projList').innerHTML=`<div style="color:var(--red);padding:10px">Erro: ${e.message}</div>`;
+  }
+}
+
+function setPeriodo(d,btn){
+  dias=d;
+  document.querySelectorAll('.fbt').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  loadFluxo();
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',checkAuth);else checkAuth();
+</script>
+</body>
+</html>

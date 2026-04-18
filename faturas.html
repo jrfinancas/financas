@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Finanças JR · Faturas</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0d0f14;--surface:#13161e;--surface2:#1a1e29;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+#loginOverlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--bg);z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.ll{font-family:'DM Serif Display',serif;font-size:36px;letter-spacing:-1px;margin-bottom:6px}.ll span{color:var(--accent)}
+.ls{font-size:13px;color:var(--muted);margin-bottom:44px}.lb{width:100%;max-width:320px}
+.ll2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;display:block}
+.li{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:22px;outline:none;text-align:center;letter-spacing:6px;margin-bottom:10px;-webkit-appearance:none}
+.li:focus{border-color:var(--accent)}.li.err{border-color:var(--red)}
+.lbtn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.lerr{color:var(--red);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px}
+.lhint{color:#374151;font-size:11px;text-align:center}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(14px + var(--st));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,.97);backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px}nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all .2s}
+nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
+.main{max-width:860px;margin:0 auto;padding:20px 16px calc(20px + var(--sb))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+.fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;display:block}
+.fi,.fs{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+.fi:focus,.fs:focus{border-color:var(--accent)}
+.fs{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.fs option{background:var(--surface)}
+.fg{margin-bottom:13px}.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.bprimary{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.bsecondary{width:100%;padding:11px;background:none;border:1.5px solid var(--border);border-radius:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+/* CARTÃO SELECTOR */
+.cartao-tabs{display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.cartao-tabs::-webkit-scrollbar{display:none}
+.ctab{flex:0 0 auto;padding:10px 16px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .2s;text-align:center;min-width:130px}
+.ctab.on{border-color:var(--accent);background:rgba(79,142,247,.1)}
+.ctab-nome{font-size:13px;font-weight:600}
+.ctab-saldo{font-size:12px;color:var(--red);margin-top:2px}
+/* FATURA */
+.fatura-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.fatura-mes{font-size:18px;font-weight:600}
+.fatura-total{font-family:'DM Serif Display',serif;font-size:24px;color:var(--red)}
+.status-badge{font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600}
+.status-aberta{background:rgba(251,191,36,.15);color:var(--yellow)}
+.status-paga{background:rgba(52,211,153,.15);color:var(--green)}
+.status-vencida{background:rgba(248,113,113,.15);color:var(--red)}
+/* TX ITEM */
+.txitem{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.txitem:last-child{border-bottom:none}
+.txchk{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:pointer}
+.txbody{flex:1;min-width:0}
+.txpayee{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.txmeta{font-size:11px;color:var(--muted);margin-top:2px}
+.txamt{font-size:13px;font-weight:600;color:var(--red);flex-shrink:0}
+.reconciled{opacity:.5;text-decoration:line-through}
+/* MES SELECTOR */
+.mes-nav{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.mes-btn{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);cursor:pointer;font-size:16px}
+.mes-label{flex:1;text-align:center;font-size:15px;font-weight:600}
+/* MODAL PAGAMENTO */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:none;align-items:flex-end;justify-content:center;padding:20px}
+.modal.open{display:flex}
+.mbox{background:var(--surface);border-radius:16px;padding:22px;width:100%;max-width:580px}
+.mhd{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.mclose{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div class="ll">Finanças <span>JR</span></div>
+  <div class="ls">Gestão Financeira Pessoal</div>
+  <div class="lb">
+    <label class="ll2">PIN de acesso</label>
+    <input type="password" inputmode="numeric" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="lerr" id="pinErr"></div>
+    <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <div class="lhint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+</div>
+
+<!-- MODAL PAGAMENTO -->
+<div class="modal" id="pagModal" onclick="if(event.target===this)closePag()">
+  <div class="mbox">
+    <div class="mhd"><span>💳 Pagar Fatura</span><button class="mclose" onclick="closePag()">×</button></div>
+    <div class="fg"><label class="fl">Valor a pagar</label>
+      <div style="position:relative"><span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600">R$</span>
+      <input type="text" inputmode="decimal" class="fi" id="pagValor" style="padding-left:32px;font-size:20px;font-family:'DM Serif Display',serif"></div>
+    </div>
+    <div class="fr">
+      <div><label class="fl">Data</label><input type="date" class="fi" id="pagData"></div>
+      <div><label class="fl">Débitar de</label><select class="fs" id="pagConta">
+        <option value="santander-cc">Santander CC</option>
+        <option value="xp">XP</option>
+        <option value="daycoval">Daycoval</option>
+      </select></div>
+    </div>
+    <div class="fg"><label class="fl">Observação</label><input type="text" class="fi" id="pagMemo" placeholder="Ex: Pagamento fatura março/26"></div>
+    <button class="bprimary" onclick="confirmarPagamento()">✓ Confirmar Pagamento</button>
+    <button class="bsecondary" onclick="closePag()">Cancelar</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="lancamentos.html">Lançamentos</a>
+    <a href="#" class="active">Faturas</a>
+  </nav>
+</header>
+
+<div class="main">
+  <!-- SELETOR DE CARTÃO -->
+  <div class="card-title" style="margin-bottom:10px">Selecionar Cartão</div>
+  <div class="cartao-tabs" id="cartaoTabs"></div>
+
+  <!-- FATURA ATUAL -->
+  <div class="card" id="faturaCard" style="display:none">
+    <div class="mes-nav">
+      <button class="mes-btn" onclick="navMes(-1)">‹</button>
+      <div class="mes-label" id="mesLabel"></div>
+      <button class="mes-btn" onclick="navMes(1)">›</button>
+    </div>
+    <div class="fatura-header">
+      <div>
+        <div class="fatura-mes" id="faturaMes"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px" id="faturaVenc"></div>
+      </div>
+      <div style="text-align:right">
+        <div class="fatura-total" id="faturaTotal">R$ 0,00</div>
+        <span class="status-badge" id="faturaBadge">aberta</span>
+      </div>
+    </div>
+    <!-- Resumo -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:100px;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Lançamentos</div>
+        <div style="font-size:18px;font-weight:600" id="faturaCount">0</div>
+      </div>
+      <div style="flex:1;min-width:100px;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Reconciliados</div>
+        <div style="font-size:18px;font-weight:600;color:var(--green)" id="faturaReconciled">0</div>
+      </div>
+      <div style="flex:1;min-width:100px;background:var(--surface2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Pendentes</div>
+        <div style="font-size:18px;font-weight:600;color:var(--yellow)" id="faturaPendente">0</div>
+      </div>
+    </div>
+    <!-- Botões ação -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button onclick="reconcileAll()" style="flex:1;padding:10px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);border-radius:8px;color:var(--green);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500">✓ Reconciliar Todos</button>
+      <button onclick="openPagamento()" style="flex:1;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600">💳 Pagar Fatura</button>
+    </div>
+    <!-- Lista transações -->
+    <div id="faturaTxs"><div style="text-align:center;padding:20px;color:var(--muted)">⟳ Carregando...</div></div>
+  </div>
+
+  <div id="semCartao" style="text-align:center;padding:40px;color:var(--muted)">
+    <div style="font-size:30px;margin-bottom:10px">💳</div>
+    <div>Nenhum cartão cadastrado</div>
+    <a href="contas.html" style="color:var(--accent);font-size:13px;margin-top:8px;display:inline-block">Cadastrar conta →</a>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
+const ALABEL={'santander-unique-visa':'Santander Unique Visa','santander-unique-master':'Santander Unique Master','santander-cc':'Santander CC','porto-visa':'Porto Visa Infinite','xp':'XP','daycoval':'Daycoval','wise':'Wise','carteira':'Carteira'};
+const CLABEL={aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos'};
+
+async function hashPin(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+SALT));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return p+'_'+SALT;}}
+function isAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(!s)return false;if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(AUTH);return false;}return true;}catch(e){return false;}}
+async function doLogin(){const inp=document.getElementById('pinInput'),err=document.getElementById('pinErr');const pin=inp.value.trim();if(!pin){err.textContent='Digite o PIN';return;}const hash=await hashPin(pin),stored=localStorage.getItem('jr_pin_hash');if(!stored){localStorage.setItem('jr_pin_hash',hash);localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else if(hash===stored){localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else{inp.classList.add('err');err.textContent='PIN incorreto.';inp.value='';setTimeout(()=>inp.classList.remove('err'),400);}}
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';setTimeout(()=>{try{document.getElementById('pinInput').focus();}catch(e){}},100);}
+function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
+function checkAuth(){if(!isAuth())showLogin();else{hideLogin();startApp();}}
+
+async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbUpd(t,q,d){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{method:'PATCH',headers:{...SBH,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
+
+function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+let cartoes=[], curCartao=null;
+const now=new Date();
+let curAno=now.getFullYear(), curMes=now.getMonth()+1;
+
+async function startApp(){
+  try {
+    const contas=await sbGet('contas','tipo=eq.cartao&ativo=eq.true&order=ordem.asc');
+    cartoes=contas;
+    if(!cartoes.length){document.getElementById('semCartao').style.display='block';return;}
+    document.getElementById('semCartao').style.display='none';
+    renderCartaoTabs();
+    selCartao(cartoes[0].id);
+  } catch(e) {
+    // Fallback to hardcoded cards
+    cartoes=[
+      {id:'santander-unique-visa',nome:'Santander Unique Visa',cor:'#e31b23'},
+      {id:'santander-unique-master',nome:'Santander Unique Master',cor:'#e31b23'},
+      {id:'porto-visa',nome:'Porto Visa Infinite',cor:'#00a859'},
+    ];
+    document.getElementById('semCartao').style.display='none';
+    renderCartaoTabs();
+    selCartao(cartoes[0].id);
+  }
+}
+
+function renderCartaoTabs(){
+  document.getElementById('cartaoTabs').innerHTML=cartoes.map(c=>`
+    <div class="ctab" id="ctab-${c.id}" onclick="selCartao('${c.id}')">
+      <div class="ctab-nome">${c.nome}</div>
+    </div>`).join('');
+}
+
+function selCartao(id){
+  curCartao=id;
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('on'));
+  const el=document.getElementById('ctab-'+id);
+  if(el)el.classList.add('on');
+  document.getElementById('faturaCard').style.display='block';
+  loadFatura();
+}
+
+function navMes(d){
+  curMes+=d;
+  if(curMes>12){curMes=1;curAno++;}
+  if(curMes<1){curMes=12;curAno--;}
+  loadFatura();
+}
+
+async function loadFatura(){
+  const mes=String(curMes).padStart(2,'0');
+  const ym=`${curAno}-${mes}`;
+  // Date range for this month
+  const from=`${ym}-01`;
+  const lastDay=new Date(curAno,curMes,0).getDate();
+  const to=`${ym}-${lastDay}`;
+  document.getElementById('mesLabel').textContent=fmtMo(ym);
+  document.getElementById('faturaMes').textContent=`Fatura ${fmtMo(ym)}`;
+  try {
+    const txs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&type=eq.expense&order=date.desc`);
+    const total=txs.reduce((s,t)=>s+parseFloat(t.amount),0);
+    const reconciled=txs.filter(t=>t.reconciled).length;
+    document.getElementById('faturaTotal').textContent='R$ '+fmt(total);
+    document.getElementById('faturaCount').textContent=txs.length;
+    document.getElementById('faturaReconciled').textContent=reconciled;
+    document.getElementById('faturaPendente').textContent=txs.length-reconciled;
+    // Status
+    const badge=document.getElementById('faturaBadge');
+    const isCurrentMonth=curAno===now.getFullYear()&&curMes===now.getMonth()+1;
+    const isPast=new Date(curAno,curMes-1)<new Date(now.getFullYear(),now.getMonth());
+    badge.textContent=isPast?(reconciled===txs.length&&txs.length>0?'paga':'em aberto'):'aberta';
+    badge.className='status-badge status-'+(isPast?(reconciled===txs.length&&txs.length>0?'paga':'vencida'):'aberta');
+    // Store for pagamento
+    window._faturaTotal=total;window._faturaYM=ym;window._faturaTxs=txs;
+    // Render transactions
+    if(!txs.length){document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>';return;}
+    document.getElementById('faturaTxs').innerHTML=txs.map(t=>`
+      <div class="txitem ${t.reconciled?'reconciled':''}">
+        <input type="checkbox" class="txchk" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)">
+        <div class="txbody">
+          <div class="txpayee">${t.payee_display||t.payee}</div>
+          <div class="txmeta">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}${t.memo?' · '+t.memo.substring(0,40):''}</div>
+        </div>
+        <div class="txamt">-R$ ${fmt(t.amount)}</div>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('faturaTxs').innerHTML=`<div style="color:var(--red);padding:10px">Erro: ${e.message}</div>`;
+  }
+}
+
+async function toggleReconcile(id,val){
+  try{await sbUpd('transactions',`id=eq.${id}`,{reconciled:val});loadFatura();}
+  catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+async function reconcileAll(){
+  const ids=(window._faturaTxs||[]).map(t=>t.id);
+  if(!ids.length)return;
+  try{
+    await sbUpd('transactions',`id=in.(${ids.join(',')})`,{reconciled:true});
+    toast('✓ Todos reconciliados!','var(--green)','#0d0f14');
+    loadFatura();
+  }catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+function openPagamento(){
+  const total=window._faturaTotal||0;
+  const ym=window._faturaYM||'';
+  document.getElementById('pagValor').value=fmt(total);
+  document.getElementById('pagData').value=new Date().toISOString().slice(0,10);
+  document.getElementById('pagMemo').value=`Pagamento fatura ${curCartao} ${fmtMo(ym)}`;
+  document.getElementById('pagModal').classList.add('open');
+}
+function closePag(){document.getElementById('pagModal').classList.remove('open');}
+
+async function confirmarPagamento(){
+  const valor=parseFloat(document.getElementById('pagValor').value.replace(',','.'));
+  const data=document.getElementById('pagData').value;
+  const conta=document.getElementById('pagConta').value;
+  const memo=document.getElementById('pagMemo').value;
+  if(!valor||!data||!conta){toast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
+  try{
+    await sbIns('transactions',[{
+      id:Date.now(),type:'expense',amount:valor,date:data,
+      payee:`Pagamento fatura ${ALABEL[curCartao]||curCartao}`,
+      account:conta,category:'taxas-bancarias',
+      memo:memo,is_deductible:false,receipt_status:'na',
+      is_fatura_payment:true
+    }]);
+    // Mark all as reconciled
+    await reconcileAll();
+    closePag();
+    toast(`✓ Pagamento de R$ ${fmt(valor)} registrado!`,'var(--green)','#0d0f14');
+    loadFatura();
+  }catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',checkAuth);else checkAuth();
+</script>
+</body>
+</html>

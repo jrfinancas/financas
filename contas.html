@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Finanças JR · Contas</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0d0f14;--surface:#13161e;--surface2:#1a1e29;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+/* LOGIN */
+#loginOverlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--bg);z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.ll{font-family:'DM Serif Display',serif;font-size:36px;letter-spacing:-1px;margin-bottom:6px}.ll span{color:var(--accent)}
+.ls{font-size:13px;color:var(--muted);margin-bottom:44px}
+.lb{width:100%;max-width:320px}
+.ll2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;display:block}
+.li{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:22px;outline:none;text-align:center;letter-spacing:6px;margin-bottom:10px;-webkit-appearance:none}
+.li:focus{border-color:var(--accent)}
+.li.err{border-color:var(--red);animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.lbtn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.lerr{color:var(--red);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px}
+.lhint{color:#374151;font-size:11px;text-align:center}
+/* HEADER */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(14px + var(--st));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,.97);backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px}
+nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all .2s}
+nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
+.main{max-width:860px;margin:0 auto;padding:20px 16px calc(20px + var(--sb))}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+/* FORM */
+.fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;display:block}
+.fi,.fs{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+.fi:focus,.fs:focus{border-color:var(--accent)}
+.fs{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.fs option{background:var(--surface)}
+.fg{margin-bottom:13px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.aw{position:relative}
+.ap{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);font-weight:600;font-size:15px;pointer-events:none}
+.aw .fi{padding-left:32px}
+.bsave{width:100%;padding:14px;background:var(--green);color:#0d0f14;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.bclear{width:100%;padding:11px;background:none;border:1.5px solid var(--border);border-radius:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+/* CONTA CARD */
+.conta-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.conta-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.conta-body{flex:1;min-width:0}
+.conta-nome{font-size:15px;font-weight:600}
+.conta-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.conta-saldo{font-family:'DM Serif Display',serif;font-size:18px;text-align:right;flex-shrink:0}
+.conta-acts{display:flex;gap:6px;margin-top:10px}
+.conta-act{flex:1;padding:7px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer}
+.conta-act.edit{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+.conta-act.del{background:rgba(248,113,113,.1);color:var(--red)}
+/* COLOR PICKER */
+.color-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.color-btn{width:28px;height:28px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:border-color .2s}
+.color-btn.sel{border-color:white}
+/* TIPO BADGE */
+.tipo-badge{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:600}
+.tipo-corrente{background:rgba(79,142,247,.15);color:var(--accent)}
+.tipo-cartao{background:rgba(248,113,113,.15);color:var(--red)}
+.tipo-investimento{background:rgba(52,211,153,.15);color:var(--green)}
+.tipo-dinheiro{background:rgba(251,191,36,.15);color:var(--yellow)}
+.tipo-internacional{background:rgba(124,106,247,.15);color:#7c6af7}
+/* TOAST */
+#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div class="ll">Finanças <span>JR</span></div>
+  <div class="ls">Gestão Financeira Pessoal</div>
+  <div class="lb">
+    <label class="ll2">PIN de acesso</label>
+    <input type="password" inputmode="numeric" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="lerr" id="pinErr"></div>
+    <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <div class="lhint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="lancamentos.html">Lançamentos</a>
+    <a href="#" class="active">Contas</a>
+  </nav>
+</header>
+
+<div class="main">
+
+  <!-- FORM NOVA CONTA -->
+  <div class="card">
+    <div class="card-title" id="formTitle">➕ Nova Conta</div>
+    <div class="fr">
+      <div><label class="fl">Nome</label><input type="text" class="fi" id="cNome" placeholder="Ex: Nubank, Carteira..."></div>
+      <div><label class="fl">Tipo</label><select class="fs" id="cTipo" onchange="onTipoChange()">
+        <option value="corrente">Conta Corrente</option>
+        <option value="cartao">Cartão de Crédito</option>
+        <option value="investimento">Investimentos</option>
+        <option value="dinheiro">Dinheiro / Carteira</option>
+        <option value="internacional">Internacional</option>
+        <option value="poupanca">Poupança</option>
+      </select></div>
+    </div>
+    <div class="fr">
+      <div><label class="fl">Banco / Instituição</label><input type="text" class="fi" id="cBanco" placeholder="Ex: Santander, XP..."></div>
+      <div id="cSaldoWrap"><label class="fl">Saldo inicial R$</label>
+        <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="cSaldo" placeholder="0,00" style="padding-left:32px"></div>
+      </div>
+    </div>
+    <!-- Campos cartão -->
+    <div id="cCartaoFields" style="display:none">
+      <div class="fr">
+        <div><label class="fl">Dia fechamento</label><input type="number" class="fi" id="cFechamento" min="1" max="28" placeholder="Ex: 10"></div>
+        <div><label class="fl">Dia vencimento</label><input type="number" class="fi" id="cVencimento" min="1" max="28" placeholder="Ex: 17"></div>
+      </div>
+      <div class="fg"><label class="fl">Limite R$</label>
+        <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="cLimite" placeholder="0,00" style="padding-left:32px"></div>
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Cor</label>
+      <div class="color-grid" id="colorGrid"></div>
+      <input type="hidden" id="cCor" value="#4f8ef7">
+    </div>
+    <input type="hidden" id="cEditId">
+    <button class="bsave" onclick="saveConta()">✓ Salvar Conta</button>
+    <button class="bclear" onclick="clearForm()">Limpar</button>
+  </div>
+
+  <!-- LISTA DE CONTAS -->
+  <div class="card">
+    <div class="card-title">Contas Cadastradas <span id="contaCount" style="color:var(--accent);text-transform:none;font-weight:400"></span></div>
+    <div id="contaList"><div style="text-align:center;padding:20px;color:var(--muted)">⟳ Carregando...</div></div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+const SALT='jrfinancas_2026';
+const AUTH='jr_auth_v3';
+
+async function hashPin(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+SALT));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return p+'_'+SALT;}}
+function isAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(!s)return false;if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(AUTH);return false;}return true;}catch(e){return false;}}
+async function doLogin(){const inp=document.getElementById('pinInput'),err=document.getElementById('pinErr');const pin=inp.value.trim();if(!pin){err.textContent='Digite o PIN';return;}const hash=await hashPin(pin),stored=localStorage.getItem('jr_pin_hash');if(!stored){localStorage.setItem('jr_pin_hash',hash);localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else if(hash===stored){localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else{inp.classList.add('err');err.textContent='PIN incorreto.';inp.value='';setTimeout(()=>inp.classList.remove('err'),400);}}
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';setTimeout(()=>{try{document.getElementById('pinInput').focus();}catch(e){}},100);}
+function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
+function checkAuth(){if(!isAuth())showLogin();else{hideLogin();startApp();}}
+
+const CORES=['#4f8ef7','#f87171','#34d399','#fbbf24','#7c6af7','#fb923c','#e31b23','#00a859','#00b9ff','#f59e0b','#8b5cf6','#ec4899','#6b7280','#14b8a6','#000000'];
+const TIPO_ICONS={'corrente':'🏦','cartao':'💳','investimento':'📈','dinheiro':'💵','internacional':'🌍','poupanca':'🐷'};
+const TIPO_LABELS={'corrente':'Conta Corrente','cartao':'Cartão de Crédito','investimento':'Investimentos','dinheiro':'Dinheiro / Carteira','internacional':'Internacional','poupanca':'Poupança'};
+
+async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbUpd(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbDel(t,id){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:SBH});if(!r.ok)throw new Error(await r.text());}
+
+function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+let contas=[];
+
+function startApp(){
+  buildColorGrid();
+  loadContas();
+}
+
+function buildColorGrid(){
+  const grid=document.getElementById('colorGrid');
+  grid.innerHTML=CORES.map(c=>`<div class="color-btn${c==='#4f8ef7'?' sel':''}" style="background:${c}" onclick="selColor('${c}',this)" title="${c}"></div>`).join('');
+}
+
+function selColor(c,btn){
+  document.getElementById('cCor').value=c;
+  document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+function onTipoChange(){
+  const t=document.getElementById('cTipo').value;
+  document.getElementById('cCartaoFields').style.display=t==='cartao'?'block':'none';
+}
+
+async function loadContas(){
+  try{
+    contas=await sbGet('contas','order=ordem.asc');
+    // Get current balances from transactions
+    const list=document.getElementById('contaList');
+    document.getElementById('contaCount').textContent=`(${contas.length})`;
+    if(!contas.length){list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhuma conta cadastrada</div>';return;}
+    // Get saldo per conta from transactions
+    const txr=await fetch(`${SB}/rest/v1/transactions?select=account,type,amount`,{headers:SBH});
+    const txs=await txr.json();
+    const saldos={};
+    txs.forEach(t=>{
+      const v=parseFloat(t.amount)||0;
+      if(!saldos[t.account])saldos[t.account]=0;
+      saldos[t.account]+=(t.type==='income'?v:-v);
+    });
+    list.innerHTML=contas.map(c=>{
+      const saldoTx=saldos[c.id]||0;
+      const saldoTotal=parseFloat(c.saldo_inicial||0)+saldoTx;
+      const pos=saldoTotal>=0;
+      return `<div class="conta-card">
+        <div class="conta-icon" style="background:${c.cor}22">${TIPO_ICONS[c.tipo]||'🏦'}</div>
+        <div class="conta-body">
+          <div class="conta-nome">${c.nome}</div>
+          <div class="conta-meta"><span class="tipo-badge tipo-${c.tipo}">${TIPO_LABELS[c.tipo]||c.tipo}</span>${c.banco?' · '+c.banco:''}</div>
+          <div class="conta-acts">
+            <button class="conta-act edit" onclick="editConta('${c.id}')">✎ Editar</button>
+            <button class="conta-act del" onclick="delConta('${c.id}')">✕ Remover</button>
+          </div>
+        </div>
+        <div>
+          <div class="conta-saldo ${pos?'':''}">
+            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">Saldo atual</div>
+            <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldoTotal)}</div>
+            ${parseFloat(c.saldo_inicial||0)!==0?`<div style="font-size:10px;color:var(--muted);text-align:right">inicial: R$ ${fmt(c.saldo_inicial)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){toast('Erro ao carregar contas','var(--red)','white');}
+}
+
+async function saveConta(){
+  const nome=document.getElementById('cNome').value.trim();
+  const tipo=document.getElementById('cTipo').value;
+  const banco=document.getElementById('cBanco').value.trim();
+  const saldo=parseFloat(document.getElementById('cSaldo').value.replace(',','.'))||0;
+  const cor=document.getElementById('cCor').value;
+  const eid=document.getElementById('cEditId').value;
+  if(!nome){toast('⚠ Digite o nome da conta','#fbbf24','#0d0f14');return;}
+  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,saldo_atual:saldo,cor,ativo:true};
+  if(tipo==='cartao'){
+    conta.dia_fechamento=parseInt(document.getElementById('cFechamento').value)||null;
+    conta.dia_vencimento=parseInt(document.getElementById('cVencimento').value)||null;
+    conta.limite=parseFloat(document.getElementById('cLimite').value.replace(',','.'))||null;
+  }
+  try{
+    if(eid){
+      await sbUpd('contas',eid,conta);
+      toast('✓ Conta atualizada!','var(--green)','#0d0f14');
+    } else {
+      conta.id=nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').slice(0,30)+'-'+Date.now().toString().slice(-4);
+      conta.ordem=contas.length+1;
+      await sbIns('contas',conta);
+      toast('✓ Conta criada!','var(--green)','#0d0f14');
+    }
+    clearForm();
+    loadContas();
+  }catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+function editConta(id){
+  const c=contas.find(x=>x.id===id);if(!c)return;
+  document.getElementById('cNome').value=c.nome;
+  document.getElementById('cTipo').value=c.tipo;
+  document.getElementById('cBanco').value=c.banco||'';
+  document.getElementById('cSaldo').value=c.saldo_inicial?fmt(c.saldo_inicial):'';
+  document.getElementById('cCor').value=c.cor||'#4f8ef7';
+  document.getElementById('cEditId').value=c.id;
+  document.getElementById('formTitle').textContent='✎ Editar Conta';
+  onTipoChange();
+  if(c.tipo==='cartao'){
+    document.getElementById('cFechamento').value=c.dia_fechamento||'';
+    document.getElementById('cVencimento').value=c.dia_vencimento||'';
+    document.getElementById('cLimite').value=c.limite?fmt(c.limite):'';
+  }
+  // Update color selection
+  document.querySelectorAll('.color-btn').forEach(b=>{b.classList.toggle('sel',b.style.background===c.cor||b.style.backgroundColor===c.cor);});
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function delConta(id){
+  const c=contas.find(x=>x.id===id);
+  if(!confirm(`Remover a conta "${c?.nome}"?\n\nIsso não apaga as transações, apenas remove a conta da lista.`))return;
+  try{await sbDel('contas',id);loadContas();toast('Conta removida','var(--red)','white');}
+  catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+function clearForm(){
+  ['cNome','cBanco','cSaldo','cFechamento','cVencimento','cLimite','cEditId'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('cTipo').value='corrente';
+  document.getElementById('cCor').value='#4f8ef7';
+  document.getElementById('cCartaoFields').style.display='none';
+  document.getElementById('formTitle').textContent='➕ Nova Conta';
+  buildColorGrid();
+}
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',checkAuth);else checkAuth();
+</script>
+</body>
+</html>
