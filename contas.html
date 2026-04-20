@@ -248,7 +248,10 @@ async function saveConta(){
   const cor=document.getElementById('cCor').value;
   const eid=document.getElementById('cEditId').value;
   if(!nome){toast('⚠ Digite o nome da conta','#fbbf24','#0d0f14');return;}
-  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,saldo_atual:saldo,cor,ativo:true};
+  // When editing, don't overwrite saldo_atual (it's calculated from transactions)
+  const isEdit = !!document.getElementById('cEditId').value;
+  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,cor,ativo:true};
+  if(!isEdit) conta.saldo_atual=saldo; // only set on create
   if(tipo==='cartao'){
     conta.dia_fechamento=parseInt(document.getElementById('cFechamento').value)||null;
     conta.dia_vencimento=parseInt(document.getElementById('cVencimento').value)||null;

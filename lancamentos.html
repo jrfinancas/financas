@@ -1511,7 +1511,8 @@ function addRecSLine(pre) {
   const div=document.createElement('div');div.className='sline';div.id='rsl'+n;
   const cats=['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${pre?.category===c?' selected':''}>${CLABEL[c]||c}</option>`).join('');
   div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n}</span><button class="rmvbtn" onclick="document.getElementById('rsl${n}').remove()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="rslc${n}" style="font-size:13px"><option value="">...</option>${cats}</select></div>
+  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="rslc${n}" onchange="fillSub('rslsub${n}','rslc${n}')" style="font-size:13px"><option value="">...</option>${cats}</select></div>
+  <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="rslsub${n}" style="font-size:13px"><option value="">—</option></select></div>
   <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="rsla${n}" placeholder="0,00" value="${pre?.amount?fmt(pre.amount):''}" style="font-size:14px"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="rsld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
   document.getElementById('recSLines').appendChild(div);
@@ -1545,8 +1546,10 @@ async function saveRec() {
     const lines=[];
     document.querySelectorAll('[id^="rslc"]').forEach(el=>{
       const n=el.id.slice(4);
-      const c=el.value,a=parseFloat(document.getElementById('rsla'+n)?.value?.replace(',','.'))||0,d=document.getElementById('rsld'+n)?.value||'';
-      if(c&&a)lines.push({category:c,amount:a,desc:d});
+      const cat=el.value,a=parseFloat(document.getElementById('rsla'+n)?.value?.replace(',','.'))||0;
+      const d=document.getElementById('rsld'+n)?.value||'';
+      const sub=document.getElementById('rslsub'+n)?.value||null;
+      if(cat&&a)lines.push({category:cat,subcategory:sub,amount:a,desc:d});
     });
     if(!tot||!ac||!lines.length){toast('⚠ Preencha total, conta e linhas','#fbbf24','#0d0f14');return;}
     rec={...rec,amount:tot,account:ac,split_lines:lines};

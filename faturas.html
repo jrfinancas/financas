@@ -248,14 +248,33 @@ function navMes(d){
 async function loadFatura(){
   const mes=String(curMes).padStart(2,'0');
   const ym=`${curAno}-${mes}`;
-  // Date range for this month
-  const from=`${ym}-01`;
-  const lastDay=new Date(curAno,curMes,0).getDate();
-  const to=`${ym}-${lastDay}`;
+  // Get card's fechamento day to compute correct billing period
+  const cartao=cartoes.find(c=>c.id===curCartao);
+  const fechDia=cartao?.dia_fechamento||null;
+  let from, to;
+  if(fechDia) {
+    // Billing period: from day after fechamento of previous month to fechamento of current month
+    const prevMes=curMes===1?12:curMes-1;
+    const prevAno=curMes===1?curAno-1:curAno;
+    const prevLastDay=new Date(prevAno,prevMes,0).getDate();
+    const prevFech=Math.min(fechDia,prevLastDay);
+    from=`${prevAno}-${String(prevMes).padStart(2,'0')}-${String(prevFech+1).padStart(2,'0')}`;
+    const curLastDay=new Date(curAno,curMes,0).getDate();
+    const curFech=Math.min(fechDia,curLastDay);
+    to=`${curAno}-${mes}-${String(curFech).padStart(2,'0')}`;
+  } else {
+    from=`${ym}-01`;
+    const lastDay=new Date(curAno,curMes,0).getDate();
+    to=`${ym}-${lastDay}`;
+  }
+  const periodoLabel=fechDia?`${fmtDate(from)} → ${fmtDate(to)}`:`${fmtMo(ym)}`;
   document.getElementById('mesLabel').textContent=fmtMo(ym);
   document.getElementById('faturaMes').textContent=`Fatura ${fmtMo(ym)}`;
+  document.getElementById('faturaVenc').textContent=
+    cartao?.dia_vencimento?`Venc: dia ${cartao.dia_vencimento} · Período: ${periodoLabel}`:periodoLabel;
   try {
-    const txs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&type=eq.expense&order=date.desc`);
+    // Load ALL transactions for this account in the period (includes Quicken imports)
+    const txs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&type=eq.expense&is_fatura_payment=eq.false&order=date.desc`);
     const total=txs.reduce((s,t)=>s+parseFloat(t.amount),0);
     const reconciled=txs.filter(t=>t.reconciled).length;
     document.getElementById('faturaTotal').textContent='R$ '+fmt(total);
@@ -306,7 +325,12 @@ function openPagamento(){
   const ym=window._faturaYM||'';
   document.getElementById('pagValor').value=fmt(total);
   document.getElementById('pagData').value=new Date().toISOString().slice(0,10);
-  document.getElementById('pagMemo').value=`Pagamento fatura ${curCartao} ${fmtMo(ym)}`;
+  const cartaoPag=cartoes.find(cc=>cc.id===curCartao);
+  document.getElementById('pagMemo').value='Pagamento fatura '+(cartaoPag?.nome||curCartao)+' '+fmtMo(ym);
+  // Populate conta options from loaded cartoes (non-credit accounts)
+  const pagContaSel=document.getElementById('pagConta');
+  pagContaSel.innerHTML=cartoes.filter(cc=>cc.tipo!=='cartao').map(cc=>`<option value="${cc.id}">${cc.nome}</option>`).join('')
+    ||'<option value="santander-cc">Santander CC</option>';
   document.getElementById('pagModal').classList.add('open');
 }
 function closePag(){document.getElementById('pagModal').classList.remove('open');}
