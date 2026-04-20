@@ -1483,14 +1483,6 @@ async function exportIR() {
   var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='IR_'+year+'.csv';a.click();
   toast('CSV exportado!','var(--green)','#0d0f14');
-}-01-01&date=lte.${year}-12-31&is_deductible=eq.true&order=date.asc`);
-  const rows=[['Data','Fornecedor','Categoria','Valor','Tipo','Comprovante','Observação']];
-  txs.forEach(t=>rows.push([t.date,t.payee_display||t.payee,CLABEL[t.category]||t.category,fmt(t.amount),t.type==='income'?'Receita':'Despesa',t.receipt_status==='attached'?'Sim':'Não',t.memo||'']));
-  const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('
-');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`IR_${year}.csv`;a.click();
-  toast('✓ CSV exportado!','var(--green)','#0d0f14');
 }
 
 // ============================================================
