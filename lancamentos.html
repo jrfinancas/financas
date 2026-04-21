@@ -489,7 +489,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <label class="fl">Status do Comprovante</label>
       <div class="rstatus">
         <button class="rbtn on na" id="rAtt" onclick="setRS('att',this)">✓ Anexado</button>
-        <button class="rbtn" id="rPnd" onclick="setRS('pnd',this)">⏳ Aguardando</button>
+        <button class="rbtn" id="rPnd" onclick="setRS('pending',this)">⏳ Aguardando</button>
         <button class="rbtn on na" id="rNA"  onclick="setRS('na', this)">— N/A</button>
       </div>
       <!-- FX -->
@@ -885,7 +885,7 @@ const TODAY = new Date().toISOString().slice(0,10);
 const THIS_MONTH = TODAY.slice(0,7);
 const THIS_YEAR  = TODAY.slice(0,4);
 
-const DED  = new Set(['saude','educacao','seguros','impostos','salario','bonus','dividendos','outras-entradas']);
+const DED  = new Set(['saude','educacao','impostos','salario','bonus','dividendos']);
 const INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
 
 const SUBS = {
@@ -1054,8 +1054,10 @@ function onCatCh(px) {
   const cat=document.getElementById(px+'Cat').value;
   fillSub(px+'Sub', px+'Cat');
   const badge=document.getElementById(px+'DedBadge');
-  if(badge) badge.style.display=DED.has(cat)?'inline-flex':'none';
-  if(px==='n' && DED.has(cat) && !INC.has(cat) && !nB64 && nRS==='na') setRS('pnd',document.getElementById('rPnd'));
+  const subVal=(document.getElementById('nSub')?.value)||'';
+  const isDedutivel=DED.has(cat) && !['medicamentos','academia','outros_impostos'].includes(subVal);
+  if(badge) badge.style.display=isDedutivel?'inline-flex':'none';
+  if(px==='n' && DED.has(cat) && !INC.has(cat) && !nB64 && nRS==='na') setRS('pending',document.getElementById('rPnd'));
 }
 
 function setRS(v, btn) {
@@ -1134,7 +1136,7 @@ Continuar mesmo assim?`;
         payee,payee_display:inst>1?`${payee} (${i+1}/${inst})`:null,
         account:acct,category:cat,subcategory:document.getElementById('nSub').value||null,
         memo:document.getElementById('nMemo').value||null,
-        receipt_status:i===0?nRS:'na',is_deductible:DED.has(cat),
+        receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:DED.has(cat)&&!new Set(['medicamentos','academia','outros_impostos']).has(sub),
         installments:inst,installment_num:i+1,group_id:gid,
         fx:i===0&&pendFX?pendFX:null});
     }
@@ -1228,7 +1230,7 @@ async function saveSplit() {
   sync('busy');
   try {
     const gid=Date.now();
-    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,type:'expense',amount:l.amount,date,payee,account:acct,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:DED.has(l.category),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot})));
+    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,type:'expense',amount:l.amount,date,payee,account:acct,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot})));
     await upsertPayee(payee,null,null);
     sync('ok'); toast(`✓ ${lines.length} linhas salvas!`,'var(--green)','#0d0f14'); clearSplit();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
@@ -1439,9 +1441,17 @@ async function loadIR() {
   }
   const year=sel.value||THIS_YEAR;
   try {
-    const txs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true`);
+    const allTxs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true`);
+    // Apply subcategory deductibility rules
+    const NON_DED_CATS_IR=new Set(['seguros','outras-entradas']);
+    const NON_DED_SUBS_IR=new Set(['medicamentos','academia','outros_impostos']);
+    const txs=allTxs.filter(t=>{
+      if(NON_DED_CATS_IR.has(t.category)) return false;
+      if(t.subcategory && NON_DED_SUBS_IR.has(t.subcategory)) return false;
+      return true;
+    });
     const de=txs.filter(t=>t.type==='expense'), di=txs.filter(t=>t.type==='income');
-    const pend=txs.filter(t=>t.receipt_status==='pending');
+    const pend=allTxs.filter(t=>t.receipt_status==='pending');
     const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
     document.getElementById('irKpis').innerHTML=`
       <div class="irkpi-card"><div class="irkpi-label">Despesas Dedutíveis</div><div class="irkpi-val neg">-R$ ${fmt(te)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${de.length} lançamentos</div></div>
@@ -1481,7 +1491,15 @@ async function markOK(id) {
 
 async function exportIR() {
   const year=document.getElementById('irYear')?.value||THIS_YEAR;
-  const txs=await sbGet('transactions','date=gte.'+year+'-01-01&date=lte.'+year+'-12-31&is_deductible=eq.true&order=date.asc');
+  const txs_all=await sbGet('transactions','date=gte.'+year+'-01-01&date=lte.'+year+'-12-31&is_deductible=eq.true&order=date.asc');
+    // Apply subcategory exclusion rules per user spec
+    const NON_DED_SUBS=new Set(['medicamentos','academia','outros_impostos','manutencao']);
+    const NON_DED_CATS=new Set(['outras-entradas','seguros']);
+    const txs=txs_all.filter(t=>{
+      if(NON_DED_CATS.has(t.category)) return false;
+      if(NON_DED_SUBS.has(t.subcategory)) return false;
+      return true;
+    });
   const rows=[['Data','Fornecedor','Categoria','Valor','Tipo','Comprovante','Observacao']];
   txs.forEach(function(t){rows.push([t.date,t.payee_display||t.payee,CLABEL[t.category]||t.category,fmt(t.amount),t.type==='income'?'Receita':'Despesa',t.receipt_status==='attached'?'Sim':'Nao',t.memo||'']);});
   var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
@@ -1583,6 +1601,17 @@ async function saveRec() {
   } catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
 }
 
+function isDeductible(cat, sub) {
+  // Seguros nunca dedutível
+  if(cat==='seguros') return false;
+  // outras-entradas nunca dedutível
+  if(cat==='outras-entradas') return false;
+  // Subcategorias não dedutíveis dentro de categorias dedutíveis
+  const NON_DED_SUBS=new Set(['medicamentos','academia','outros_impostos']);
+  if(NON_DED_SUBS.has(sub)) return false;
+  return DED.has(cat);
+}
+
 function toggleEstimated() {
   const chk=document.getElementById('recEstimated').checked;
   document.getElementById('recEstNote').style.display=chk?'block':'none';
@@ -1658,7 +1687,7 @@ async function launchRec(id) {
   }
   const date=r.next_date;const gid=Date.now();const rows=[];
   if(r.launch_type==='split'&&r.split_lines){
-    r.split_lines.forEach((l,i)=>rows.push({id:gid+i,type:r.type,amount:l.amount,date,payee:r.name,account:r.account,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:DED.has(l.category),receipt_status:'na',is_split:true,split_total:r.amount,from_recorrente:true}));
+    r.split_lines.forEach((l,i)=>rows.push({id:gid+i,type:r.type,amount:l.amount,date,payee:r.name,account:r.account,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:r.amount,from_recorrente:true}));
   } else {
     rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:r.memo||null,is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }

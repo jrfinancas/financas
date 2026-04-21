@@ -314,7 +314,18 @@ async function loadFatura(){
       document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
       return;
     }
-    document.getElementById('faturaTxs').innerHTML=txs.map(t=>`
+    // Render with sort support
+    let sortField='date', sortDir=1;
+    function renderTxList(list){
+      document.getElementById('faturaTxs').innerHTML=
+        `<div style="display:flex;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--muted)">
+          <div style="width:18px"></div>
+          <div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs('date')">DATA ${sortField==='date'?(sortDir>0?'↑':'↓'):''}</div>
+          <div style="flex:2;cursor:pointer;user-select:none" onclick="sortTxs('payee')">FORNECEDOR ${sortField==='payee'?(sortDir>0?'↑':'↓'):''}</div>
+          <div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs('category')">CATEGORIA ${sortField==='category'?(sortDir>0?'↑':'↓'):''}</div>
+          <div style="cursor:pointer;user-select:none;min-width:90px;text-align:right" onclick="sortTxs('amount')">VALOR ${sortField==='amount'?(sortDir>0?'↑':'↓'):''}</div>
+        </div>`+
+        list.map(t=>`
       <div class="txitem ${t.reconciled?'reconciled':''}">
         <input type="checkbox" class="txchk" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)">
         <div class="txbody">
@@ -323,6 +334,19 @@ async function loadFatura(){
         </div>
         <div class="txamt">-R$ ${fmt(t.amount)}</div>
       </div>`).join('')+edgeHtml;
+      document.getElementById('faturaTxs').innerHTML+=edgeHtml;
+    }
+    window._txsData=txs;
+    renderTxList(txs);
+    window.sortTxs=function(field){
+      if(sortField===field) sortDir*=-1; else {sortField=field;sortDir=1;}
+      const sorted=[...window._txsData].sort((a,b)=>{
+        const va=a[field]||'', vb=b[field]||'';
+        if(field==='amount') return (parseFloat(va)-parseFloat(vb))*sortDir;
+        return va.localeCompare(vb)*sortDir;
+      });
+      renderTxList(sorted);
+    };
   } catch(e) {
     document.getElementById('faturaTxs').innerHTML=`<div style="color:var(--red);padding:10px">Erro: ${e.message}</div>`;
   }
@@ -366,9 +390,9 @@ async function confirmarPagamento(){
   if(!valor||!data||!conta){toast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
   try{
     await sbIns('transactions',[{
-      id:Date.now(),type:'expense',amount:valor,date:data,
-      payee:`Pagamento fatura ${ALABEL[curCartao]||curCartao}`,
-      account:conta,category:'taxas-bancarias',
+      id:Date.now(),type:'transfer',amount:valor,date:data,
+      payee:'Pagamento fatura '+(ALABEL[curCartao]||curCartao),
+      account:conta,category:'transferencia',
       memo:memo,is_deductible:false,receipt_status:'na',
       is_fatura_payment:true
     }]);
