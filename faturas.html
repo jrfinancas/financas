@@ -161,11 +161,12 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       <button onclick="openPagamento()" style="flex:1;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600">💳 Pagar Fatura</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:8px 12px;background:var(--surface2);border-radius:8px">
-      <input type="checkbox" id="hideReconciled" style="width:16px;height:16px;accent-color:var(--accent)" onchange="renderTxList(window._txsData||[])">
+      <input type="checkbox" id="hideReconciled" style="width:16px;height:16px;accent-color:var(--accent)" onchange="window.renderTxList(window._txsData||[])">
       <label for="hideReconciled" style="font-size:13px;cursor:pointer;flex:1">Ocultar lançamentos já reconciliados</label>
       <span id="reconciledCount" style="font-size:11px;color:var(--muted)"></span>
     </div>
     <!-- Lista transações -->
+    <div id="pagtosBox"></div>
     <div id="faturaTxs"><div style="text-align:center;padding:20px;color:var(--muted)">⟳ Carregando...</div></div>
   </div>
 
@@ -292,6 +293,8 @@ async function loadFatura(){
     const fromBuffer = addDaysStr(from, -2);
     const toBuffer = addDaysStr(to, 2);
     const allTxs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${fromBuffer}&date=lte.${toBuffer}&type=eq.expense&is_fatura_payment=eq.false&order=date.desc`);
+    // Also load payments for this cartão in this period
+    const pagtos=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&is_fatura_payment=eq.true&order=date.desc`);
     // Split into in-period and edge transactions
     const txs = allTxs.filter(t=>t.date>=from && t.date<=to);
     const edgeTxs = allTxs.filter(t=>t.date<from || t.date>to);
@@ -316,15 +319,18 @@ async function loadFatura(){
         ${edgeTxs.map(t=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--muted)">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--yellow)">-R$ ${fmt(t.amount)}</span></div>`).join('')}
       </div>` : '';
     if(!txs.length){
-      const recCount=(window._txsData||[]).filter(t=>t.reconciled).length;
+      const allTxsList=window._txsData||[];
+      const recCount=allTxsList.filter(t=>t.reconciled).length;
+      const recTotal=allTxsList.filter(t=>t.reconciled).reduce((s,t)=>s+parseFloat(t.amount),0);
       const countEl=document.getElementById('reconciledCount');
-      if(countEl) countEl.textContent=recCount+' reconciliado(s)';
+      if(countEl) countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal);
       document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
       return;
     }
-    // Render with sort support
-    let sortField='date', sortDir=1;
-    function renderTxList(list){
+    // Render with sort support - store state on window for external access
+    window._sortField='date'; window._sortDir=1;
+    window.renderTxList=function(list){
+      const sortField=window._sortField, sortDir=window._sortDir;
       // Apply hide-reconciled filter
       const hideRec = document.getElementById('hideReconciled')?.checked;
       const visible = hideRec ? list.filter(t=>!t.reconciled) : list;
@@ -347,16 +353,19 @@ async function loadFatura(){
         <div class="txamt">-R$ ${fmt(t.amount)}</div>
       </div>`).join('')+edgeHtml;
     }
+    // Show payment section
+    const pagtosHtml = (pagtos||[]).length ? '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px">✓ PAGAMENTO(S) REGISTRADO(S)</div>'+(pagtos||[]).map(p=>'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+fmtDate(p.date)+' · '+(p.memo||p.payee)+'</span><span style="color:var(--green);font-weight:600">+R$ '+fmt(p.amount)+'</span></div>').join('')+'</div>' : '';
+    document.getElementById('pagtosBox').innerHTML = pagtosHtml;
     window._txsData=txs;
-    renderTxList(txs);
+    window.renderTxList(txs);
     window.sortTxs=function(field){
-      if(sortField===field) sortDir*=-1; else {sortField=field;sortDir=1;}
+      if(window._sortField===field) window._sortDir*=-1; else {window._sortField=field;window._sortDir=1;}
       const sorted=[...window._txsData].sort((a,b)=>{
         const va=a[field]||'', vb=b[field]||'';
-        if(field==='amount') return (parseFloat(va)-parseFloat(vb))*sortDir;
-        return va.localeCompare(vb)*sortDir;
+        if(field==='amount') return (parseFloat(va)-parseFloat(vb))*window._sortDir;
+        return va.localeCompare(vb)*window._sortDir;
       });
-      renderTxList(sorted);
+      window.renderTxList(sorted);
     };
   } catch(e) {
     document.getElementById('faturaTxs').innerHTML=`<div style="color:var(--red);padding:10px">Erro: ${e.message}</div>`;

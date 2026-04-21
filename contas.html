@@ -115,7 +115,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     </div>
     <div class="fr">
       <div><label class="fl">Banco / Instituição</label><input type="text" class="fi" id="cBanco" placeholder="Ex: Santander, XP..."></div>
-      <div id="cSaldoWrap"><label class="fl">Saldo inicial R$</label>
+      <div id="cSaldoWrap"><label class="fl">Saldo atual da conta R$ <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(valor real hoje — começou a usar o app)</span></label>
         <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="cSaldo" placeholder="0,00" style="padding-left:32px"></div>
       </div>
     </div>
@@ -205,19 +205,14 @@ async function loadContas(){
     const list=document.getElementById('contaList');
     document.getElementById('contaCount').textContent=`(${contas.length})`;
     if(!contas.length){list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhuma conta cadastrada</div>';return;}
-    // Get saldo per conta from transactions
-    const txr=await fetch(`${SB}/rest/v1/transactions?select=account,type,amount`,{headers:SBH});
-    const txs=await txr.json();
-    const saldos={};
-    txs.forEach(t=>{
-      const v=parseFloat(t.amount)||0;
-      if(!saldos[t.account])saldos[t.account]=0;
-      saldos[t.account]+=(t.type==='income'?v:-v);
-    });
+    // Saldo: para contas operacionais, mostra saldo_inicial como referência
+    // NÃO soma transações históricas (evita distorção pelo Quicken desde 2011)
+    // O saldo_inicial deve ser o saldo real cadastrado pelo usuário
+    const CONTAS_CARTAO = new Set(['santander-unique-visa','santander-unique-master','porto-visa']);
     list.innerHTML=contas.map(c=>{
-      const saldoTx=saldos[c.id]||0;
-      const saldoTotal=parseFloat(c.saldo_inicial||0)+saldoTx;
-      const pos=saldoTotal>=0;
+      const saldo=parseFloat(c.saldo_inicial||0);
+      const pos=saldo>=0;
+      const isCartao=c.tipo==='cartao'||CONTAS_CARTAO.has(c.id);
       return `<div class="conta-card">
         <div class="conta-icon" style="background:${c.cor}22">${TIPO_ICONS[c.tipo]||'🏦'}</div>
         <div class="conta-body">
@@ -229,10 +224,11 @@ async function loadContas(){
           </div>
         </div>
         <div>
-          <div class="conta-saldo ${pos?'':''}">
-            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">Saldo atual</div>
-            <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldoTotal)}</div>
-            ${parseFloat(c.saldo_inicial||0)!==0?`<div style="font-size:10px;color:var(--muted);text-align:right">inicial: R$ ${fmt(c.saldo_inicial)}</div>`:''}
+          <div class="conta-saldo">
+            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Limite':'Saldo cadastrado'}</div>
+            <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
+            ${isCartao&&c.limite?`<div style="font-size:10px;color:var(--muted);text-align:right">limite: R$ ${fmt(c.limite)}</div>`:''}
+            ${!isCartao&&saldo===0?`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Atualize o saldo</div>`:''}
           </div>
         </div>
       </div>`;
