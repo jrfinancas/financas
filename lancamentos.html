@@ -1183,20 +1183,25 @@ function addSLine(pre) {
   const div=document.createElement('div');div.className='sline';div.id='sl'+n;
   const cats=['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${pre?.category===c?' selected':''}>${CLABEL[c]||c}</option>`).join('');
   div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n}</span><button class="rmvbtn" onclick="document.getElementById('sl${n}').remove();chkSplit()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" style="font-size:13px"><option value="">...</option>${cats}</select></div>
+  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="fillSub('slsub${n}','slc${n}')" style="font-size:13px"><option value="">...</option>${cats}</select></div>
+  <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub${n}" style="font-size:13px"><option value="">—</option></select></div>
   <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla${n}" placeholder="0,00" value="${pre?.amount?fmt(pre.amount):''}" oninput="chkSplit()"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
-  document.getElementById('sLines').appendChild(div); chkSplit();
+  document.getElementById('sLines').appendChild(div);
+  if(pre?.category){fillSub('slsub'+n,'slc'+n);if(pre?.subcategory)setTimeout(()=>{const s=document.getElementById('slsub'+n);if(s)s.value=pre.subcategory;},10);}
+  chkSplit();
 }
 
 function getSLines() {
   const l=[];
   document.querySelectorAll('[id^="sl"]').forEach(el=>{
+    if(!el.id.match(/^sl\d+$/)) return; // only sl1, sl2... not slc1, sla1 etc
     const n=el.id.slice(2);
-    const c=document.getElementById('slc'+n)?.value;
+    const cat=document.getElementById('slc'+n)?.value;
     const a=parseFloat(document.getElementById('sla'+n)?.value?.replace(',','.'))||0;
     const d=document.getElementById('sld'+n)?.value||'';
-    if(c&&a) l.push({category:c,amount:a,desc:d});
+    const sub=document.getElementById('slsub'+n)?.value||null;
+    if(cat&&a) l.push({category:cat,subcategory:sub,amount:a,desc:d});
   });
   return l;
 }
@@ -1516,6 +1521,16 @@ function addRecSLine(pre) {
   <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="rsla${n}" placeholder="0,00" value="${pre?.amount?fmt(pre.amount):''}" style="font-size:14px"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="rsld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
   document.getElementById('recSLines').appendChild(div);
+  // Populate subcategory if category is pre-set
+  if(pre?.category) {
+    fillSub('rslsub'+n, 'rslc'+n);
+    if(pre?.subcategory) {
+      setTimeout(()=>{
+        const sub=document.getElementById('rslsub'+n);
+        if(sub) sub.value=pre.subcategory;
+      },10);
+    }
+  }
 }
 
 function updRecDate() {

@@ -192,6 +192,10 @@ async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{head
 async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbUpd(t,q,d){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{method:'PATCH',headers:{...SBH,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
 
+function addDaysStr(dateStr, n){
+  const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
 function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
@@ -270,11 +274,22 @@ async function loadFatura(){
   const periodoLabel=fechDia?`${fmtDate(from)} → ${fmtDate(to)}`:`${fmtMo(ym)}`;
   document.getElementById('mesLabel').textContent=fmtMo(ym);
   document.getElementById('faturaMes').textContent=`Fatura ${fmtMo(ym)}`;
-  document.getElementById('faturaVenc').textContent=
-    cartao?.dia_vencimento?`Venc: dia ${cartao.dia_vencimento} · Período: ${periodoLabel}`:periodoLabel;
+  const vencLabel = cartao?.dia_vencimento
+    ? `Venc: dia ${cartao.dia_vencimento} · Período: ${periodoLabel}`
+    : periodoLabel;
+  document.getElementById('faturaVenc').textContent = vencLabel;
+  document.getElementById('faturaVenc').title =
+    fechDia ? `Fechamento: dia ${fechDia} · O período pode variar ±1-2 dias dependendo do mês`
+    : 'Sem dia de fechamento cadastrado — usando período completo do mês';
   try {
     // Load ALL transactions for this account in the period (includes Quicken imports)
-    const txs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&type=eq.expense&is_fatura_payment=eq.false&order=date.desc`);
+    // Load transactions in billing period + a few days buffer for edge cases
+    const fromBuffer = addDaysStr(from, -2);
+    const toBuffer = addDaysStr(to, 2);
+    const allTxs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${fromBuffer}&date=lte.${toBuffer}&type=eq.expense&is_fatura_payment=eq.false&order=date.desc`);
+    // Split into in-period and edge transactions
+    const txs = allTxs.filter(t=>t.date>=from && t.date<=to);
+    const edgeTxs = allTxs.filter(t=>t.date<from || t.date>to);
     const total=txs.reduce((s,t)=>s+parseFloat(t.amount),0);
     const reconciled=txs.filter(t=>t.reconciled).length;
     document.getElementById('faturaTotal').textContent='R$ '+fmt(total);
@@ -290,7 +305,15 @@ async function loadFatura(){
     // Store for pagamento
     window._faturaTotal=total;window._faturaYM=ym;window._faturaTxs=txs;
     // Render transactions
-    if(!txs.length){document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>';return;}
+    const edgeHtml = edgeTxs.length ? `
+      <div style="margin-top:14px;padding:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px">
+        <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ ${edgeTxs.length} lançamento(s) próximos ao fechamento — verifique se pertencem a esta fatura ou à anterior/próxima</div>
+        ${edgeTxs.map(t=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--muted)">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--yellow)">-R$ ${fmt(t.amount)}</span></div>`).join('')}
+      </div>` : '';
+    if(!txs.length){
+      document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
+      return;
+    }
     document.getElementById('faturaTxs').innerHTML=txs.map(t=>`
       <div class="txitem ${t.reconciled?'reconciled':''}">
         <input type="checkbox" class="txchk" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)">
@@ -299,7 +322,7 @@ async function loadFatura(){
           <div class="txmeta">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}${t.memo?' · '+t.memo.substring(0,40):''}</div>
         </div>
         <div class="txamt">-R$ ${fmt(t.amount)}</div>
-      </div>`).join('');
+      </div>`).join('')+edgeHtml;
   } catch(e) {
     document.getElementById('faturaTxs').innerHTML=`<div style="color:var(--red);padding:10px">Erro: ${e.message}</div>`;
   }
