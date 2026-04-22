@@ -1132,7 +1132,15 @@ Continuar mesmo assim?`;
     for(let i=0;i<inst;i++){
       const d=new Date(fm+'-01');d.setMonth(d.getMonth()+i);
       rows.push({id:gid+i,type:nType==='exp'?'expense':'income',amount:p,
-        date:i===0?date:d.toISOString().slice(0,7)+'-01',
+        date:(()=>{
+          if(i===0) return date;
+          const orig=new Date(date+'T00:00:00');
+          const nd=new Date(fm+'-01T00:00:00');
+          nd.setMonth(nd.getMonth()+i);
+          const maxDay=new Date(nd.getFullYear(),nd.getMonth()+1,0).getDate();
+          nd.setDate(Math.min(orig.getDate(),maxDay));
+          return nd.toISOString().slice(0,10);
+        })(),
         payee,payee_display:inst>1?`${payee} (${i+1}/${inst})`:null,
         account:acct,category:cat,subcategory:document.getElementById('nSub').value||null,
         memo:document.getElementById('nMemo').value||null,

@@ -312,11 +312,12 @@ async function loadFatura(){
     badge.className='status-badge status-'+(isPast?(reconciled===txs.length&&txs.length>0?'paga':'vencida'):'aberta');
     // Store for pagamento
     window._faturaTotal=total;window._faturaYM=ym;window._faturaTxs=txs;
-    // Render transactions
-    const edgeHtml = edgeTxs.length ? `
+    // Render transactions - edge transactions also respect hideReconciled
+    const edgeTxsFiltered = edgeTxs; // shown in yellow always, but mark reconciled
+    const edgeHtml = edgeTxsFiltered.length ? `
       <div style="margin-top:14px;padding:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px">
         <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ ${edgeTxs.length} lançamento(s) próximos ao fechamento — verifique se pertencem a esta fatura ou à anterior/próxima</div>
-        ${edgeTxs.map(t=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)"><span style="color:var(--muted)">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--yellow)">-R$ ${fmt(t.amount)}</span></div>`).join('')}
+        ${edgeTxsFiltered.map(t=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);${t.reconciled?'opacity:.4;text-decoration:line-through':''}"><input type="checkbox" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)" style="width:14px;height:14px;accent-color:var(--accent)"><span style="color:var(--muted);flex:1">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--yellow)">-R$ ${fmt(t.amount)}</span></div>`).join('')}
       </div>` : '';
     if(!txs.length){
       const allTxsList=window._txsData||[];
