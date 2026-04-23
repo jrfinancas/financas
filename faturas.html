@@ -255,6 +255,23 @@ function navMes(d){
   loadFatura();
 }
 
+function updatePagtosBox(){
+  const pagtos=window._pagtos||[];
+  const box=document.getElementById('pagtosBox');
+  if(!box) return;
+  if(!pagtos.length){box.innerHTML='';return;}
+  let html='<div style="margin-bottom:12px;padding:10px 12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px">';
+  html+='<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px">✓ PAGAMENTO(S) REGISTRADO(S)</div>';
+  pagtos.forEach(function(p){
+    html+='<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0">';
+    html+='<span>'+fmtDate(p.date)+' · '+(p.memo||p.payee)+'</span>';
+    html+='<span style="color:var(--green);font-weight:600">+R$ '+fmt(p.amount)+'</span>';
+    html+='</div>';
+  });
+  html+='</div>';
+  box.innerHTML=html;
+}
+
 async function loadFatura(){
   const mes=String(curMes).padStart(2,'0');
   const ym=`${curAno}-${mes}`;
@@ -332,6 +349,12 @@ async function loadFatura(){
     window._sortField='date'; window._sortDir=1;
     window.renderTxList=function(list){
       const sortField=window._sortField, sortDir=window._sortDir;
+      // Update reconciled count + subtotal
+      const allItems=list||[];
+      const recItems=allItems.filter(t=>t.reconciled);
+      const recTotal=recItems.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      const countEl=document.getElementById('reconciledCount');
+      if(countEl) countEl.textContent=recItems.length+' reconciliado(s) · R$ '+fmt(recTotal);
       // Apply hide-reconciled filter
       const hideRec = document.getElementById('hideReconciled')?.checked;
       const visible = hideRec ? list.filter(t=>!t.reconciled) : list;
@@ -358,6 +381,8 @@ async function loadFatura(){
     const pagtosHtml = (pagtos||[]).length ? '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px">✓ PAGAMENTO(S) REGISTRADO(S)</div>'+(pagtos||[]).map(p=>'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+fmtDate(p.date)+' · '+(p.memo||p.payee)+'</span><span style="color:var(--green);font-weight:600">+R$ '+fmt(p.amount)+'</span></div>').join('')+'</div>' : '';
     document.getElementById('pagtosBox').innerHTML = pagtosHtml;
     window._txsData=txs;
+    window._pagtos=pagtos||[];
+    updatePagtosBox();
     window.renderTxList(txs);
     window.sortTxs=function(field){
       if(window._sortField===field) window._sortDir*=-1; else {window._sortField=field;window._sortDir=1;}

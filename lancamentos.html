@@ -1134,9 +1134,9 @@ Continuar mesmo assim?`;
       rows.push({id:gid+i,type:nType==='exp'?'expense':'income',amount:p,
         date:(()=>{
           if(i===0) return date;
+          // Add i months to the original purchase date
           const orig=new Date(date+'T00:00:00');
-          const nd=new Date(fm+'-01T00:00:00');
-          nd.setMonth(nd.getMonth()+i);
+          const nd=new Date(orig.getFullYear(), orig.getMonth()+i, 1);
           const maxDay=new Date(nd.getFullYear(),nd.getMonth()+1,0).getDate();
           nd.setDate(Math.min(orig.getDate(),maxDay));
           return nd.toISOString().slice(0,10);
@@ -1338,7 +1338,15 @@ async function saveEdit() {
   if(!amt||!date||!payee){toast('⚠ Campos obrigatórios','#fbbf24','#0d0f14');return;}
   const btn=document.getElementById('eSaveBtn');btn.disabled=true;btn.textContent='Salvando...';sync('busy');
   try {
-    await sbUpd('transactions',id,{amount:amt,date,payee,payee_display:payee,account:document.getElementById('eAcct').value,category:document.getElementById('eCat').value,subcategory:document.getElementById('eSub').value||null,memo:document.getElementById('eMemo').value||null,is_deductible:DED.has(document.getElementById('eCat').value)});
+    const eCat=document.getElementById('eCat').value;
+    const eSub=document.getElementById('eSub').value||null;
+    const eReceiptStatus=document.getElementById('eRS')?.value||'na';
+    await sbUpd('transactions',id,{amount:amt,date,payee,payee_display:payee,
+      account:document.getElementById('eAcct').value,
+      category:eCat,subcategory:eSub,
+      memo:document.getElementById('eMemo').value||null,
+      receipt_status:eReceiptStatus,
+      is_deductible:isDeductible(eCat,eSub||'')});
     sync('ok'); closeEdit(); toast('✓ Atualizado!','var(--green)','#0d0f14'); loadHist();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
   btn.disabled=false;btn.textContent='✓ Salvar';
@@ -1453,9 +1461,12 @@ async function loadIR() {
     // Apply subcategory deductibility rules
     const NON_DED_CATS_IR=new Set(['seguros','outras-entradas']);
     const NON_DED_SUBS_IR=new Set(['medicamentos','academia','outros_impostos']);
+    const DED_SUBS_SAUDE_IR=new Set(['medico','dentista','plano_saude','nutricionista','fisicoterapeuta','psicologo','hospitalar','laboratorio','nutricionista_psicologo']);
     const txs=allTxs.filter(t=>{
       if(NON_DED_CATS_IR.has(t.category)) return false;
       if(t.subcategory && NON_DED_SUBS_IR.has(t.subcategory)) return false;
+      // Saúde só dedutível com subcategoria médica válida
+      if(t.category==='saude' && !DED_SUBS_SAUDE_IR.has(t.subcategory||'')) return false;
       return true;
     });
     const de=txs.filter(t=>t.type==='expense'), di=txs.filter(t=>t.type==='income');

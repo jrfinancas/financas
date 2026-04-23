@@ -225,7 +225,7 @@ async function loadContas(){
         </div>
         <div>
           <div class="conta-saldo">
-            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Limite':'Saldo cadastrado'}</div>
+            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Fatura atual':'Saldo atual'}</div>
             <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
             ${isCartao&&c.limite?`<div style="font-size:10px;color:var(--muted);text-align:right">limite: R$ ${fmt(c.limite)}</div>`:''}
             ${!isCartao&&saldo===0?`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Atualize o saldo</div>`:''}
