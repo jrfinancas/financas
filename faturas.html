@@ -364,27 +364,31 @@ async function loadFatura(){
       // First pass: count how many items per group_id to detect real splits
       const groupCount = {};
       visible.forEach(function(t) {
-        if(t.is_split && t.group_id) groupCount[t.group_id] = (groupCount[t.group_id]||0) + 1;
+        if(t.is_split && t.group_id) {
+          const key = String(t.group_id);
+          groupCount[key] = (groupCount[key]||0) + 1;
+        }
       });
       const grouped = [];
       const seenGroups = {};
       visible.forEach(function(t) {
         // Only group if there are actually multiple items with same group_id
-        const isRealSplit = t.is_split && t.group_id && (groupCount[t.group_id]||0) > 1;
+        const isRealSplit = t.is_split && t.group_id && (groupCount[String(t.group_id)]||0) > 1;
         if(isRealSplit) {
-          if(!seenGroups[t.group_id]) {
-            seenGroups[t.group_id] = {
+          const gKey = String(t.group_id);
+          if(!seenGroups[gKey]) {
+            seenGroups[gKey] = {
               id: t.id, group_id: t.group_id, date: t.date,
               payee: t.payee, payee_display: t.payee_display,
               amount: 0, is_split: true, reconciled: t.reconciled,
               ids: [], allReconciled: true, lines: [], category: t.category, memo: null
             };
-            grouped.push(seenGroups[t.group_id]);
+            grouped.push(seenGroups[gKey]);
           }
-          seenGroups[t.group_id].amount += parseFloat(t.amount||0);
-          seenGroups[t.group_id].ids.push(t.id);
-          seenGroups[t.group_id].lines.push(CLABEL[t.category]||t.category);
-          if(!t.reconciled) seenGroups[t.group_id].allReconciled = false;
+          seenGroups[gKey].amount += parseFloat(t.amount||0);
+          seenGroups[gKey].ids.push(t.id);
+          seenGroups[gKey].lines.push(CLABEL[t.category]||t.category);
+          if(!t.reconciled) seenGroups[gKey].allReconciled = false;
         } else {
           grouped.push(Object.assign({}, t, {is_split: false}));
         }

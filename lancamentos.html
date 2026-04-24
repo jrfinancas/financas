@@ -490,7 +490,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         </div>
       </div>
       <div class="fr">
-        <div><label class="fl">Categoria <span class="aibadge" id="nCatBadge" style="display:none">IA</span></label>
+        <div id="nCatRow"><label class="fl">Categoria <span class="aibadge" id="nCatBadge" style="display:none">IA</span></label>
           <select class="fs" id="nCat" onchange="onCatCh('n')">
             <option value="">Selecionar...</option>
             <optgroup label="Despesas"><option value="aluguel">Aluguel</option><option value="animais">Animais de Estimação</option><option value="arranjos">Arranjos Domésticos</option><option value="automovel">Automóvel</option><option value="contas">Contas</option><option value="despesas-trabalho">Desp. Trabalho</option><option value="doacoes">Doações</option><option value="educacao">Educação</option><option value="hobbies">Hobbies e Lazer</option><option value="impostos">Impostos</option><option value="juros">Juros</option><option value="outras-despesas">Outras Despesas</option><option value="saude">Saúde e Fitness</option><option value="seguros">Seguros</option><option value="taxas-bancarias">Taxas Bancárias</option><option value="utilitarios">Utilitários</option><option value="vestuario">Vestuário</option><option value="viagens">Viagens</option></optgroup>
@@ -501,11 +501,11 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       </div>
       <div id="nDedBadge" class="dedbadge" style="display:none">⭐ Dedutível no IR</div>
       <label class="fl">Status do Comprovante</label>
-      <div class="rstatus">
+      <div id="nRSRow"><div class="rstatus">
         <button class="rbtn on na" id="rAtt" onclick="setRS('att',this)">✓ Anexado</button>
         <button class="rbtn" id="rPnd" onclick="setRS('pending',this)">⏳ Aguardando</button>
         <button class="rbtn on na" id="rNA"  onclick="setRS('na', this)">— N/A</button>
-      </div>
+      </div></div>
       <!-- FX -->
       <div class="fxtoggle" onclick="toggleFX()">
         <label><input type="checkbox" id="fxChk" onclick="event.stopPropagation();toggleFX()">🌍 Moeda estrangeira</label>
@@ -1074,7 +1074,7 @@ function setType(px, t, btn) {
         document.getElementById('nPay').value='';
     }
   }
-  const btns = px==='n' ? [document.getElementById('nExpBtn'),document.getElementById('nIncBtn')] : document.querySelectorAll('#tab-recorrentes .ttype .tbtn');
+  const btns = px==='n' ? [document.getElementById('nExpBtn'),document.getElementById('nIncBtn'),document.getElementById('nTrfBtn')].filter(Boolean) : document.querySelectorAll('#tab-recorrentes .ttype .tbtn');
   btns.forEach(b=>b.classList.remove('on','exp','inc'));
   const target = btn||(t==='exp'?btns[0]:btns[1]);
   if(target) target.classList.add('on',t);
