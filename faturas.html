@@ -361,16 +361,23 @@ async function loadFatura(){
       const arr = s => sortField===s ? (sortDir>0?'↑':'↓') : '';
 
       // Group split transactions by group_id for display
+      // First pass: count how many items per group_id to detect real splits
+      const groupCount = {};
+      visible.forEach(function(t) {
+        if(t.is_split && t.group_id) groupCount[t.group_id] = (groupCount[t.group_id]||0) + 1;
+      });
       const grouped = [];
       const seenGroups = {};
       visible.forEach(function(t) {
-        if(t.is_split && t.group_id) {
+        // Only group if there are actually multiple items with same group_id
+        const isRealSplit = t.is_split && t.group_id && (groupCount[t.group_id]||0) > 1;
+        if(isRealSplit) {
           if(!seenGroups[t.group_id]) {
             seenGroups[t.group_id] = {
               id: t.id, group_id: t.group_id, date: t.date,
               payee: t.payee, payee_display: t.payee_display,
               amount: 0, is_split: true, reconciled: t.reconciled,
-              ids: [], allReconciled: true, lines: []
+              ids: [], allReconciled: true, lines: [], category: t.category, memo: null
             };
             grouped.push(seenGroups[t.group_id]);
           }
@@ -379,7 +386,7 @@ async function loadFatura(){
           seenGroups[t.group_id].lines.push(CLABEL[t.category]||t.category);
           if(!t.reconciled) seenGroups[t.group_id].allReconciled = false;
         } else {
-          grouped.push(t);
+          grouped.push(Object.assign({}, t, {is_split: false}));
         }
       });
 
@@ -393,7 +400,7 @@ async function loadFatura(){
         +'</div>'
         +grouped.map(function(t) {
           const rec = t.is_split ? t.allReconciled : t.reconciled;
-          const chkIds = t.is_split ? t.ids.join(',') : String(t.id);
+          const chkIds = (t.is_split && t.ids && t.ids.length) ? t.ids.join(',') : String(t.id);
           const splitBadge = t.is_split
             ? '<span style="font-size:10px;background:rgba(124,106,247,.15);color:#a78bfa;border-radius:4px;padding:1px 5px;margin-left:4px">split · '+t.lines.join(' + ')+'</span>'
             : '';

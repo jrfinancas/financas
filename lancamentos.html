@@ -386,7 +386,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option>
       </select></div>
     </div>
-    <div class="fg"><label class="fl">Fornecedor</label><input type="text" class="fi" id="ePay"></div>
+    <div class="fg" id="nPayRow"><label class="fl">Fornecedor</label><input type="text" class="fi" id="ePay"></div>
     <div class="fr">
       <div><label class="fl">Categoria</label><select class="fs" id="eCat" onchange="fillSub('eSub','eCat')">
         <option value="aluguel">Aluguel</option><option value="animais">Animais</option><option value="arranjos">Arranjos Dom.</option><option value="automovel">Automóvel</option><option value="contas">Contas</option><option value="despesas-trabalho">Desp. Trabalho</option><option value="doacoes">Doações</option><option value="educacao">Educação</option><option value="hobbies">Hobbies</option><option value="impostos">Impostos</option><option value="juros">Juros</option><option value="outras-despesas">Outras Desp.</option><option value="saude">Saúde e Fitness</option><option value="seguros">Seguros</option><option value="taxas-bancarias">Taxas Banc.</option><option value="utilitarios">Utilitários</option><option value="vestuario">Vestuário</option><option value="viagens">Viagens</option><option value="salario">Salários</option><option value="bonus">Bônus</option><option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entr.</option>
@@ -447,13 +447,16 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <button class="tbtn" id="nTrfBtn" onclick="setType('n','trf',this)">⇄ Transferência</button>
       </div>
       <div id="nTrfRow" style="display:none">
-        <label class="fl">Conta Destino</label>
-        <select class="fs" id="nAcctDest">
+        <div style="display:flex;gap:8px">
+          <div style="flex:1"><label class="fl">Conta Destino</label>
+          <select class="fs" id="nAcctDest" onchange="checkTrfFx()">
           <option value="">Selecionar...</option>
           <optgroup label="Santander"><option value="santander-unique-visa">Santander Unique Visa</option><option value="santander-unique-master">Santander Unique Master</option><option value="santander-cc">Santander CC</option></optgroup>
           <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
           <optgroup label="Outros"><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="wise">Wise</option><option value="carteira">Carteira (Dinheiro)</option></optgroup>
-        </select>
+        </select></div>
+          <div id="nTrfFxRow" style="display:none;flex:1"><label class="fl">Taxa de câmbio <span style="font-size:10px;color:var(--muted)">(1 BRL = ? moeda)</span></label><input type="text" inputmode="decimal" class="fi" id="nTrfFx" placeholder="ex: 0.18 USD"></div>
+        </div>
       </div>
       <div class="fg"><label class="fl">Valor <span class="aibadge" id="nAmtBadge" style="display:none">IA</span></label>
         <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="nAmt" placeholder="0,00" oninput="calcInst()"></div>
@@ -494,7 +497,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
             <optgroup label="Receitas"><option value="salario">Salários</option><option value="bonus">Bônus</option><option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entradas</option></optgroup>
           </select>
         </div>
-        <div><label class="fl">Subcategoria</label><select class="fs" id="nSub"><option value="">—</option></select></div>
+        <div id="nSubRow"><label class="fl">Subcategoria</label><select class="fs" id="nSub"><option value="">—</option></select></div>
       </div>
       <div id="nDedBadge" class="dedbadge" style="display:none">⭐ Dedutível no IR</div>
       <label class="fl">Status do Comprovante</label>
@@ -1054,13 +1057,21 @@ function fillSub(subId, catId) {
 function setType(px, t, btn) {
   if(px==='n') {
     nType=t;
-    // Show/hide destination account for transfers
     const trfRow = document.getElementById('nTrfRow');
     if(trfRow) trfRow.style.display = t==='trf' ? '' : 'none';
-    // Auto-set category for transfers
+    // Fields to disable/hide for transfers
+    const trfHide = ['nPayRow','nCatRow','nSubRow','nRSRow','nSplitRow'];
+    trfHide.forEach(function(id){
+      const el = document.getElementById(id);
+      if(el) el.style.display = t==='trf' ? 'none' : '';
+    });
     if(t==='trf') {
       document.getElementById('nCat').value='transferencia';
+      document.getElementById('nPay').value='Transferência';
       fillSub('nSub','nCat');
+    } else {
+      if(document.getElementById('nPay').value==='Transferência')
+        document.getElementById('nPay').value='';
     }
   }
   const btns = px==='n' ? [document.getElementById('nExpBtn'),document.getElementById('nIncBtn')] : document.querySelectorAll('#tab-recorrentes .ttype .tbtn');
@@ -1655,6 +1666,14 @@ async function saveRec() {
     else{rec.id=Date.now();rec.launch_history=[];await sbIns('recorrentes',rec);}
     sync('ok'); await loadRecs(); clearRec(); toast('✓ Recorrente salva!','var(--green)','#0d0f14');
   } catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+function checkTrfFx() {
+  const dest = document.getElementById('nAcctDest')?.value||'';
+  const fxRow = document.getElementById('nTrfFxRow');
+  // Show FX field when destination is Wise or foreign account
+  const isFx = dest === 'wise' || dest === 'xp';
+  if(fxRow) fxRow.style.display = isFx ? '' : 'none';
 }
 
 function isDeductible(cat, sub) {
