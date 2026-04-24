@@ -1286,7 +1286,7 @@ async function saveSplit() {
   sync('busy');
   try {
     const gid=Date.now();
-    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,type:'expense',amount:l.amount,date,payee,account:acct,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot})));
+    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,group_id:gid,type:'expense',amount:l.amount,date,payee,payee_display:payee,account:acct,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot,installments:1,installment_num:1,from_recorrente:false})));
     await upsertPayee(payee,null,null);
     sync('ok'); toast(`✓ ${lines.length} linhas salvas!`,'var(--green)','#0d0f14'); clearSplit();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
