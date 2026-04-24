@@ -359,23 +359,57 @@ async function loadFatura(){
       const hideRec = document.getElementById('hideReconciled')?.checked;
       const visible = hideRec ? list.filter(t=>!t.reconciled) : list;
       const arr = s => sortField===s ? (sortDir>0?'↑':'↓') : '';
+
+      // Group split transactions by group_id for display
+      const grouped = [];
+      const seenGroups = {};
+      visible.forEach(function(t) {
+        if(t.is_split && t.group_id) {
+          if(!seenGroups[t.group_id]) {
+            seenGroups[t.group_id] = {
+              id: t.id, group_id: t.group_id, date: t.date,
+              payee: t.payee, payee_display: t.payee_display,
+              amount: 0, is_split: true, reconciled: t.reconciled,
+              ids: [], allReconciled: true, lines: []
+            };
+            grouped.push(seenGroups[t.group_id]);
+          }
+          seenGroups[t.group_id].amount += parseFloat(t.amount||0);
+          seenGroups[t.group_id].ids.push(t.id);
+          seenGroups[t.group_id].lines.push(CLABEL[t.category]||t.category);
+          if(!t.reconciled) seenGroups[t.group_id].allReconciled = false;
+        } else {
+          grouped.push(t);
+        }
+      });
+
       document.getElementById('faturaTxs').innerHTML=
-        `<div style="display:flex;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--muted)">
-          <div style="width:18px"></div>
-          <div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs('date')">DATA ${arr('date')}</div>
-          <div style="flex:2;cursor:pointer;user-select:none" onclick="sortTxs('payee')">FORNECEDOR ${arr('payee')}</div>
-          <div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs('category')">CATEGORIA ${arr('category')}</div>
-          <div style="cursor:pointer;user-select:none;min-width:90px;text-align:right" onclick="sortTxs('amount')">VALOR ${arr('amount')}</div>
-        </div>`+
-        visible.map(t=>`
-      <div class="txitem ${t.reconciled?'reconciled':''}">
-        <input type="checkbox" class="txchk" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)">
-        <div class="txbody">
-          <div class="txpayee">${t.payee_display||t.payee}</div>
-          <div class="txmeta">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}${t.memo?' · '+t.memo.substring(0,40):''}</div>
-        </div>
-        <div class="txamt">-R$ ${fmt(t.amount)}</div>
-      </div>`).join('')+edgeHtml;
+        '<div style="display:flex;gap:6px;padding:8px 0;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--muted)">'
+        +'<div style="width:18px"></div>'
+        +'<div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs(&quot;date&quot;)">DATA '+arr('date')+'</div>'
+        +'<div style="flex:2;cursor:pointer;user-select:none" onclick="sortTxs(&quot;payee&quot;)">FORNECEDOR '+arr('payee')+'</div>'
+        +'<div style="flex:1;cursor:pointer;user-select:none" onclick="sortTxs(&quot;category&quot;)">CATEGORIA '+arr('category')+'</div>'
+        +'<div style="cursor:pointer;user-select:none;min-width:90px;text-align:right" onclick="sortTxs(&quot;amount&quot;)">VALOR '+arr('amount')+'</div>'
+        +'</div>'
+        +grouped.map(function(t) {
+          const rec = t.is_split ? t.allReconciled : t.reconciled;
+          const chkIds = t.is_split ? t.ids.join(',') : String(t.id);
+          const splitBadge = t.is_split
+            ? '<span style="font-size:10px;background:rgba(124,106,247,.15);color:#a78bfa;border-radius:4px;padding:1px 5px;margin-left:4px">split · '+t.lines.join(' + ')+'</span>'
+            : '';
+          const catLabel = t.is_split ? '' : (CLABEL[t.category]||t.category);
+          const memoLabel = (!t.is_split && t.memo) ? ' · '+t.memo.substring(0,35) : '';
+          const div = document.createElement('div');
+          div.className = 'txitem' + (rec ? ' reconciled' : '');
+          div.innerHTML = '<input type="checkbox" class="txchk"'+(rec?' checked':'')+' data-ids="'+chkIds+'">'
+            + '<div class="txbody">'
+            + '<div class="txpayee">'+(t.payee_display||t.payee)+splitBadge+'</div>'
+            + '<div class="txmeta">'+fmtDate(t.date)+(catLabel?' · '+catLabel:'')+memoLabel+'</div>'
+            + '</div>'
+            + '<div class="txamt">-R$ '+fmt(t.is_split ? t.amount.toFixed(2) : t.amount)+'</div>';
+          div.querySelector('.txchk').addEventListener('change', function(e){toggleReconcileGroup(e.target.dataset.ids, e.target.checked);});
+          return div.outerHTML;
+        }).join('')+edgeHtml;
     }
     // Show payment section
     const pagtosHtml = (pagtos||[]).length ? '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:8px"><div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:6px">✓ PAGAMENTO(S) REGISTRADO(S)</div>'+(pagtos||[]).map(p=>'<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+fmtDate(p.date)+' · '+(p.memo||p.payee)+'</span><span style="color:var(--green);font-weight:600">+R$ '+fmt(p.amount)+'</span></div>').join('')+'</div>' : '';
