@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Finanças JR · Emails</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d0f14; --surface:#13161e; --surface2:#1a1d27; --border:#252a38;
+    --text:#e8eaf0; --muted:#6b7280; --accent:#4f8ef7; --green:#34d399;
+    --red:#f87171; --yellow:#fbbf24; --purple:#a78bfa;
+    --st: env(safe-area-inset-top, 0px);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; padding-bottom:40px; }
+  
+  /* Nav */
+  nav { position:fixed; top:0; left:0; right:0; z-index:100;
+    background:rgba(13,15,20,.92); backdrop-filter:blur(12px);
+    padding:calc(var(--st) + 10px) 16px 10px;
+    display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
+  nav a { color:var(--muted); text-decoration:none; font-size:13px; }
+  nav a:hover { color:var(--text); }
+  nav .sep { color:var(--border); }
+  nav .cur { color:var(--text); font-weight:600; }
+  
+  .page { max-width:480px; margin:0 auto; padding:calc(var(--st) + 70px) 16px 20px; }
+  
+  h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
+  .sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
+  
+  /* Status card */
+  .status-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:20px;
+  }
+  .status-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .status-row:last-child { margin-bottom:0; }
+  .status-label { font-size:12px; color:var(--muted); }
+  .status-val { font-size:13px; font-weight:500; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+  .dot.green { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .dot.red { background:var(--red); }
+  .dot.yellow { background:var(--yellow); }
+
+  /* Main button */
+  .btn-check {
+    width:100%; padding:16px; background:var(--accent); border:none; border-radius:14px;
+    color:#fff; font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600;
+    cursor:pointer; transition:opacity .2s; margin-bottom:20px;
+  }
+  .btn-check:hover { opacity:.9; }
+  .btn-check:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-check.loading::after { content:' ⟳'; animation:spin 1s linear infinite; display:inline-block; }
+  
+  /* Connect Yahoo */
+  .connect-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:20px; text-align:center; margin-bottom:20px;
+  }
+  .connect-box h3 { font-size:16px; margin-bottom:8px; }
+  .connect-box p { font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.5; }
+  .btn-yahoo {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:12px 20px; background:#7B0099; border:none; border-radius:10px;
+    color:#fff; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
+    cursor:pointer; text-decoration:none;
+  }
+  .btn-yahoo:hover { opacity:.9; }
+
+  /* Email cards */
+  .email-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:12px; transition:border-color .2s;
+  }
+  .email-card.processing { border-color:var(--accent); }
+  .email-card.done { opacity:.5; border-color:var(--green); }
+  
+  .email-from { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .email-subject { font-size:14px; font-weight:600; margin-bottom:8px; }
+  .email-preview { font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.4; 
+    overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  
+  /* AI suggestion */
+  .suggestion {
+    background:var(--surface2); border:1px solid rgba(79,142,247,.2);
+    border-radius:12px; padding:12px; margin-bottom:12px;
+  }
+  .sug-title { font-size:10px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+  .sug-fields { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
+  .sug-field { background:var(--bg); border-radius:8px; padding:8px; }
+  .sug-field label { font-size:10px; color:var(--muted); display:block; margin-bottom:2px; }
+  .sug-field input, .sug-field select {
+    width:100%; background:transparent; border:none; color:var(--text);
+    font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; outline:none;
+  }
+  .sug-field.full { grid-column:1/-1; }
+  
+  .sug-actions { display:flex; gap:8px; }
+  .btn-approve {
+    flex:1; padding:10px; background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.3);
+    border-radius:10px; color:var(--green); font-family:'DM Sans',sans-serif;
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn-skip {
+    padding:10px 16px; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; color:var(--muted); font-family:'DM Sans',sans-serif;
+    font-size:13px; cursor:pointer;
+  }
+  .btn-edit {
+    padding:10px 16px; background:rgba(79,142,247,.1); border:1px solid rgba(79,142,247,.2);
+    border-radius:10px; color:var(--accent); font-family:'DM Sans',sans-serif;
+    font-size:13px; cursor:pointer;
+  }
+
+  /* CPF section */
+  .cpf-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:16px; margin-bottom:20px;
+  }
+  .cpf-card h3 { font-size:14px; font-weight:600; margin-bottom:8px; }
+  .cpf-card p { font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5; }
+  .cpf-row { display:flex; gap:8px; }
+  .cpf-input {
+    flex:1; background:var(--surface2); border:1.5px solid var(--border); border-radius:10px;
+    padding:10px 12px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px;
+    outline:none; -webkit-text-security:disc; letter-spacing:2px;
+  }
+  .cpf-input:focus { border-color:var(--accent); }
+  .btn-save-cpf {
+    padding:10px 16px; background:var(--accent); border:none; border-radius:10px;
+    color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer;
+  }
+
+  /* Empty state */
+  .empty { text-align:center; padding:40px 20px; color:var(--muted); }
+  .empty .icon { font-size:40px; margin-bottom:12px; }
+  .empty p { font-size:14px; }
+
+  /* Toast */
+  .toast { position:fixed; bottom:calc(20px + env(safe-area-inset-bottom,0px)); left:50%;
+    transform:translateX(-50%) translateY(20px); opacity:0;
+    background:var(--surface2); border:1px solid var(--border); border-radius:12px;
+    padding:10px 18px; font-size:13px; font-weight:500; white-space:nowrap;
+    transition:all .3s; pointer-events:none; z-index:999; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spin { animation:spin 1s linear infinite; display:inline-block; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html">← Início</a>
+  <span class="sep">›</span>
+  <span class="cur">📧 Emails</span>
+</nav>
+
+<div class="page">
+  <h1>📧 Captura de Emails</h1>
+  <p class="sub">Lê recibos da pasta <strong>Compras JRFinancas</strong> e sugere lançamentos</p>
+
+  <!-- CPF Section -->
+  <div class="cpf-card" id="cpfCard">
+    <h3>🔐 CPF (opcional)</h3>
+    <p>Salvo localmente com criptografia — nunca enviado ao servidor. Usado para desbloquear faturas e emails que pedem confirmação de CPF.</p>
+    <div class="cpf-row">
+      <input type="tel" class="cpf-input" id="cpfInput" placeholder="000.000.000-00" maxlength="14">
+      <button class="btn-save-cpf" onclick="saveCPF()">Salvar</button>
+    </div>
+  </div>
+
+  <!-- Connection Status -->
+  <div id="connectSection">
+    <div class="status-card" id="connectedBox">
+      <div class="status-row">
+        <span class="status-label">Status</span>
+        <span class="status-val"><span class="dot green"></span>Conectado</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Conta principal</span>
+        <span class="status-val" id="connEmail1">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Conta secundária</span>
+        <span class="status-val" id="connEmail2">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Última verificação</span>
+        <span class="status-val" id="lastCheck">Nunca</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Check button -->
+  <button class="btn-check" id="btnCheck" onclick="checkEmails()">
+    📬 Verificar Emails Agora
+  </button>
+
+  <!-- Results -->
+  <div id="results"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH={'apikey':ANON_KEY,'Authorization':'Bearer '+ANON_KEY,'Content-Type':'application/json'};
+
+// Yahoo OAuth config — fill after creating app
+const WORKER_URL = 'https://financas-jr-emails.agente-x79.workers.dev';
+
+const YAHOO_EMAILS = ['agente_x79@yahoo.com','jroberto_osouza@yahoo.com.br'];
+
+// ── CPF ──
+const CPF_KEY = 'jr_cpf_v1';
+const CPF_SALT = 'jrfinancas_cpf_2026';
+
+async function hashStr(str) {
+  const enc = new TextEncoder().encode(str);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function encryptCPF(cpf) {
+  const clean = cpf.replace(/\D/g,'');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CPF_SALT.padEnd(32,'0').slice(0,32)),
+    {name:'AES-GCM'}, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(clean));
+  const combined = new Uint8Array([...iv, ...new Uint8Array(enc)]);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptCPF() {
+  const stored = localStorage.getItem(CPF_KEY);
+  if(!stored) return null;
+  try {
+    const combined = new Uint8Array(atob(stored).split('').map(c=>c.charCodeAt(0)));
+    const iv = combined.slice(0,12), data = combined.slice(12);
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CPF_SALT.padEnd(32,'0').slice(0,32)),
+      {name:'AES-GCM'}, false, ['decrypt']);
+    const dec = await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, data);
+    return new TextDecoder().decode(dec);
+  } catch(e) { return null; }
+}
+
+async function saveCPF() {
+  const val = document.getElementById('cpfInput').value.replace(/\D/g,'');
+  if(val.length !== 11) { toast('⚠ CPF inválido','var(--yellow)'); return; }
+  const enc = await encryptCPF(val);
+  localStorage.setItem(CPF_KEY, enc);
+  document.getElementById('cpfInput').value = '';
+  document.getElementById('cpfCard').style.borderColor = 'var(--green)';
+  toast('✓ CPF salvo com criptografia','var(--green)');
+}
+
+async function initCPF() {
+  const cpf = await decryptCPF();
+  if(cpf) {
+    document.getElementById('cpfCard').style.borderColor = 'var(--green)';
+    document.getElementById('cpfInput').placeholder = '••••••••••• (salvo)';
+  }
+}
+
+// ── Yahoo OAuth ──
+const TOKEN_KEY = 'jr_yahoo_tokens_v1';
+
+function startYahooOAuth() {
+  if(YAHOO_CLIENT_ID === 'YAHOO_CLIENT_ID_HERE') {
+    toast('⚠ Configure o Yahoo Client ID primeiro','var(--yellow)');
+    return;
+  }
+  const state = Math.random().toString(36).slice(2);
+  localStorage.setItem('yahoo_oauth_state', state);
+  const params = new URLSearchParams({
+    client_id: YAHOO_CLIENT_ID,
+    redirect_uri: YAHOO_REDIRECT,
+    response_type: 'code',
+    scope: 'mail-r',
+    state: state,
+    nonce: Date.now()
+  });
+  window.location.href = 'https://api.login.yahoo.com/oauth2/request_auth?' + params;
+}
+
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  if(!code) return;
+  if(state !== localStorage.getItem('yahoo_oauth_state')) {
+    toast('⚠ State inválido — tente novamente','var(--red)'); return;
+  }
+  // Exchange code for token via Edge Function
+  toast('🔄 Conectando...','var(--accent)');
+  try {
+    const r = await fetch(`${SB}/functions/v1/yahoo-email`, {
+      method:'POST',
+      headers:{...SBH},
+      body: JSON.stringify({action:'exchange_token', code, redirect_uri: YAHOO_REDIRECT})
+    });
+    const d = await r.json();
+    if(d.access_token) {
+      localStorage.setItem(TOKEN_KEY, JSON.stringify({
+        access_token: d.access_token,
+        refresh_token: d.refresh_token,
+        expires_at: Date.now() + (d.expires_in * 1000)
+      }));
+      window.history.replaceState({}, '', window.location.pathname);
+      updateConnectionUI(true);
+      toast('✓ Yahoo conectado!','var(--green)');
+    } else {
+      toast('⚠ Erro: '+JSON.stringify(d),'var(--red)');
+    }
+  } catch(e) { toast('⚠ Erro de conexão: '+e.message,'var(--red)'); }
+}
+
+function getTokens() {
+  const t = localStorage.getItem(TOKEN_KEY);
+  return t ? JSON.parse(t) : null;
+}
+
+function updateConnectionUI(connected) {
+  document.getElementById('notConnectedBox').style.display = connected ? 'none' : '';
+  document.getElementById('connectedBox').style.display = connected ? '' : 'none';
+  if(connected) {
+    document.getElementById('connEmail1').textContent = YAHOO_EMAILS[0];
+    document.getElementById('connEmail2').textContent = YAHOO_EMAILS[1];
+    const last = localStorage.getItem('jr_last_check');
+    if(last) document.getElementById('lastCheck').textContent = new Date(parseInt(last)).toLocaleString('pt-BR');
+  }
+}
+
+// ── Check emails ──
+async function checkEmails() {
+  // No OAuth needed - Worker handles IMAP directly
+  const btn = document.getElementById('btnCheck');
+  btn.disabled = true; btn.textContent = '⟳ Verificando...';
+  document.getElementById('results').innerHTML = '<div class="empty"><div class="spin" style="font-size:30px">⟳</div><p style="margin-top:12px">Buscando emails...</p></div>';
+
+  try {
+    const r = await fetch(WORKER_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'fetch_emails' })
+    });
+    const data = await r.json();
+    localStorage.setItem('jr_last_check', Date.now().toString());
+    document.getElementById('lastCheck').textContent = new Date().toLocaleString('pt-BR');
+
+    if(!data.emails?.length) {
+      document.getElementById('results').innerHTML = '<div class="empty"><div class="icon">📭</div><p>Nenhum email novo na pasta</p></div>';
+    } else {
+      renderEmails(data.emails);
+    }
+  } catch(e) {
+    document.getElementById('results').innerHTML = '<div class="empty" style="color:var(--red)">⚠ Erro: '+e.message+'</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = '📬 Verificar Emails Agora';
+  }
+}
+
+// ── Render email cards ──
+const CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos',automovel:'Automóvel',
+  contas:'Contas',educacao:'Educação',hobbies:'Hobbies',impostos:'Impostos',
+  juros:'Juros/Taxas',outras_despesas:'Outras Despesas',saude:'Saúde',
+  seguros:'Seguros',taxas_bancarias:'Taxas Bancárias',utilitarios:'Utilitários',
+  vestuario:'Vestuário',viagens:'Viagens',transferencia:'Transferência'};
+
+function renderEmails(emails) {
+  const container = document.getElementById('results');
+  container.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-weight:600">${emails.length} EMAIL(S) ENCONTRADO(S)</div>`;
+  emails.forEach(function(email, idx) {
+    const card = document.createElement('div');
+    card.className = 'email-card';
+    card.id = 'ecard'+idx;
+    card.innerHTML = `
+      <div class="email-from">${email.from}</div>
+      <div class="email-subject">${email.subject}</div>
+      <div class="email-preview">${email.preview}</div>
+      <div id="sug${idx}">
+        <button onclick="getSuggestion(${idx})" style="width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">
+          ✨ Sugerir Lançamento com IA
+        </button>
+      </div>`;
+    card._emailData = email;
+    container.appendChild(card);
+  });
+}
+
+async function getSuggestion(idx) {
+  const card = document.getElementById('ecard'+idx);
+  const sugDiv = document.getElementById('sug'+idx);
+  sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">⟳</span> Analisando com IA...</div>';
+  card.classList.add('processing');
+
+  const email = card._emailData;
+  try {
+    const r = await fetch(`${SB}/functions/v1/yahoo-email`, {
+      method:'POST',
+      headers:{...SBH},
+      body: JSON.stringify({
+        action: 'analyze_email',
+        email: email
+      })
+    });
+    const sug = await r.json();
+    renderSuggestion(idx, sug, email);
+  } catch(e) {
+    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">⚠ Erro: '+e.message+'</div>';
+    card.classList.remove('processing');
+  }
+}
+
+function renderSuggestion(idx, sug, email) {
+  const sugDiv = document.getElementById('sug'+idx);
+  const catOptions = Object.entries(CLABEL).map(([v,l])=>
+    `<option value="${v}"${v===sug.category?' selected':''}>${l}</option>`).join('');
+  const today = new Date().toISOString().slice(0,10);
+
+  sugDiv.innerHTML = `
+    <div class="suggestion">
+      <div class="sug-title">✨ Sugestão da IA</div>
+      <div class="sug-fields">
+        <div class="sug-field full">
+          <label>Fornecedor</label>
+          <input type="text" id="sf_pay${idx}" value="${sug.payee||''}">
+        </div>
+        <div class="sug-field">
+          <label>Valor R$</label>
+          <input type="text" id="sf_amt${idx}" value="${sug.amount||''}">
+        </div>
+        <div class="sug-field">
+          <label>Data</label>
+          <input type="date" id="sf_dt${idx}" value="${sug.date||today}">
+        </div>
+        <div class="sug-field full">
+          <label>Categoria</label>
+          <select id="sf_cat${idx}">${catOptions}</select>
+        </div>
+        <div class="sug-field full">
+          <label>Observação</label>
+          <input type="text" id="sf_memo${idx}" value="${sug.memo||email.subject}">
+        </div>
+      </div>
+      <div class="sug-actions">
+        <button class="btn-approve" onclick="approveEntry(${idx},'${email.message_id}')">✓ Confirmar</button>
+        <button class="btn-skip" onclick="skipEmail(${idx},'${email.message_id}')">Ignorar</button>
+      </div>
+    </div>`;
+}
+
+async function approveEntry(idx, messageId) {
+  const card = document.getElementById('ecard'+idx);
+  const payee = document.getElementById('sf_pay'+idx).value.trim();
+  const amount = parseFloat(document.getElementById('sf_amt'+idx).value.replace(',','.'));
+  const date = document.getElementById('sf_dt'+idx).value;
+  const category = document.getElementById('sf_cat'+idx).value;
+  const memo = document.getElementById('sf_memo'+idx).value;
+
+  if(!payee||!amount||!date) { toast('⚠ Preencha os campos obrigatórios','var(--yellow)'); return; }
+
+  const tx = {
+    id: Date.now(),
+    type: 'expense',
+    amount, date, payee, payee_display: payee,
+    account: 'santander-cc',
+    category,
+    subcategory: null,
+    memo,
+    is_deductible: ['saude','educacao','impostos'].includes(category),
+    receipt_status: 'attached',
+    installments: 1, installment_num: 1,
+    group_id: Date.now(),
+    from_recorrente: false,
+    is_split: false
+  };
+
+  try {
+    const r = await fetch(`${SB}/rest/v1/transactions`, {
+      method:'POST',
+      headers:{...SBH,'Prefer':'return=minimal'},
+      body: JSON.stringify(tx)
+    });
+    if(!r.ok) throw new Error(await r.text());
+
+    // Mark email as processed
+    await fetch(`${SB}/functions/v1/yahoo-email`, {
+      method:'POST', headers:{...SBH},
+      body: JSON.stringify({action:'mark_processed', message_id: messageId})
+    });
+
+    card.classList.remove('processing');
+    card.classList.add('done');
+    card.querySelector('.sug-fields')?.parentElement?.remove();
+    card.innerHTML += '<div style="text-align:center;padding:8px;color:var(--green);font-size:13px;font-weight:600">✓ Lançamento salvo!</div>';
+    toast('✓ Lançamento registrado!','var(--green)');
+  } catch(e) { toast('⚠ Erro: '+e.message,'var(--red)'); }
+}
+
+async function skipEmail(idx, messageId) {
+  const card = document.getElementById('ecard'+idx);
+  await fetch(WORKER_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'mark_processed', message_id: messageId, account_email: email.account })
+  });
+  card.classList.add('done');
+  document.getElementById('sug'+idx).innerHTML = '<div style="text-align:center;font-size:12px;color:var(--muted);padding:8px">Ignorado</div>';
+}
+
+// ── Toast ──
+function toast(msg, color='var(--green)') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.color = color; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+// ── Init ──
+async function init() {
+  initCPF();
+  // Always connected - Worker handles auth
+  updateConnectionUI(true);
+}
+
+init();
+</script>
+</body>
+</html>
