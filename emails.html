@@ -4,320 +4,182 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Finanças JR · Emails</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg:#0d0f14; --surface:#13161e; --surface2:#1a1d27; --border:#252a38;
-    --text:#e8eaf0; --muted:#6b7280; --accent:#4f8ef7; --green:#34d399;
-    --red:#f87171; --yellow:#fbbf24; --purple:#a78bfa;
-    --st: env(safe-area-inset-top, 0px);
-  }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; padding-bottom:40px; }
-  
-  /* Nav */
-  nav { position:fixed; top:0; left:0; right:0; z-index:100;
-    background:rgba(13,15,20,.92); backdrop-filter:blur(12px);
-    padding:calc(var(--st) + 10px) 16px 10px;
-    display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); }
-  nav a { color:var(--muted); text-decoration:none; font-size:13px; }
-  nav a:hover { color:var(--text); }
-  nav .sep { color:var(--border); }
-  nav .cur { color:var(--text); font-weight:600; }
-  
-  .page { max-width:480px; margin:0 auto; padding:calc(var(--st) + 70px) 16px 20px; }
-  
-  h1 { font-size:22px; font-weight:700; margin-bottom:4px; }
-  .sub { font-size:13px; color:var(--muted); margin-bottom:24px; }
-  
-  /* Status card */
-  .status-card {
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:16px; margin-bottom:20px;
-  }
-  .status-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-  .status-row:last-child { margin-bottom:0; }
-  .status-label { font-size:12px; color:var(--muted); }
-  .status-val { font-size:13px; font-weight:500; }
-  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
-  .dot.green { background:var(--green); box-shadow:0 0 6px var(--green); }
-  .dot.red { background:var(--red); }
-  .dot.yellow { background:var(--yellow); }
-
-  /* Main button */
-  .btn-check {
-    width:100%; padding:16px; background:var(--accent); border:none; border-radius:14px;
-    color:#fff; font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600;
-    cursor:pointer; transition:opacity .2s; margin-bottom:20px;
-  }
-  .btn-check:hover { opacity:.9; }
-  .btn-check:disabled { opacity:.5; cursor:not-allowed; }
-  .btn-check.loading::after { content:' ⟳'; animation:spin 1s linear infinite; display:inline-block; }
-  
-  /* Connect Yahoo */
-  .connect-box {
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:20px; text-align:center; margin-bottom:20px;
-  }
-  .connect-box h3 { font-size:16px; margin-bottom:8px; }
-  .connect-box p { font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.5; }
-  .btn-yahoo {
-    display:inline-flex; align-items:center; gap:8px;
-    padding:12px 20px; background:#7B0099; border:none; border-radius:10px;
-    color:#fff; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
-    cursor:pointer; text-decoration:none;
-  }
-  .btn-yahoo:hover { opacity:.9; }
-
-  /* Email cards */
-  .email-card {
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:16px; margin-bottom:12px; transition:border-color .2s;
-  }
-  .email-card.processing { border-color:var(--accent); }
-  .email-card.done { opacity:.5; border-color:var(--green); }
-  
-  .email-from { font-size:11px; color:var(--muted); margin-bottom:4px; }
-  .email-subject { font-size:14px; font-weight:600; margin-bottom:8px; }
-  .email-preview { font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.4; 
-    overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-  
-  /* AI suggestion */
-  .suggestion {
-    background:var(--surface2); border:1px solid rgba(79,142,247,.2);
-    border-radius:12px; padding:12px; margin-bottom:12px;
-  }
-  .sug-title { font-size:10px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
-  .sug-fields { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:10px; }
-  .sug-field { background:var(--bg); border-radius:8px; padding:8px; }
-  .sug-field label { font-size:10px; color:var(--muted); display:block; margin-bottom:2px; }
-  .sug-field input, .sug-field select {
-    width:100%; background:transparent; border:none; color:var(--text);
-    font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; outline:none;
-  }
-  .sug-field.full { grid-column:1/-1; }
-  
-  .sug-actions { display:flex; gap:8px; }
-  .btn-approve {
-    flex:1; padding:10px; background:rgba(52,211,153,.12); border:1px solid rgba(52,211,153,.3);
-    border-radius:10px; color:var(--green); font-family:'DM Sans',sans-serif;
-    font-size:13px; font-weight:600; cursor:pointer;
-  }
-  .btn-skip {
-    padding:10px 16px; background:var(--surface); border:1px solid var(--border);
-    border-radius:10px; color:var(--muted); font-family:'DM Sans',sans-serif;
-    font-size:13px; cursor:pointer;
-  }
-  .btn-edit {
-    padding:10px 16px; background:rgba(79,142,247,.1); border:1px solid rgba(79,142,247,.2);
-    border-radius:10px; color:var(--accent); font-family:'DM Sans',sans-serif;
-    font-size:13px; cursor:pointer;
-  }
-
-  /* CPF section */
-  .cpf-card {
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
-    padding:16px; margin-bottom:20px;
-  }
-  .cpf-card h3 { font-size:14px; font-weight:600; margin-bottom:8px; }
-  .cpf-card p { font-size:12px; color:var(--muted); margin-bottom:12px; line-height:1.5; }
-  .cpf-row { display:flex; gap:8px; }
-  .cpf-input {
-    flex:1; background:var(--surface2); border:1.5px solid var(--border); border-radius:10px;
-    padding:10px 12px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px;
-    outline:none; -webkit-text-security:disc; letter-spacing:2px;
-  }
-  .cpf-input:focus { border-color:var(--accent); }
-  .btn-save-cpf {
-    padding:10px 16px; background:var(--accent); border:none; border-radius:10px;
-    color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer;
-  }
-
-  /* Empty state */
-  .empty { text-align:center; padding:40px 20px; color:var(--muted); }
-  .empty .icon { font-size:40px; margin-bottom:12px; }
-  .empty p { font-size:14px; }
-
-  /* Toast */
-  .toast { position:fixed; bottom:calc(20px + env(safe-area-inset-bottom,0px)); left:50%;
-    transform:translateX(-50%) translateY(20px); opacity:0;
-    background:var(--surface2); border:1px solid var(--border); border-radius:12px;
-    padding:10px 18px; font-size:13px; font-weight:500; white-space:nowrap;
-    transition:all .3s; pointer-events:none; z-index:999; }
-  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-
-  @keyframes spin { to { transform:rotate(360deg); } }
-  .spin { animation:spin 1s linear infinite; display:inline-block; }
+  :root { --bg:#0d0f14;--surface:#13161e;--surface2:#1a1d27;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--purple:#a78bfa;--st:env(safe-area-inset-top,0px); }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding-bottom:40px}
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(13,15,20,.92);backdrop-filter:blur(12px);padding:calc(var(--st) + 10px) 16px 10px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
+  nav a{color:var(--muted);text-decoration:none;font-size:13px}
+  nav .cur{color:var(--text);font-weight:600}
+  .page{max-width:480px;margin:0 auto;padding:calc(var(--st) + 70px) 16px 20px}
+  h1{font-size:22px;font-weight:700;margin-bottom:4px}
+  .sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:8px}
+  .card p{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+  .status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .status-row:last-child{margin-bottom:0}
+  .status-label{font-size:12px;color:var(--muted)}
+  .status-val{font-size:13px;font-weight:500}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+  .dot.green{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .dot.red{background:var(--red)}
+  .btn{width:100%;padding:14px;background:var(--accent);border:none;border-radius:12px;color:#fff;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;margin-bottom:12px}
+  .btn:hover{opacity:.9}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.green{background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);color:var(--green)}
+  .btn.ghost{background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+  .btn-google{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:none;border-radius:12px;color:#333;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;margin-bottom:12px}
+  .email-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px}
+  .email-card.done{opacity:.4}
+  .email-from{font-size:11px;color:var(--muted);margin-bottom:3px}
+  .email-subject{font-size:14px;font-weight:600;margin-bottom:6px}
+  .email-preview{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .sug{background:var(--surface2);border:1px solid rgba(79,142,247,.2);border-radius:12px;padding:12px;margin-bottom:10px}
+  .sug-title{font-size:10px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+  .sug-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+  .sug-field{background:var(--bg);border-radius:8px;padding:8px}
+  .sug-field.full{grid-column:1/-1}
+  .sug-field label{font-size:10px;color:var(--muted);display:block;margin-bottom:2px}
+  .sug-field input,.sug-field select{width:100%;background:transparent;border:none;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;outline:none}
+  .sug-actions{display:flex;gap:8px}
+  .btn-ok{flex:1;padding:10px;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);border-radius:10px;color:var(--green);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+  .btn-skip{padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+  .cpf-row{display:flex;gap:8px}
+  .cpf-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;letter-spacing:2px}
+  .cpf-input:focus{border-color:var(--accent)}
+  .empty{text-align:center;padding:40px 20px;color:var(--muted)}
+  .empty .icon{font-size:36px;margin-bottom:10px}
+  .toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%) translateY(20px);opacity:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 18px;font-size:13px;font-weight:500;white-space:nowrap;transition:all .3s;pointer-events:none;z-index:999}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .spin{animation:spin 1s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-
 <nav>
   <a href="index.html">← Início</a>
-  <span class="sep">›</span>
+  <span style="color:var(--border)">›</span>
   <span class="cur">📧 Emails</span>
 </nav>
 
 <div class="page">
   <h1>📧 Captura de Emails</h1>
-  <p class="sub">Lê recibos da pasta <strong>Compras JRFinancas</strong> e sugere lançamentos</p>
+  <p class="sub">Lê emails do <strong>financasjrs@gmail.com</strong> e sugere lançamentos com IA</p>
 
-  <!-- CPF Section -->
-  <div class="cpf-card" id="cpfCard">
+  <!-- CPF -->
+  <div class="card" id="cpfCard">
     <h3>🔐 CPF (opcional)</h3>
-    <p>Salvo localmente com criptografia — nunca enviado ao servidor. Usado para desbloquear faturas e emails que pedem confirmação de CPF.</p>
+    <p>Salvo com criptografia no dispositivo. Nunca enviado ao servidor.</p>
     <div class="cpf-row">
       <input type="tel" class="cpf-input" id="cpfInput" placeholder="000.000.000-00" maxlength="14">
-      <button class="btn-save-cpf" onclick="saveCPF()">Salvar</button>
+      <button class="btn" style="width:auto;padding:10px 16px;margin:0" onclick="saveCPF()">Salvar</button>
     </div>
   </div>
 
-  <!-- Connection Status -->
-  <div id="connectSection">
-    <div class="status-card" id="connectedBox">
+  <!-- Gmail connection -->
+  <div id="authSection">
+    <div class="card" id="notConnected">
+      <h3>Conectar Gmail</h3>
+      <p>Autorize acesso de leitura ao <strong>financasjrs@gmail.com</strong> para o app ler os recibos.</p>
+      <button class="btn-google" onclick="startGoogleOAuth()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Conectar Gmail
+      </button>
+    </div>
+    <div class="card" id="connected" style="display:none">
       <div class="status-row">
         <span class="status-label">Status</span>
         <span class="status-val"><span class="dot green"></span>Conectado</span>
       </div>
       <div class="status-row">
-        <span class="status-label">Conta principal</span>
-        <span class="status-val" id="connEmail1">—</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Conta secundária</span>
-        <span class="status-val" id="connEmail2">—</span>
+        <span class="status-label">Conta</span>
+        <span class="status-val">financasjrs@gmail.com</span>
       </div>
       <div class="status-row">
         <span class="status-label">Última verificação</span>
-        <span class="status-val" id="lastCheck">Nunca</span>
+        <span class="status-val" id="lastCheck">—</span>
       </div>
+      <button class="btn ghost" style="margin-top:10px;margin-bottom:0;padding:8px" onclick="disconnect()">Desconectar</button>
     </div>
   </div>
 
-  <!-- Check button -->
-  <button class="btn-check" id="btnCheck" onclick="checkEmails()">
-    📬 Verificar Emails Agora
-  </button>
+  <button class="btn" id="btnCheck" onclick="checkEmails()" style="margin-top:4px">📬 Verificar Emails Agora</button>
 
-  <!-- Results -->
   <div id="results"></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-const SB='https://tggtktjblunlbsjbhlls.supabase.co';
-const ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const SBH={'apikey':ANON_KEY,'Authorization':'Bearer '+ANON_KEY,'Content-Type':'application/json'};
-
-// Yahoo OAuth config — fill after creating app
-const WORKER_URL = 'https://financas-jr-emails.agente-x79.workers.dev';
-
-const YAHOO_EMAILS = ['agente_x79@yahoo.com','jroberto_osouza@yahoo.com.br'];
-
-// ── CPF ──
+const WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
+const SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
+const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH = {'apikey':ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json'};
+const GOOGLE_CLIENT_ID = '218884036084-nl08fa9t7t3tqo7es0m1ao97e6ohc709.apps.googleusercontent.com';
+const REDIRECT = 'https://jrfinancas.github.io/financas/emails.html';
+const TOKEN_KEY = 'jr_gmail_tokens_v1';
 const CPF_KEY = 'jr_cpf_v1';
 const CPF_SALT = 'jrfinancas_cpf_2026';
 
-async function hashStr(str) {
-  const enc = new TextEncoder().encode(str);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
+const CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos',automovel:'Automóvel',contas:'Contas',educacao:'Educação',hobbies:'Hobbies',impostos:'Impostos',juros:'Juros',outras_despesas:'Outras Despesas',saude:'Saúde',seguros:'Seguros',taxas_bancarias:'Taxas Bancárias',utilitarios:'Utilitários',vestuario:'Vestuário',viagens:'Viagens',transferencia:'Transferência'};
 
-async function encryptCPF(cpf) {
-  const clean = cpf.replace(/\D/g,'');
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CPF_SALT.padEnd(32,'0').slice(0,32)),
-    {name:'AES-GCM'}, false, ['encrypt']);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const enc = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(clean));
-  const combined = new Uint8Array([...iv, ...new Uint8Array(enc)]);
-  return btoa(String.fromCharCode(...combined));
-}
-
-async function decryptCPF() {
-  const stored = localStorage.getItem(CPF_KEY);
-  if(!stored) return null;
-  try {
-    const combined = new Uint8Array(atob(stored).split('').map(c=>c.charCodeAt(0)));
-    const iv = combined.slice(0,12), data = combined.slice(12);
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CPF_SALT.padEnd(32,'0').slice(0,32)),
-      {name:'AES-GCM'}, false, ['decrypt']);
-    const dec = await crypto.subtle.decrypt({name:'AES-GCM',iv}, key, data);
-    return new TextDecoder().decode(dec);
-  } catch(e) { return null; }
-}
-
+// ── CPF ──
 async function saveCPF() {
   const val = document.getElementById('cpfInput').value.replace(/\D/g,'');
-  if(val.length !== 11) { toast('⚠ CPF inválido','var(--yellow)'); return; }
-  const enc = await encryptCPF(val);
-  localStorage.setItem(CPF_KEY, enc);
+  if (val.length !== 11) { toast('⚠ CPF inválido','var(--yellow)'); return; }
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(CPF_SALT.padEnd(32,'0').slice(0,32)), {name:'AES-GCM'}, false, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, new TextEncoder().encode(val));
+  const combined = new Uint8Array([...iv,...new Uint8Array(enc)]);
+  localStorage.setItem(CPF_KEY, btoa(String.fromCharCode(...combined)));
   document.getElementById('cpfInput').value = '';
   document.getElementById('cpfCard').style.borderColor = 'var(--green)';
-  toast('✓ CPF salvo com criptografia','var(--green)');
+  toast('✓ CPF salvo','var(--green)');
 }
 
-async function initCPF() {
-  const cpf = await decryptCPF();
-  if(cpf) {
-    document.getElementById('cpfCard').style.borderColor = 'var(--green)';
-    document.getElementById('cpfInput').placeholder = '••••••••••• (salvo)';
-  }
-}
-
-// ── Yahoo OAuth ──
-const TOKEN_KEY = 'jr_yahoo_tokens_v1';
-
-function startYahooOAuth() {
-  if(YAHOO_CLIENT_ID === 'YAHOO_CLIENT_ID_HERE') {
-    toast('⚠ Configure o Yahoo Client ID primeiro','var(--yellow)');
-    return;
-  }
+// ── OAuth Google ──
+function startGoogleOAuth() {
   const state = Math.random().toString(36).slice(2);
-  localStorage.setItem('yahoo_oauth_state', state);
+  localStorage.setItem('gmail_oauth_state', state);
   const params = new URLSearchParams({
-    client_id: YAHOO_CLIENT_ID,
-    redirect_uri: YAHOO_REDIRECT,
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: REDIRECT,
     response_type: 'code',
-    scope: 'mail-r',
-    state: state,
-    nonce: Date.now()
+    scope: 'https://www.googleapis.com/auth/gmail.modify',
+    access_type: 'offline',
+    prompt: 'consent',
+    state
   });
-  window.location.href = 'https://api.login.yahoo.com/oauth2/request_auth?' + params;
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
 }
 
 async function handleOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   const state = params.get('state');
-  if(!code) return;
-  if(state !== localStorage.getItem('yahoo_oauth_state')) {
-    toast('⚠ State inválido — tente novamente','var(--red)'); return;
-  }
-  // Exchange code for token via Edge Function
+  if (!code) return;
+  if (state !== localStorage.getItem('gmail_oauth_state')) { toast('⚠ State inválido','var(--red)'); return; }
+
   toast('🔄 Conectando...','var(--accent)');
-  try {
-    const r = await fetch(`${SB}/functions/v1/yahoo-email`, {
-      method:'POST',
-      headers:{...SBH},
-      body: JSON.stringify({action:'exchange_token', code, redirect_uri: YAHOO_REDIRECT})
-    });
-    const d = await r.json();
-    if(d.access_token) {
-      localStorage.setItem(TOKEN_KEY, JSON.stringify({
-        access_token: d.access_token,
-        refresh_token: d.refresh_token,
-        expires_at: Date.now() + (d.expires_in * 1000)
-      }));
-      window.history.replaceState({}, '', window.location.pathname);
-      updateConnectionUI(true);
-      toast('✓ Yahoo conectado!','var(--green)');
-    } else {
-      toast('⚠ Erro: '+JSON.stringify(d),'var(--red)');
-    }
-  } catch(e) { toast('⚠ Erro de conexão: '+e.message,'var(--red)'); }
+  const r = await fetch(WORKER, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ action:'exchange_token', code })
+  });
+  const d = await r.json();
+  if (d.access_token) {
+    localStorage.setItem(TOKEN_KEY, JSON.stringify({
+      access_token: d.access_token,
+      refresh_token: d.refresh_token,
+      expires_at: Date.now() + (d.expires_in * 1000)
+    }));
+    window.history.replaceState({}, '', window.location.pathname);
+    updateUI(true);
+    toast('✓ Gmail conectado!','var(--green)');
+  } else {
+    toast('⚠ Erro: ' + JSON.stringify(d),'var(--red)');
+  }
 }
 
 function getTokens() {
@@ -325,36 +187,60 @@ function getTokens() {
   return t ? JSON.parse(t) : null;
 }
 
-function updateConnectionUI(connected) {
-  document.getElementById('notConnectedBox').style.display = connected ? 'none' : '';
-  document.getElementById('connectedBox').style.display = connected ? '' : 'none';
-  if(connected) {
-    document.getElementById('connEmail1').textContent = YAHOO_EMAILS[0];
-    document.getElementById('connEmail2').textContent = YAHOO_EMAILS[1];
-    const last = localStorage.getItem('jr_last_check');
-    if(last) document.getElementById('lastCheck').textContent = new Date(parseInt(last)).toLocaleString('pt-BR');
+async function getValidToken() {
+  let tokens = getTokens();
+  if (!tokens) return null;
+  // Refresh if expired or about to expire
+  if (tokens.expires_at < Date.now() + 60000) {
+    const r = await fetch(WORKER, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'refresh_token', refresh_token: tokens.refresh_token })
+    });
+    const d = await r.json();
+    if (d.access_token) {
+      tokens = { ...tokens, access_token: d.access_token, expires_at: Date.now() + (d.expires_in * 1000) };
+      localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+    }
+  }
+  return tokens.access_token;
+}
+
+function disconnect() {
+  localStorage.removeItem(TOKEN_KEY);
+  updateUI(false);
+  toast('Desconectado','var(--muted)');
+}
+
+function updateUI(connected) {
+  document.getElementById('notConnected').style.display = connected ? 'none' : '';
+  document.getElementById('connected').style.display = connected ? '' : 'none';
+  if (connected) {
+    const last = localStorage.getItem('jr_last_email_check');
+    document.getElementById('lastCheck').textContent = last ? new Date(parseInt(last)).toLocaleString('pt-BR') : '—';
   }
 }
 
 // ── Check emails ──
 async function checkEmails() {
-  // No OAuth needed - Worker handles IMAP directly
+  const tokens = getTokens();
+  if (!tokens) { toast('⚠ Conecte o Gmail primeiro','var(--yellow)'); return; }
+
   const btn = document.getElementById('btnCheck');
   btn.disabled = true; btn.textContent = '⟳ Verificando...';
-  document.getElementById('results').innerHTML = '<div class="empty"><div class="spin" style="font-size:30px">⟳</div><p style="margin-top:12px">Buscando emails...</p></div>';
+  document.getElementById('results').innerHTML = '<div class="empty"><div class="spin" style="font-size:28px">⟳</div><p style="margin-top:10px">Buscando emails...</p></div>';
 
   try {
-    const r = await fetch(WORKER_URL, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'fetch_emails' })
+    const access_token = await getValidToken();
+    const r = await fetch(WORKER, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'fetch_emails', access_token, refresh_token: tokens.refresh_token })
     });
     const data = await r.json();
-    localStorage.setItem('jr_last_check', Date.now().toString());
+    localStorage.setItem('jr_last_email_check', Date.now().toString());
     document.getElementById('lastCheck').textContent = new Date().toLocaleString('pt-BR');
 
-    if(!data.emails?.length) {
-      document.getElementById('results').innerHTML = '<div class="empty"><div class="icon">📭</div><p>Nenhum email novo na pasta</p></div>';
+    if (!data.emails?.length) {
+      document.getElementById('results').innerHTML = '<div class="empty"><div class="icon">📭</div><p>Nenhum email não lido na caixa de entrada</p></div>';
     } else {
       renderEmails(data.emails);
     }
@@ -365,167 +251,132 @@ async function checkEmails() {
   }
 }
 
-// ── Render email cards ──
-const CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos',automovel:'Automóvel',
-  contas:'Contas',educacao:'Educação',hobbies:'Hobbies',impostos:'Impostos',
-  juros:'Juros/Taxas',outras_despesas:'Outras Despesas',saude:'Saúde',
-  seguros:'Seguros',taxas_bancarias:'Taxas Bancárias',utilitarios:'Utilitários',
-  vestuario:'Vestuário',viagens:'Viagens',transferencia:'Transferência'};
-
 function renderEmails(emails) {
-  const container = document.getElementById('results');
-  container.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:12px;font-weight:600">${emails.length} EMAIL(S) ENCONTRADO(S)</div>`;
-  emails.forEach(function(email, idx) {
+  const el = document.getElementById('results');
+  el.innerHTML = `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600">${emails.length} EMAIL(S) NÃO LIDO(S)</div>`;
+  emails.forEach((email, idx) => {
     const card = document.createElement('div');
     card.className = 'email-card';
-    card.id = 'ecard'+idx;
+    card.id = 'ec'+idx;
     card.innerHTML = `
       <div class="email-from">${email.from}</div>
       <div class="email-subject">${email.subject}</div>
       <div class="email-preview">${email.preview}</div>
       <div id="sug${idx}">
-        <button onclick="getSuggestion(${idx})" style="width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">
-          ✨ Sugerir Lançamento com IA
-        </button>
+        <button onclick="getSuggestion(${idx})" style="width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">✨ Sugerir Lançamento com IA</button>
       </div>`;
-    card._emailData = email;
-    container.appendChild(card);
+    card._email = email;
+    el.appendChild(card);
   });
 }
 
 async function getSuggestion(idx) {
-  const card = document.getElementById('ecard'+idx);
+  const card = document.getElementById('ec'+idx);
   const sugDiv = document.getElementById('sug'+idx);
-  sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">⟳</span> Analisando com IA...</div>';
-  card.classList.add('processing');
-
-  const email = card._emailData;
+  sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">⟳</span> Analisando...</div>';
+  const email = card._email;
   try {
-    const r = await fetch(`${SB}/functions/v1/yahoo-email`, {
-      method:'POST',
-      headers:{...SBH},
-      body: JSON.stringify({
-        action: 'analyze_email',
-        email: email
-      })
+    const r = await fetch(WORKER, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'analyze_email', email })
     });
     const sug = await r.json();
     renderSuggestion(idx, sug, email);
   } catch(e) {
-    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">⚠ Erro: '+e.message+'</div>';
-    card.classList.remove('processing');
+    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">⚠ ' + e.message + '</div>';
   }
 }
 
 function renderSuggestion(idx, sug, email) {
-  const sugDiv = document.getElementById('sug'+idx);
-  const catOptions = Object.entries(CLABEL).map(([v,l])=>
-    `<option value="${v}"${v===sug.category?' selected':''}>${l}</option>`).join('');
   const today = new Date().toISOString().slice(0,10);
+  const cats = ['aluguel','animais','arranjos','automovel','contas','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens']
+    .map(c => `<option value="${c}"${c===sug.category?' selected':''}>${CLABEL[c]||c}</option>`).join('');
 
-  sugDiv.innerHTML = `
-    <div class="suggestion">
-      <div class="sug-title">✨ Sugestão da IA</div>
-      <div class="sug-fields">
-        <div class="sug-field full">
-          <label>Fornecedor</label>
-          <input type="text" id="sf_pay${idx}" value="${sug.payee||''}">
-        </div>
-        <div class="sug-field">
-          <label>Valor R$</label>
-          <input type="text" id="sf_amt${idx}" value="${sug.amount||''}">
-        </div>
-        <div class="sug-field">
-          <label>Data</label>
-          <input type="date" id="sf_dt${idx}" value="${sug.date||today}">
-        </div>
-        <div class="sug-field full">
-          <label>Categoria</label>
-          <select id="sf_cat${idx}">${catOptions}</select>
-        </div>
-        <div class="sug-field full">
-          <label>Observação</label>
-          <input type="text" id="sf_memo${idx}" value="${sug.memo||email.subject}">
-        </div>
+  document.getElementById('sug'+idx).innerHTML = `
+    <div class="sug">
+      <div class="sug-title">✨ Sugestão IA ${sug.confidence >= 0.7 ? '· Alta confiança' : '· Verifique os dados'}</div>
+      <div class="sug-grid">
+        <div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p${idx}" value="${sug.payee||''}"></div>
+        <div class="sug-field"><label>Valor R$</label><input type="text" id="sf_a${idx}" value="${sug.amount||''}"></div>
+        <div class="sug-field"><label>Data</label><input type="date" id="sf_d${idx}" value="${sug.date||today}"></div>
+        <div class="sug-field full"><label>Categoria</label><select id="sf_c${idx}">${cats}</select></div>
+        <div class="sug-field full"><label>Observação</label><input type="text" id="sf_m${idx}" value="${sug.memo||email.subject}"></div>
       </div>
       <div class="sug-actions">
-        <button class="btn-approve" onclick="approveEntry(${idx},'${email.message_id}')">✓ Confirmar</button>
-        <button class="btn-skip" onclick="skipEmail(${idx},'${email.message_id}')">Ignorar</button>
+        <button class="btn-ok" onclick="approve(${idx},'${email.message_id}')">✓ Confirmar</button>
+        <button class="btn-skip" onclick="skip(${idx},'${email.message_id}')">Ignorar</button>
       </div>
     </div>`;
 }
 
-async function approveEntry(idx, messageId) {
-  const card = document.getElementById('ecard'+idx);
-  const payee = document.getElementById('sf_pay'+idx).value.trim();
-  const amount = parseFloat(document.getElementById('sf_amt'+idx).value.replace(',','.'));
-  const date = document.getElementById('sf_dt'+idx).value;
-  const category = document.getElementById('sf_cat'+idx).value;
-  const memo = document.getElementById('sf_memo'+idx).value;
+async function approve(idx, msgId) {
+  const payee = document.getElementById('sf_p'+idx).value.trim();
+  const amount = parseFloat(document.getElementById('sf_a'+idx).value.replace(',','.'));
+  const date = document.getElementById('sf_d'+idx).value;
+  const cat = document.getElementById('sf_c'+idx).value;
+  const memo = document.getElementById('sf_m'+idx).value;
+  if (!payee||!amount||!date) { toast('⚠ Preencha os campos','var(--yellow)'); return; }
 
-  if(!payee||!amount||!date) { toast('⚠ Preencha os campos obrigatórios','var(--yellow)'); return; }
-
-  const tx = {
-    id: Date.now(),
-    type: 'expense',
-    amount, date, payee, payee_display: payee,
-    account: 'santander-cc',
-    category,
-    subcategory: null,
-    memo,
-    is_deductible: ['saude','educacao','impostos'].includes(category),
-    receipt_status: 'attached',
-    installments: 1, installment_num: 1,
-    group_id: Date.now(),
-    from_recorrente: false,
-    is_split: false
-  };
+  const tx = { id:Date.now(), type:'expense', amount, date, payee, payee_display:payee,
+    account:'santander-cc', category:cat, subcategory:null, memo,
+    is_deductible:['saude','educacao','impostos'].includes(cat),
+    receipt_status:'attached', installments:1, installment_num:1,
+    group_id:Date.now(), from_recorrente:false, is_split:false };
 
   try {
-    const r = await fetch(`${SB}/rest/v1/transactions`, {
-      method:'POST',
-      headers:{...SBH,'Prefer':'return=minimal'},
-      body: JSON.stringify(tx)
+    const r = await fetch(SB+'/rest/v1/transactions', {
+      method:'POST', headers:{...SBH,'Prefer':'return=minimal'}, body:JSON.stringify(tx)
     });
-    if(!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(await r.text());
 
-    // Mark email as processed
-    await fetch(`${SB}/functions/v1/yahoo-email`, {
-      method:'POST', headers:{...SBH},
-      body: JSON.stringify({action:'mark_processed', message_id: messageId})
-    });
+    // Mark as read
+    const access_token = await getValidToken();
+    if (access_token) {
+      await fetch(WORKER, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'mark_processed', message_id:msgId, access_token })
+      });
+    }
 
-    card.classList.remove('processing');
+    const card = document.getElementById('ec'+idx);
     card.classList.add('done');
-    card.querySelector('.sug-fields')?.parentElement?.remove();
-    card.innerHTML += '<div style="text-align:center;padding:8px;color:var(--green);font-size:13px;font-weight:600">✓ Lançamento salvo!</div>';
-    toast('✓ Lançamento registrado!','var(--green)');
+    document.getElementById('sug'+idx).innerHTML = '<div style="text-align:center;padding:8px;color:var(--green);font-size:13px;font-weight:600">✓ Lançamento salvo!</div>';
+    toast('✓ Salvo!','var(--green)');
   } catch(e) { toast('⚠ Erro: '+e.message,'var(--red)'); }
 }
 
-async function skipEmail(idx, messageId) {
-  const card = document.getElementById('ecard'+idx);
-  await fetch(WORKER_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ action:'mark_processed', message_id: messageId, account_email: email.account })
-  });
+async function skip(idx, msgId) {
+  const access_token = await getValidToken();
+  if (access_token) {
+    await fetch(WORKER, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'mark_processed', message_id:msgId, access_token })
+    });
+  }
+  const card = document.getElementById('ec'+idx);
   card.classList.add('done');
   document.getElementById('sug'+idx).innerHTML = '<div style="text-align:center;font-size:12px;color:var(--muted);padding:8px">Ignorado</div>';
 }
 
-// ── Toast ──
 function toast(msg, color='var(--green)') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.style.color = color; el.classList.add('show');
-  setTimeout(()=>el.classList.remove('show'), 3000);
+  setTimeout(() => el.classList.remove('show'), 3000);
 }
 
 // ── Init ──
 async function init() {
-  initCPF();
-  // Always connected - Worker handles auth
-  updateConnectionUI(true);
+  // Check CPF
+  const cpf = localStorage.getItem(CPF_KEY);
+  if (cpf) { document.getElementById('cpfCard').style.borderColor='var(--green)'; document.getElementById('cpfInput').placeholder='••••••••••• (salvo)'; }
+
+  // Handle OAuth callback
+  if (window.location.search.includes('code=')) {
+    await handleOAuthCallback();
+    return;
+  }
+
+  updateUI(!!getTokens());
 }
 
 init();
