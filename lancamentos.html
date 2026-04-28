@@ -1094,8 +1094,13 @@ function onCatCh(px) {
 
 function setRS(v, btn) {
   nRS=v;
-  document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on','att','pnd','na'));
-  if(btn) btn.classList.add('on',v);
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.remove('on','att','pnd','na','pending'));
+  if(btn) {
+    btn.classList.add('on');
+    // Map value to CSS class
+    const cls = v==='pending'?'pnd': v==='att'?'att':'na';
+    btn.classList.add(cls);
+  }
 }
 
 function onInstChange() {
