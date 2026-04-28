@@ -1148,6 +1148,7 @@ async function saveNormal() {
   const payee=document.getElementById('nPay').value.trim();
   const acct=document.getElementById('nAcct').value;
   const cat=document.getElementById('nCat').value;
+  const sub=document.getElementById('nSub').value||null;
   const inst=getInstCount();
   const fm=document.getElementById('nFirst').value||THIS_MONTH;
   if(!amt||!date||!payee||!acct||!cat){toast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
