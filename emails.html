@@ -107,7 +107,7 @@
 
   <button class="btn" id="btnCheck" onclick="checkEmails()" style="margin-top:4px">📬 Verificar Emails Agora</button>
 
-  <div id="results"></div>
+  <div id="results" style="padding-bottom:80px"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -258,13 +258,14 @@ function renderEmails(emails) {
     const card = document.createElement('div');
     card.className = 'email-card';
     card.id = 'ec'+idx;
-    card.innerHTML = `
-      <div class="email-from">${email.from}</div>
-      <div class="email-subject">${email.subject}</div>
-      <div class="email-preview">${email.preview}</div>
-      <div id="sug${idx}">
-        <button onclick="getSuggestion(${idx})" style="width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">✨ Sugerir Lançamento com IA</button>
-      </div>`;
+    const pdfTag = email.has_pdf ? ' <span style="font-size:10px;background:rgba(52,211,153,.1);color:var(--green);border-radius:4px;padding:1px 5px">📎 PDF</span>' : '';
+    card.innerHTML =
+      '<div class="email-from">'+email.from+'</div>'
+      +'<div class="email-subject">'+email.subject+pdfTag+'</div>'
+      +'<div class="email-preview">'+email.preview+'</div>'
+      +'<div id="sug'+idx+'">'
+      +'<button onclick="getSuggestion('+idx+')" style="width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">✨ Sugerir Lançamento com IA</button>'
+      +'</div>';
     card._email = email;
     el.appendChild(card);
   });
@@ -273,59 +274,90 @@ function renderEmails(emails) {
 async function getSuggestion(idx) {
   const card = document.getElementById('ec'+idx);
   const sugDiv = document.getElementById('sug'+idx);
-  sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">⟳</span> Analisando...</div>';
   const email = card._email;
+  const hasPDF = email.has_pdf && email.attachments?.length > 0;
+  sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">⟳</span> '+(hasPDF?'Lendo PDF e cotação...':'Analisando...')+'</div>';
   try {
+    const access_token = await getValidToken();
     const r = await fetch(WORKER, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'analyze_email', email })
+      body: JSON.stringify({ action:'analyze_email', email, access_token })
     });
     const sug = await r.json();
     renderSuggestion(idx, sug, email);
   } catch(e) {
-    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">⚠ ' + e.message + '</div>';
+    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">⚠ '+e.message+'</div>';
   }
 }
 
 function renderSuggestion(idx, sug, email) {
   const today = new Date().toISOString().slice(0,10);
-  const cats = ['aluguel','animais','arranjos','automovel','contas','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens']
-    .map(c => `<option value="${c}"${c===sug.category?' selected':''}>${CLABEL[c]||c}</option>`).join('');
-
-  document.getElementById('sug'+idx).innerHTML = `
-    <div class="sug">
-      <div class="sug-title">✨ Sugestão IA ${sug.confidence >= 0.7 ? '· Alta confiança' : '· Verifique os dados'}</div>
-      <div class="sug-grid">
-        <div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p${idx}" value="${sug.payee||''}"></div>
-        <div class="sug-field"><label>Valor R$</label><input type="text" id="sf_a${idx}" value="${sug.amount||''}"></div>
-        <div class="sug-field"><label>Data</label><input type="date" id="sf_d${idx}" value="${sug.date||today}"></div>
-        <div class="sug-field full"><label>Categoria</label><select id="sf_c${idx}">${cats}</select></div>
-        <div class="sug-field full"><label>Observação</label><input type="text" id="sf_m${idx}" value="${sug.memo||email.subject}"></div>
-      </div>
-      <div class="sug-actions">
-        <button class="btn-ok" onclick="approve(${idx},'${email.message_id}')">✓ Confirmar</button>
-        <button class="btn-skip" onclick="skip(${idx},'${email.message_id}')">Ignorar</button>
-      </div>
-    </div>`;
+  const cats = ['aluguel','animais','arranjos','automovel','contas','educacao','hobbies',
+    'impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'];
+  const catOpts = cats.map(function(cat){
+    return '<option value="'+cat+'"'+(cat===sug.category?' selected':'')+'>'+( CLABEL[cat]||cat)+'</option>';
+  }).join('');
+  const accts = [['santander-cc','Santander CC'],['santander-unique-visa','Santander Unique Visa'],
+    ['santander-unique-master','Santander Unique Master'],['porto-visa','Porto Visa Infinite'],
+    ['xp','XP'],['daycoval','Daycoval'],['wise','Wise'],['carteira','Carteira']];
+  const acctOpts = accts.map(function(a){
+    return '<option value="'+a[0]+'"'+(a[0]===(sug.account||'santander-cc')?' selected':'')+'>'+a[1]+'</option>';
+  }).join('');
+  const hasFX = sug.currency && sug.currency!=='BRL' && sug.fx_rate>0;
+  const fxBadge = hasFX
+    ? '<div style="grid-column:1/-1;background:rgba(124,106,247,.1);border:1px solid rgba(124,106,247,.2);border-radius:8px;padding:8px;font-size:12px;color:var(--purple)">💱 '+sug.currency+' '+sug.amount_original+' × R$ '+parseFloat(sug.fx_rate).toFixed(4)+' = R$ '+sug.amount+'</div>'
+    : '';
+  const pdfBadge = email.has_pdf ? ' <span style="font-size:10px;background:rgba(52,211,153,.1);color:var(--green);border-radius:4px;padding:1px 5px">PDF lido</span>' : '';
+  const confLabel = (sug.confidence||0)>=0.8?'· Alta confiança ✓':(sug.confidence||0)>=0.5?'· Verifique':'· Baixa confiança ⚠';
+  document.getElementById('sug'+idx).innerHTML =
+    '<div class="sug">'
+    +'<div class="sug-title">✨ IA '+confLabel+pdfBadge+'</div>'
+    +'<div class="sug-grid">'
+    +fxBadge
+    +'<div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p'+idx+'" value="'+(sug.payee||'')+'"></div>'
+    +'<div class="sug-field"><label>Valor R$</label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'"></div>'
+    +'<div class="sug-field"><label>Data</label><input type="date" id="sf_d'+idx+'" value="'+(sug.date||today)+'"></div>'
+    +'<div class="sug-field full"><label>Conta</label><select id="sf_ac'+idx+'">'+acctOpts+'</select></div>'
+    +'<div class="sug-field full"><label>Categoria</label><select id="sf_c'+idx+'">'+catOpts+'</select></div>'
+    +'<div class="sug-field"><label>Parcelas</label><select id="sf_in'+idx+'"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="6">6x</option><option value="12">12x</option></select></div>'
+    +'<div class="sug-field"><label>Subcategoria</label><input type="text" id="sf_s'+idx+'" placeholder="opcional"></div>'
+    +'<div class="sug-field full"><label>Observação</label><input type="text" id="sf_m'+idx+'" value="'+(sug.memo||'')+'"></div>'
+    +'</div>'
+    +'<div class="sug-actions">'
+    +'<button class="btn-ok" onclick="approve('+idx+',''+email.message_id+'')">✓ Confirmar</button>'
+    +'<button class="btn-skip" onclick="skip('+idx+',''+email.message_id+'')">Ignorar</button>'
+    +'</div>'
+    +'</div>';
 }
 
 async function approve(idx, msgId) {
   const payee = document.getElementById('sf_p'+idx).value.trim();
-  const amount = parseFloat(document.getElementById('sf_a'+idx).value.replace(',','.'));
+  const amount = parseFloat(String(document.getElementById('sf_a'+idx).value).replace(',','.'));
   const date = document.getElementById('sf_d'+idx).value;
   const cat = document.getElementById('sf_c'+idx).value;
+  const acct = document.getElementById('sf_ac'+idx)?.value||'santander-cc';
+  const inst = parseInt(document.getElementById('sf_in'+idx)?.value||'1');
+  const sub = document.getElementById('sf_s'+idx)?.value||null;
   const memo = document.getElementById('sf_m'+idx).value;
   if (!payee||!amount||!date) { toast('⚠ Preencha os campos','var(--yellow)'); return; }
 
-  const tx = { id:Date.now(), type:'expense', amount, date, payee, payee_display:payee,
-    account:'santander-cc', category:cat, subcategory:null, memo,
-    is_deductible:['saude','educacao','impostos'].includes(cat),
-    receipt_status:'attached', installments:1, installment_num:1,
-    group_id:Date.now(), from_recorrente:false, is_split:false };
+  const gid = Date.now();
+  const rows = [];
+  for (let i=0; i<inst; i++) {
+    const d = new Date(date+'T00:00:00'); d.setMonth(d.getMonth()+i);
+    rows.push({ id:gid+i, type:'expense', amount:Math.round((amount/inst)*100)/100,
+      date:i===0?date:d.toISOString().slice(0,10), payee, payee_display:payee,
+      account:acct, category:cat, subcategory:sub,
+      memo:inst>1?memo+' ('+(i+1)+'/'+inst+')':memo,
+      is_deductible:['saude','educacao','impostos'].includes(cat),
+      receipt_status:'attached', installments:inst, installment_num:i+1,
+      group_id:gid, from_recorrente:false, is_split:false });
+  }
+  const tx = rows[0];
 
   try {
     const r = await fetch(SB+'/rest/v1/transactions', {
-      method:'POST', headers:{...SBH,'Prefer':'return=minimal'}, body:JSON.stringify(tx)
+      method:'POST', headers:{...SBH,'Prefer':'return=minimal'}, body:JSON.stringify(rows.length>1?rows:tx)
     });
     if (!r.ok) throw new Error(await r.text());
 
