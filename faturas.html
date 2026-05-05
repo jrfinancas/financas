@@ -309,7 +309,7 @@ async function loadFatura(){
     // Load transactions in billing period + a few days buffer for edge cases
     const fromBuffer = addDaysStr(from, -2);
     const toBuffer = addDaysStr(to, 2);
-    const allTxs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${fromBuffer}&date=lte.${toBuffer}&type=eq.expense&is_fatura_payment=eq.false&order=date.desc`);
+    const allTxs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${fromBuffer}&date=lte.${toBuffer}&is_fatura_payment=eq.false&order=date.desc`);
     // Also load payments for this cartão in this period
     const pagtos=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&is_fatura_payment=eq.true&order=date.desc`);
     // Split into in-period and edge transactions
@@ -354,7 +354,10 @@ async function loadFatura(){
       const recItems=allItems.filter(t=>t.reconciled);
       const recTotal=recItems.reduce((s,t)=>s+parseFloat(t.amount||0),0);
       const countEl=document.getElementById('reconciledCount');
-      if(countEl) countEl.textContent=recItems.length+' reconciliado(s) · R$ '+fmt(recTotal);
+      if(countEl) {
+        const periodTotal=allItems.filter(t=>!t.is_fatura_payment).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+        countEl.textContent=recItems.length+' reconciliado(s) · R$ '+fmt(recTotal)+' / total período: R$ '+fmt(periodTotal);
+      }
       // Apply hide-reconciled filter
       const hideRec = document.getElementById('hideReconciled')?.checked;
       const visible = hideRec ? list.filter(t=>!t.reconciled) : list;
@@ -443,9 +446,31 @@ async function loadFatura(){
   }
 }
 
+async function toggleReconcileGroup(idsStr,val){
+  const ids=String(idsStr).split(',').map(s=>s.trim()).filter(Boolean);
+  if(!ids.length) return;
+  try {
+    // Update all ids in group
+    await Promise.all(ids.map(id=>sbUpd('transactions','id=eq.'+id,{reconciled:val})));
+    // Update local _txsData optimistically
+    (window._txsData||[]).forEach(function(t){
+      if(ids.includes(String(t.id))) t.reconciled=val;
+    });
+    (window._faturaTxs||[]).forEach(function(t){
+      if(ids.includes(String(t.id))) t.reconciled=val;
+    });
+    window.renderTxList(window._txsData||[]);
+  } catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
 async function toggleReconcile(id,val){
-  try{await sbUpd('transactions',`id=eq.${id}`,{reconciled:val});loadFatura();}
-  catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+  try{
+    await sbUpd('transactions','id=eq.'+id,{reconciled:val});
+    // Update local state optimistically instead of full reload
+    (window._txsData||[]).forEach(function(t){ if(String(t.id)===String(id)) t.reconciled=val; });
+    (window._faturaTxs||[]).forEach(function(t){ if(String(t.id)===String(id)) t.reconciled=val; });
+    window.renderTxList(window._txsData||[]);
+  } catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
 }
 
 async function reconcileAll(){

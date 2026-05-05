@@ -1151,7 +1151,7 @@ async function saveNormal() {
   const sub=document.getElementById('nSub').value||null;
   const inst=getInstCount();
   const fm=document.getElementById('nFirst').value||THIS_MONTH;
-  if(!amt||!date||!payee||!acct||!cat){toast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
+  if(!amt||!date||!payee||!acct||(nType!=='trf'&&!cat)){toast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
   // Duplicate check
   try {
     const dupes=await sbGet('transactions',`date=eq.${date}&payee=ilike.*${encodeURIComponent(payee)}*&amount=eq.${amt}&limit=3`);
