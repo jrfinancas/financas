@@ -422,8 +422,10 @@ async function loadFatura(){
             + '<div class="txmeta">'+fmtDate(t.date)+(catLabel?' · '+catLabel:'')+memoLabel+'</div>'
             + '</div>'
             + '<div class="txamt">-R$ '+fmt(t.is_split ? t.amount.toFixed(2) : t.amount)+'</div>';
-          div.querySelector('.txchk').addEventListener('change', function(e){toggleReconcileGroup(e.target.dataset.ids, e.target.checked);});
-          return div.outerHTML;
+          return div.outerHTML.replace(
+            'data-ids="'+chkIds+'"',
+            'data-ids="'+chkIds+'" onchange="toggleReconcileGroup(this.dataset.ids,this.checked)"'
+          );
         }).join('')+edgeHtml;
     }
     // Show payment section
