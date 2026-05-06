@@ -341,8 +341,8 @@ async function loadFatura(){
       const recCount=allTxsList.filter(t=>t.reconciled).length;
       const recTotal=allTxsList.filter(t=>t.reconciled).reduce((s,t)=>s+parseFloat(t.amount),0);
       const countEl=document.getElementById('reconciledCount');
-      if(countEl) const pTot=((window._txsData||[]).filter(t=>!t.is_fatura_payment)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
-      countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal)+' / total: R$ '+fmt(pTot);
+      if(countEl){const pTot=((window._txsData||[]).filter(t=>!t.is_fatura_payment)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal)+' / total: R$ '+fmt(pTot);}
       document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
       return;
     }
