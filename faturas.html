@@ -341,7 +341,8 @@ async function loadFatura(){
       const recCount=allTxsList.filter(t=>t.reconciled).length;
       const recTotal=allTxsList.filter(t=>t.reconciled).reduce((s,t)=>s+parseFloat(t.amount),0);
       const countEl=document.getElementById('reconciledCount');
-      if(countEl) countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal);
+      if(countEl) const pTot=((window._txsData||[]).filter(t=>!t.is_fatura_payment)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal)+' / total: R$ '+fmt(pTot);
       document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
       return;
     }
@@ -463,6 +464,15 @@ async function toggleReconcileGroup(idsStr,val){
   } catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
 }
 
+async function toggleReconcileGroup(idsStr,val){
+  const ids=String(idsStr).split(',').map(s=>s.trim()).filter(Boolean);
+  if(!ids.length) return;
+  try{
+    await Promise.all(ids.map(id=>sbUpd('transactions','id=eq.'+id,{reconciled:val})));
+    [window._txsData,window._faturaTxs].forEach(function(arr){(arr||[]).forEach(function(t){if(ids.includes(String(t.id)))t.reconciled=val;});});
+    window.renderTxList(window._txsData||[]);
+  }catch(e){toast('Erro: '+e.message,'var(--red)','white');}
+}
 async function toggleReconcile(id,val){
   try{
     await sbUpd('transactions','id=eq.'+id,{reconciled:val});

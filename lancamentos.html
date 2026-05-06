@@ -1169,7 +1169,7 @@ Continuar mesmo assim?`;
     const gid=Date.now(); const p=amt/inst; const rows=[];
     for(let i=0;i<inst;i++){
       const d=new Date(fm+'-01');d.setMonth(d.getMonth()+i);
-      rows.push({id:gid+i,type:nType==='exp'?'expense':'income',amount:p,
+      rows.push({id:gid+i,type:(nType==='exp'||nType==='trf')?'expense':'income',amount:p,
         date:(()=>{
           if(i===0) return date;
           // Add i months to the original purchase date
