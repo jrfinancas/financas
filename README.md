@@ -18,4 +18,4 @@ Os dados ficam salvos no `localStorage` do navegador de cada dispositivo.
 Para sincronizar entre Mac e iPhone, use os botões **Exportar JSON** e **Importar JSON** na aba Histórico.
 
 ---
-*Uso pessoal — José Roberto*
+*Uso pessoal — José Roberto* 
