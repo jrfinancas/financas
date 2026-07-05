@@ -429,9 +429,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <div id="tab-normal">
     <div class="card">
       <div class="card-title">📷 Comprovante</div>
-      <div class="uzone" id="nZone" ondrop="onDrop('n',event)" ondragover="event.preventDefault()">
-        <label for="nFile" style="position:absolute;inset:0;cursor:pointer;z-index:2"></label>
-        <input type="file" id="nFile" accept="image/*,application/pdf" onchange="onFile('n',event)" style="position:absolute;width:1px;height:1px;opacity:0">
+      <div class="uzone" id="nZone" onclick="document.getElementById('nFile').click()" ondrop="onDrop('n',event)" ondragover="event.preventDefault()">
+        <input type="file" id="nFile" accept="image/*,application/pdf" onchange="onFile('n',event)">
         <img id="nImg" alt="">
         <div id="nPh"><div style="font-size:24px;margin-bottom:4px">📄</div><div style="font-size:13px;font-weight:500">Toque para foto ou selecionar</div><div style="font-size:11px;color:var(--muted)">JPG, PNG · câmera ou galeria</div></div>
       </div>
@@ -546,9 +545,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <div id="tab-split" style="display:none">
     <div class="card">
       <div class="card-title">📷 Comprovante</div>
-      <div class="uzone" id="sZone" ondrop="onDrop('s',event)" ondragover="event.preventDefault()">
-        <label for="sFile" style="position:absolute;inset:0;cursor:pointer;z-index:2"></label>
-        <input type="file" id="sFile" accept="image/*,application/pdf" onchange="onFile('s',event)" style="position:absolute;width:1px;height:1px;opacity:0">
+      <div class="uzone" id="sZone" onclick="document.getElementById('sFile').click()" ondrop="onDrop('s',event)" ondragover="event.preventDefault()">
+        <input type="file" id="sFile" accept="image/*,application/pdf" onchange="onFile('s',event)">
         <img id="sImg" alt=""><div id="sPh"><div style="font-size:24px;margin-bottom:4px">📄</div><div style="font-size:13px;font-weight:500">Toque para foto ou selecionar</div></div>
       </div>
       <button class="aibtn" id="sAiBtn" onclick="runAI('s')" disabled><span id="sAiIcon">✨</span><span id="sAiTxt">Ler com IA (sugere split)</span></button>
@@ -582,9 +580,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <div id="tab-payslip" style="display:none">
     <div class="card">
       <div class="card-title">📷 Holerite</div>
-      <div class="uzone" id="pZone" ondrop="onDrop('p',event)" ondragover="event.preventDefault()">
-        <label for="pFile" style="position:absolute;inset:0;cursor:pointer;z-index:2"></label>
-        <input type="file" id="pFile" accept="image/*,application/pdf" onchange="onFile('p',event)" style="position:absolute;width:1px;height:1px;opacity:0">
+      <div class="uzone" id="pZone" onclick="document.getElementById('pFile').click()" ondrop="onDrop('p',event)" ondragover="event.preventDefault()">
+        <input type="file" id="pFile" accept="image/*,application/pdf" onchange="onFile('p',event)">
         <img id="pImg" alt=""><div id="pPh"><div style="font-size:24px;margin-bottom:4px">💼</div><div style="font-size:13px;font-weight:500">Foto do holerite</div><div style="font-size:11px;color:var(--muted)">A IA preenche automaticamente</div></div>
       </div>
       <button class="aibtn" id="pAiBtn" onclick="runAI('p')" disabled><span id="pAiIcon">✨</span><span id="pAiTxt">Ler holerite com IA</span></button>
