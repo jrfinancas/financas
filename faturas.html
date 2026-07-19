@@ -203,6 +203,7 @@ function addDaysStr(dateStr, n){
   return d.toISOString().slice(0,10);
 }
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fatVal(t){const a=parseFloat(t.amount||0);return t.type==='income'?-a:a;}
 function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
 function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
@@ -315,7 +316,7 @@ async function loadFatura(){
     // Split into in-period and edge transactions
     const txs = allTxs.filter(t=>t.date>=from && t.date<=to);
     const edgeTxs = allTxs.filter(t=>t.date<from || t.date>to);
-    const total=txs.reduce((s,t)=>s+parseFloat(t.amount),0);
+    const total=txs.reduce((s,t)=>s+fatVal(t),0);
     const reconciled=txs.filter(t=>t.reconciled).length;
     document.getElementById('faturaTotal').textContent='R$ '+fmt(total);
     document.getElementById('faturaCount').textContent=txs.length;
@@ -334,14 +335,14 @@ async function loadFatura(){
     const edgeHtml = edgeTxsFiltered.length ? `
       <div style="margin-top:14px;padding:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px">
         <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ ${edgeTxs.length} lançamento(s) próximos ao fechamento — verifique se pertencem a esta fatura ou à anterior/próxima</div>
-        ${edgeTxsFiltered.map(t=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);${t.reconciled?'opacity:.4;text-decoration:line-through':''}"><input type="checkbox" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)" style="width:14px;height:14px;accent-color:var(--accent)"><span style="color:var(--muted);flex:1">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:var(--yellow)">-R$ ${fmt(t.amount)}</span></div>`).join('')}
+        ${edgeTxsFiltered.map(t=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);${t.reconciled?'opacity:.4;text-decoration:line-through':''}"><input type="checkbox" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)" style="width:14px;height:14px;accent-color:var(--accent)"><span style="color:var(--muted);flex:1">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:${t.type==='income'?'var(--green)':'var(--yellow)'}">${t.type==='income'?'+':'-'}R$ ${fmt(t.amount)}</span></div>`).join('')}
       </div>` : '';
     if(!txs.length){
       const allTxsList=window._txsData||[];
       const recCount=allTxsList.filter(t=>t.reconciled).length;
-      const recTotal=allTxsList.filter(t=>t.reconciled).reduce((s,t)=>s+parseFloat(t.amount),0);
+      const recTotal=allTxsList.filter(t=>t.reconciled).reduce((s,t)=>s+fatVal(t),0);
       const countEl=document.getElementById('reconciledCount');
-      if(countEl){const pTot=((window._txsData||[]).filter(t=>!t.is_fatura_payment)).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      if(countEl){const pTot=((window._txsData||[]).filter(t=>!t.is_fatura_payment)).reduce((s,t)=>s+fatVal(t),0);
       countEl.textContent=recCount+' reconciliado(s) · R$ '+fmt(recTotal)+' / total: R$ '+fmt(pTot);}
       document.getElementById('faturaTxs').innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Nenhum lançamento neste período</div>'+edgeHtml;
       return;
@@ -353,10 +354,10 @@ async function loadFatura(){
       // Update reconciled count + subtotal
       const allItems=list||[];
       const recItems=allItems.filter(t=>t.reconciled);
-      const recTotal=recItems.reduce((s,t)=>s+parseFloat(t.amount||0),0);
+      const recTotal=recItems.reduce((s,t)=>s+fatVal(t),0);
       const countEl=document.getElementById('reconciledCount');
       if(countEl) {
-        const periodTotal=allItems.filter(t=>!t.is_fatura_payment).reduce((s,t)=>s+parseFloat(t.amount||0),0);
+        const periodTotal=allItems.filter(t=>!t.is_fatura_payment).reduce((s,t)=>s+fatVal(t),0);
         countEl.textContent=recItems.length+' reconciliado(s) · R$ '+fmt(recTotal)+' / total período: R$ '+fmt(periodTotal);
       }
       // Apply hide-reconciled filter
@@ -389,7 +390,7 @@ async function loadFatura(){
             };
             grouped.push(seenGroups[gKey]);
           }
-          seenGroups[gKey].amount += parseFloat(t.amount||0);
+          seenGroups[gKey].amount += fatVal(t);
           seenGroups[gKey].ids.push(t.id);
           seenGroups[gKey].lines.push(CLABEL[t.category]||t.category);
           if(!t.reconciled) seenGroups[gKey].allReconciled = false;
@@ -421,7 +422,7 @@ async function loadFatura(){
             + '<div class="txpayee">'+(t.payee_display||t.payee)+splitBadge+'</div>'
             + '<div class="txmeta">'+fmtDate(t.date)+(catLabel?' · '+catLabel:'')+memoLabel+'</div>'
             + '</div>'
-            + '<div class="txamt">-R$ '+fmt(t.is_split ? t.amount.toFixed(2) : t.amount)+'</div>';
+            + (function(){const v=t.is_split?t.amount:fatVal(t);return v<0?'<div class="txamt" style="color:var(--green)">+R$ '+fmt(Math.abs(v))+'</div>':'<div class="txamt">-R$ '+fmt(v)+'</div>';})();
           return div.outerHTML.replace(
             'data-ids="'+chkIds+'"',
             'data-ids="'+chkIds+'" onchange="toggleReconcileGroup(this.dataset.ids,this.checked)"'
