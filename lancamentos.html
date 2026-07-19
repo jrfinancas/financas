@@ -1367,10 +1367,10 @@ const SUBS = {
   contas:['Apartamento','Comestíveis','Internet','Mãe/Pai','Restaurantes','Supermercado','Telefone','TV a Cabo','Transporte'],
   'despesas-trabalho':['Não Reembolsáveis','Reembolsáveis'], doacoes:['Doações'],
   educacao:['Livros','Mensalidade'], hobbies:['Cinema','Diversão','Eventos','Jogos'],
-  impostos:['IR (Folha)','INSS (Folha)','IOF','IPTU','IPVA','Outros'],
+  impostos:['IR (Folha)','INSS (Folha)','IPTU','IPVA','Outros'],
   juros:['Juros Empréstimos','Juros Pagamentos'], 'outras-despesas':['Cuidados Pessoais','Materiais','Presentes','Taxas'],
   saude:['Academia','Dentista','Medicamentos','Médicos','Nutricionista/Psicólogo'],
-  seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias','Wise'],
+  seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias'],
   utilitarios:['Água','Eletricidade','Gás'], vestuario:['Vestuário'], viagens:['Acomodação','Alimentação','Transporte'],
   salario:['13° Salário','Salário Bruto'], bonus:['Bônus'], dividendos:['Dividendos','JCP'], 'outras-entradas':['Outros Créditos']
 };
@@ -2396,8 +2396,8 @@ async function saveCambio(){
     {...base,id:gid+1,type:'income',amount:conv,account:dest,payee:'Transferência de '+srcName,payee_display:`Câmbio ${cur} recebido`,category:'transferencia',subcategory:null,
      receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:{originalAmount:fx||null,currency:cur,rate,iof:false,brl:conv}}
   ];
-  if(iof>0)rows.push({...base,id:gid+2,type:'expense',amount:iof,payee:'IOF — Câmbio Wise',payee_display:'IOF — Câmbio Wise',category:'impostos',subcategory:'IOF',receipt_status:'na',is_split:true,split_total:conv+iof+fee});
-  if(fee>0)rows.push({...base,id:gid+3,type:'expense',amount:fee,payee:'Tarifa Wise',payee_display:'Tarifa Wise',category:'taxas-bancarias',subcategory:'Wise',receipt_status:'na',is_split:true,split_total:conv+iof+fee});
+  if(iof>0)rows.push({...base,id:gid+2,type:'expense',amount:iof,payee:'IOF — Câmbio Wise',payee_display:'IOF — Câmbio Wise',category:'impostos',subcategory:'Outros',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
+  if(fee>0)rows.push({...base,id:gid+3,type:'expense',amount:fee,payee:'Tarifa Wise',payee_display:'Tarifa Wise',category:'taxas-bancarias',subcategory:'Taxas Bancárias',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
   try{
     await sbIns('transactions',rows);
     sync('ok');toast(`✓ Câmbio salvo: transferência R$ ${fmt(conv)} + IOF R$ ${fmt(iof)} + taxa R$ ${fmt(fee)}`,'var(--green)','#0d0f14');
