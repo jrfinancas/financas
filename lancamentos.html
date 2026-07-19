@@ -430,6 +430,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <div class="tabs">
     <button class="tab" onclick="goTab('normal',this)"><i>📝</i>Normal</button>
     <button class="tab" onclick="goTab('split',this)"><i>✂️</i>Dividido</button>
+    <button class="tab" onclick="goTab('cambio',this)"><i>🌍</i>Câmbio</button>
     <button class="tab on" onclick="goTab('payslip',this)"><i>💼</i>Holerite</button>
     <button class="tab" onclick="goTab('ir',this)"><i>🧾</i>IR</button>
     <button class="tab" onclick="goTab('recorrentes',this)"><i>🔁</i>Recorrentes</button>
@@ -518,6 +519,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <button class="rbtn on na" id="rNA" onclick="setRS('na', this)">— N/A</button>
       </div></div>
       <!-- FX -->
+      <div id="fxTrfHint" style="display:none;font-size:12px;color:var(--muted);padding:8px 0">🌍 Compra de moeda estrangeira (Wise)? Use a aba <b style="color:var(--accent)">Câmbio</b> para lançar com a quebra de IOF e taxas.</div>
       <div class="fxtoggle" onclick="toggleFX()">
         <label><input type="checkbox" id="fxChk" onclick="event.stopPropagation();toggleFX()">🌍 Moeda estrangeira</label>
         <span id="fxBadge" style="display:none;font-size:10px;padding:2px 7px;border-radius:8px;background:rgba(79,142,247,.15);color:var(--accent)">USD</span>
@@ -592,6 +594,51 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <button class="addline" onclick="addSLine()">+ Adicionar linha</button>
       <button class="bsave" onclick="saveSplit()">✓ Salvar Split</button>
       <button class="bclear" onclick="clearSplit()">Limpar</button>
+    </div>
+  </div>
+
+  <!-- ======== CAMBIO ======== -->
+  <div id="tab-cambio" style="display:none">
+    <div class="card">
+      <div class="card-title">📷 Comprovante Wise</div>
+      <div class="uzone" id="wZone" onclick="document.getElementById('wFile').click()" ondrop="onDrop('w',event)" ondragover="event.preventDefault()">
+        <input type="file" id="wFile" accept="image/*,application/pdf" onchange="onFile('w',event)">
+        <img id="wImg" alt=""><div id="wPh"><div style="font-size:24px;margin-bottom:4px">🌍</div><div style="font-size:13px;font-weight:500">Comprovante da transferência Wise</div></div>
+      </div>
+      <button class="aibtn" id="wAiBtn" onclick="runAI('w')" disabled><span id="wAiIcon">✨</span><span id="wAiTxt">Ler com IA (preenche a quebra)</span></button>
+      <div class="aistat" id="wAiSt"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🌍 Compra de Moeda Estrangeira</div>
+      <div class="fr">
+        <div><label class="fl">Data</label><input type="date" class="fi" id="wDate"></div>
+        <div><label class="fl">Conta de origem</label><select class="fs" id="wSrc">
+          <option value="santander-cc" selected>Santander CC</option><option value="xp">XP</option><option value="daycoval">Daycoval</option><option value="carteira">Carteira</option>
+        </select></div>
+      </div>
+      <div class="fr">
+        <div><label class="fl">Conta destino</label><select class="fs" id="wDest"><option value="wise" selected>Wise</option><option value="xp">XP</option></select></div>
+        <div><label class="fl">Moeda</label><select class="fs" id="wCur">
+          <option value="USD">🇺🇸 USD</option><option value="EUR">🇪🇺 EUR</option><option value="GBP">🇬🇧 GBP</option><option value="OTHER">Outra...</option>
+        </select></div>
+      </div>
+      <div id="wCusRow" style="display:none;margin-bottom:12px"><label class="fl" style="font-size:10px">Código da moeda</label><input type="text" class="fi" id="wCus" maxlength="4" placeholder="JPY" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="fr">
+        <div><label class="fl">Valor recebido (moeda)</label><input type="text" inputmode="decimal" class="fi" id="wFxAmt" placeholder="0,00" oninput="calcCambio()"></div>
+        <div><label class="fl">Convertido (R$)</label><div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="wConv" placeholder="0,00" oninput="calcCambio()"></div></div>
+      </div>
+      <div class="fr">
+        <div><label class="fl">IOF (R$)</label><div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="wIof" placeholder="0,00" oninput="calcCambio()"></div></div>
+        <div><label class="fl">Taxa Wise (R$)</label><div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="wFee" placeholder="0,00" oninput="calcCambio()"></div></div>
+      </div>
+      <div class="fxres" id="wRes" style="display:none">
+        <div class="fxdet" id="wDet"></div>
+        <div class="fxbrl neg" id="wTotD">R$ 0,00</div>
+        <div class="fxdet" id="wRateD" style="margin-top:4px"></div>
+      </div>
+      <div class="fg"><label class="fl">Observação</label><textarea class="ft" id="wMemo" placeholder="Detalhe opcional..."></textarea></div>
+      <button class="bsave" id="wSaveBtn" onclick="saveCambio()">✓ Salvar Câmbio (3 lançamentos)</button>
+      <button class="bclear" onclick="clearCambio()">Limpar</button>
     </div>
   </div>
 
@@ -1293,7 +1340,7 @@ function startApp() {
 // TABS
 // ============================================================
 function goTab(t, btn) {
-  ['normal','split','payslip','ir','recorrentes','history'].forEach(x=>{
+  ['normal','split','cambio','payslip','ir','recorrentes','history'].forEach(x=>{
     document.getElementById('tab-'+x).style.display = x===t ? 'block' : 'none';
   });
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
@@ -1320,10 +1367,10 @@ const SUBS = {
   contas:['Apartamento','Comestíveis','Internet','Mãe/Pai','Restaurantes','Supermercado','Telefone','TV a Cabo','Transporte'],
   'despesas-trabalho':['Não Reembolsáveis','Reembolsáveis'], doacoes:['Doações'],
   educacao:['Livros','Mensalidade'], hobbies:['Cinema','Diversão','Eventos','Jogos'],
-  impostos:['IR (Folha)','INSS (Folha)','IPTU','IPVA','Outros'],
+  impostos:['IR (Folha)','INSS (Folha)','IOF','IPTU','IPVA','Outros'],
   juros:['Juros Empréstimos','Juros Pagamentos'], 'outras-despesas':['Cuidados Pessoais','Materiais','Presentes','Taxas'],
   saude:['Academia','Dentista','Medicamentos','Médicos','Nutricionista/Psicólogo'],
-  seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias'],
+  seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias','Wise'],
   utilitarios:['Água','Eletricidade','Gás'], vestuario:['Vestuário'], viagens:['Acomodação','Alimentação','Transporte'],
   salario:['13° Salário','Salário Bruto'], bonus:['Bônus'], dividendos:['Dividendos','JCP'], 'outras-entradas':['Outros Créditos']
 };
@@ -1339,7 +1386,7 @@ const INCMAP  = {'Salário Bruto':'salario','13° Salário':'salario','Bônus':'
 // STATE
 // ============================================================
 let nType='exp', nRS='na';
-let nB64=null, nMime=null, sB64=null, sMime=null, pB64=null, pMime=null;
+let nB64=null, nMime=null, sB64=null, sMime=null, pB64=null, pMime=null, wB64=null, wMime=null;
 let splitN=0, recSN=0, recType='exp';
 let fxOn=false, pendFX=null;
 let payees=[], recs=[];
@@ -1357,6 +1404,7 @@ function loadPrev(px, f) {
     const d=ev.target.result;
     if(px==='n'){nB64=d.split(',')[1];nMime=f.type||'image/jpeg';}
     else if(px==='s'){sB64=d.split(',')[1];sMime=f.type||'image/jpeg';}
+    else if(px==='w'){wB64=d.split(',')[1];wMime=f.type||'image/jpeg';}
     else{pB64=d.split(',')[1];pMime=f.type||'image/jpeg';}
     const img=document.getElementById(px+'Img');
     img.src=d; img.style.display='block';
@@ -1372,8 +1420,8 @@ function loadPrev(px, f) {
 // AI ANALYSIS
 // ============================================================
 async function runAI(px) {
-  const b64 = px==='n'?nB64:px==='s'?sB64:pB64;
-  const mime= px==='n'?nMime:px==='s'?sMime:pMime;
+  const b64 = px==='n'?nB64:px==='s'?sB64:px==='w'?wB64:pB64;
+  const mime= px==='n'?nMime:px==='s'?sMime:px==='w'?wMime:pMime;
   if(!b64) return;
   const btn=document.getElementById(px+'AiBtn');
   const st=document.getElementById(px+'AiSt');
@@ -1381,13 +1429,14 @@ async function runAI(px) {
   document.getElementById(px+'AiIcon').innerHTML='<div class="spin"></div>';
   document.getElementById(px+'AiTxt').textContent='Lendo...';
   st.style.display='block'; st.className='aistat r'; st.textContent='🤖 Analisando...';
-  const type = px==='p'?'payslip':px==='s'?'split':'receipt';
+  const type = px==='p'?'payslip':px==='s'?'split':px==='w'?'wise_transfer':'receipt';
   try {
     const res=await fetch(PROXY,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+KEY},body:JSON.stringify({image_b64:b64,image_mime:mime,type})});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const d=await res.json();
     if(type==='receipt') fillNormal(d);
     else if(type==='split') fillSplit(d);
+    else if(type==='wise_transfer') fillCambio(d);
     else fillPayslip(d);
     st.className='aistat ok'; st.textContent='✓ Lido! Revise os campos.';
   } catch(e) {
@@ -1476,6 +1525,11 @@ function setType(px, t, btn) {
       const el = document.getElementById(id);
       if(el) el.style.display = t==='trf' ? 'none' : '';
     });
+    // FX não se aplica a transferências: compra de moeda tem aba própria (Câmbio)
+    const fxTog=document.querySelector('.fxtoggle'), fxBx=document.getElementById('fxBox'), fxHint=document.getElementById('fxTrfHint');
+    if(fxTog) fxTog.style.display = t==='trf' ? 'none' : '';
+    if(t==='trf' && fxBx){fxBx.style.display='none';const c=document.getElementById('fxChk');if(c)c.checked=false;}
+    if(fxHint) fxHint.style.display = t==='trf' ? 'block' : 'none';
     if(t==='trf') {
       document.getElementById('nCat').value='transferencia';
       document.getElementById('nPay').value='Transferência';
@@ -2300,6 +2354,66 @@ function applyFX() {
   document.getElementById('nAmt').value=fmt(brl); calcInst();
   pendFX={originalAmount:a,currency:getFxCur(),rate:r,iof,brl};
   toast('✓ Valor aplicado!','var(--green)','#0d0f14');
+}
+
+// ============================================================
+// CAMBIO (Wise)
+// ============================================================
+function getWCur(){const s=document.getElementById('wCur').value;return s==='OTHER'?(document.getElementById('wCus')?.value||''):s;}
+document.addEventListener('DOMContentLoaded',()=>{const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
+function pnum(id){return parseFloat((document.getElementById(id).value||'').replace(/\./g,'').replace(',','.'))||0;}
+function calcCambio(){
+  const fx=pnum('wFxAmt'),conv=pnum('wConv'),iof=pnum('wIof'),fee=pnum('wFee');
+  const tot=conv+iof+fee;
+  const res=document.getElementById('wRes');
+  if(!conv){res.style.display='none';return;}
+  res.style.display='block';
+  document.getElementById('wTotD').textContent='R$ '+fmt(tot)+' (total debitado)';
+  document.getElementById('wDet').textContent=`Câmbio R$ ${fmt(conv)} + IOF R$ ${fmt(iof)} + Taxa R$ ${fmt(fee)}`;
+  document.getElementById('wRateD').textContent=fx?`Cotação efetiva: R$ ${(tot/fx).toLocaleString('pt-BR',{minimumFractionDigits:4})} / ${getWCur()} (câmbio puro: R$ ${(conv/fx).toLocaleString('pt-BR',{minimumFractionDigits:4})})`:'';
+}
+function fillCambio(d){
+  if(d.date)document.getElementById('wDate').value=d.date;
+  if(d.currency){const sel=document.getElementById('wCur');if([...sel.options].some(o=>o.value===d.currency))sel.value=d.currency;else{sel.value='OTHER';document.getElementById('wCusRow').style.display='block';document.getElementById('wCus').value=d.currency;}}
+  if(d.foreign_amount)document.getElementById('wFxAmt').value=fmt(parseFloat(d.foreign_amount));
+  if(d.converted_brl)document.getElementById('wConv').value=fmt(parseFloat(d.converted_brl));
+  if(d.iof!=null)document.getElementById('wIof').value=fmt(parseFloat(d.iof));
+  if(d.fee!=null)document.getElementById('wFee').value=fmt(parseFloat(d.fee));
+  calcCambio();
+}
+async function saveCambio(){
+  const date=document.getElementById('wDate').value, src=document.getElementById('wSrc').value, dest=document.getElementById('wDest').value;
+  const cur=getWCur(), fx=pnum('wFxAmt'), conv=pnum('wConv'), iof=pnum('wIof'), fee=pnum('wFee');
+  const memo=document.getElementById('wMemo').value||null;
+  if(!date||!conv||!cur){toast('⚠ Preencha: data, moeda e valor convertido','#fbbf24','#0d0f14');return;}
+  const btn=document.getElementById('wSaveBtn');btn.disabled=true;btn.textContent='Salvando...';
+  const gid=Date.now();
+  const srcName=(ALABEL[src]||src), rate=fx?conv/fx:null;
+  const base={date,account:src,is_deductible:false,installments:1,installment_num:1,from_recorrente:false,group_id:gid,memo};
+  const rows=[
+    {...base,id:gid,type:'expense',amount:conv,payee:`Câmbio Wise ${cur}`,payee_display:`Câmbio Wise ${cur}`,category:'transferencia',subcategory:null,
+     receipt_status:wB64?'attached':'na',is_split:true,split_total:conv+iof+fee,fx:{originalAmount:fx||null,currency:cur,rate,iof:iof>0,brl:conv}},
+    {...base,id:gid+1,type:'income',amount:conv,account:dest,payee:'Transferência de '+srcName,payee_display:`Câmbio ${cur} recebido`,category:'transferencia',subcategory:null,
+     receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:{originalAmount:fx||null,currency:cur,rate,iof:false,brl:conv}}
+  ];
+  if(iof>0)rows.push({...base,id:gid+2,type:'expense',amount:iof,payee:'IOF — Câmbio Wise',payee_display:'IOF — Câmbio Wise',category:'impostos',subcategory:'IOF',receipt_status:'na',is_split:true,split_total:conv+iof+fee});
+  if(fee>0)rows.push({...base,id:gid+3,type:'expense',amount:fee,payee:'Tarifa Wise',payee_display:'Tarifa Wise',category:'taxas-bancarias',subcategory:'Wise',receipt_status:'na',is_split:true,split_total:conv+iof+fee});
+  try{
+    await sbIns('transactions',rows);
+    sync('ok');toast(`✓ Câmbio salvo: transferência R$ ${fmt(conv)} + IOF R$ ${fmt(iof)} + taxa R$ ${fmt(fee)}`,'var(--green)','#0d0f14');
+    clearCambio();
+  }catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
+  btn.disabled=false;btn.textContent='✓ Salvar Câmbio (3 lançamentos)';
+}
+function clearCambio(){
+  ['wFxAmt','wConv','wIof','wFee','wMemo'].forEach(id=>document.getElementById(id).value='');
+  wB64=null;wMime=null;
+  const img=document.getElementById('wImg');img.style.display='none';img.src='';
+  document.getElementById('wPh').style.display='block';
+  document.getElementById('wZone').classList.remove('has');
+  document.getElementById('wAiBtn').disabled=true;
+  document.getElementById('wAiSt').style.display='none';
+  document.getElementById('wRes').style.display='none';
 }
 
 // ============================================================
