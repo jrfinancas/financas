@@ -428,17 +428,17 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 
   <!-- TABS -->
   <div class="tabs">
-    <button class="tab" onclick="goTab('normal',this)"><i>📝</i>Normal</button>
+    <button class="tab on" onclick="goTab('normal',this)"><i>📝</i>Normal</button>
     <button class="tab" onclick="goTab('split',this)"><i>✂️</i>Dividido</button>
     <button class="tab" onclick="goTab('cambio',this)"><i>🌍</i>Câmbio</button>
-    <button class="tab on" onclick="goTab('payslip',this)"><i>💼</i>Holerite</button>
+    <button class="tab" onclick="goTab('payslip',this)"><i>💼</i>Holerite</button>
     <button class="tab" onclick="goTab('ir',this)"><i>🧾</i>IR</button>
     <button class="tab" onclick="goTab('recorrentes',this)"><i>🔁</i>Recorrentes</button>
     <button class="tab" onclick="goTab('history',this)"><i>📋</i>Histórico</button>
   </div>
 
   <!-- ======== NORMAL ======== -->
-  <div id="tab-normal" style="display: none;">
+  <div id="tab-normal" style="display:block">
     <div class="card">
       <div class="card-title">📷 Comprovante</div>
       <div class="uzone" id="nZone" onclick="document.getElementById('nFile').click()" ondrop="onDrop('n',event)" ondragover="event.preventDefault()">
@@ -568,7 +568,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
     <div class="card">
       <div class="card-title">✂️ Lançamento Dividido</div>
       <div class="fr">
-        <div><label class="fl">Valor total</label><div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi neg" id="sTot" placeholder="0,00" oninput="chkSplit()"></div></div>
+        <div><label class="fl">Valor líquido (extrato)</label><div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="sTot" placeholder="0,00" oninput="chkSplit()"></div></div>
         <div><label class="fl">Data</label><input type="date" class="fi" id="sDate"></div>
       </div>
       <div class="fr">
@@ -582,15 +582,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       </div>
       <div class="div"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span class="card-title" style="margin-bottom:0">Linhas</span><span class="schk" id="sChk"></span></div>
-      <div id="sLines"><div class="sline" id="sl1"><div class="slhd"><span class="slnum">Linha 1</span><button class="rmvbtn" onclick="document.getElementById('sl1').remove();chkSplit()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc1" onchange="fillSub('slsub1','slc1')" style="font-size:13px"><option value="">...</option><option value="aluguel">Aluguel</option><option value="animais">Animais</option><option value="arranjos">Arranjos Dom.</option><option value="automovel">Automóvel</option><option value="contas">Contas</option><option value="despesas-trabalho">Trab.</option><option value="doacoes">Doações</option><option value="educacao">Educação</option><option value="hobbies">Hobbies</option><option value="impostos">Impostos</option><option value="juros">Juros</option><option value="outras-despesas">Outras Desp.</option><option value="saude">Saúde</option><option value="seguros">Seguros</option><option value="taxas-bancarias">Taxas</option><option value="utilitarios">Utilitários</option><option value="vestuario">Vestuário</option><option value="viagens">Viagens</option></select></div>
-  <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub1" style="font-size:13px"><option value="">—</option></select></div>
-  <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla1" placeholder="0,00" value="" oninput="chkSplit()"></div></div>
-  <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld1" placeholder="Opcional" value="" style="font-size:13px"></div></div><div class="sline" id="sl2"><div class="slhd"><span class="slnum">Linha 2</span><button class="rmvbtn" onclick="document.getElementById('sl2').remove();chkSplit()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc2" onchange="fillSub('slsub2','slc2')" style="font-size:13px"><option value="">...</option><option value="aluguel">Aluguel</option><option value="animais">Animais</option><option value="arranjos">Arranjos Dom.</option><option value="automovel">Automóvel</option><option value="contas">Contas</option><option value="despesas-trabalho">Trab.</option><option value="doacoes">Doações</option><option value="educacao">Educação</option><option value="hobbies">Hobbies</option><option value="impostos">Impostos</option><option value="juros">Juros</option><option value="outras-despesas">Outras Desp.</option><option value="saude">Saúde</option><option value="seguros">Seguros</option><option value="taxas-bancarias">Taxas</option><option value="utilitarios">Utilitários</option><option value="vestuario">Vestuário</option><option value="viagens">Viagens</option></select></div>
-  <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub2" style="font-size:13px"><option value="">—</option></select></div>
-  <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla2" placeholder="0,00" value="" oninput="chkSplit()"></div></div>
-  <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld2" placeholder="Opcional" value="" style="font-size:13px"></div></div></div>
+      <div id="sLines"></div>
       <button class="addline" onclick="addSLine()">+ Adicionar linha</button>
       <button class="bsave" onclick="saveSplit()">✓ Salvar Split</button>
       <button class="bclear" onclick="clearSplit()">Limpar</button>
@@ -643,7 +635,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   </div>
 
   <!-- ======== PAYSLIP ======== -->
-  <div id="tab-payslip" style="display: block;">
+  <div id="tab-payslip" style="display:none">
     <div class="card">
       <div class="card-title">📷 Holerite</div>
       <div class="uzone" id="pZone" onclick="document.getElementById('pFile').click()" ondrop="onDrop('p',event)" ondragover="event.preventDefault()">
@@ -1710,14 +1702,27 @@ function clearNormal() {
 function addSLine(pre) {
   splitN++;const n=splitN;
   const div=document.createElement('div');div.className='sline';div.id='sl'+n;
-  const cats=['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${pre?.category===c?' selected':''}>${CLABEL[c]||c}</option>`).join('');
-  div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n}</span><button class="rmvbtn" onclick="document.getElementById('sl${n}').remove();chkSplit()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="fillSub('slsub${n}','slc${n}')" style="font-size:13px"><option value="">...</option>${cats}</select></div>
+  const DESP=[['aluguel','Aluguel'],['animais','Animais de Estimação'],['arranjos','Arranjos Domésticos'],['automovel','Automóvel'],['contas','Contas'],['despesas-trabalho','Desp. Trabalho'],['doacoes','Doações'],['educacao','Educação'],['hobbies','Hobbies e Lazer'],['impostos','Impostos'],['juros','Juros'],['outras-despesas','Outras Despesas'],['saude','Saúde e Fitness'],['seguros','Seguros'],['taxas-bancarias','Taxas Bancárias'],['utilitarios','Utilitários'],['vestuario','Vestuário'],['viagens','Viagens']];
+  const RECE=[['salario','Salários'],['bonus','Bônus'],['dividendos','Dividendos'],['outras-entradas','Outras Entradas']];
+  const opt=(a)=>a.map(([v,l])=>`<option value="${v}"${pre?.category===v?' selected':''}>${l}</option>`).join('');
+  div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n} <span id="sltag${n}" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:6px"></span></span><button class="rmvbtn" onclick="document.getElementById('sl${n}').remove();chkSplit()">×</button></div>
+  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="onSplitCat(${n})" style="font-size:13px"><option value="">Selecionar...</option><optgroup label="Despesas">${opt(DESP)}</optgroup><optgroup label="Receitas">${opt(RECE)}</optgroup></select></div>
   <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub${n}" style="font-size:13px"><option value="">—</option></select></div>
   <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla${n}" placeholder="0,00" value="${pre?.amount?fmt(pre.amount):''}" oninput="chkSplit()"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
   document.getElementById('sLines').appendChild(div);
-  if(pre?.category){fillSub('slsub'+n,'slc'+n);if(pre?.subcategory)setTimeout(()=>{const s=document.getElementById('slsub'+n);if(s)s.value=pre.subcategory;},10);}
+  if(pre?.category){onSplitCat(n);if(pre?.subcategory)setTimeout(()=>{const s=document.getElementById('slsub'+n);if(s)s.value=pre.subcategory;},10);}
+  chkSplit();
+}
+
+function onSplitCat(n){
+  fillSub('slsub'+n,'slc'+n);
+  const cat=document.getElementById('slc'+n).value;
+  const tag=document.getElementById('sltag'+n);
+  const amt=document.getElementById('sla'+n);
+  if(!cat){tag.textContent='';amt.style.color='';return;}
+  if(INC.has(cat)){tag.textContent='+ entrada';tag.style.background='rgba(52,211,153,.15)';tag.style.color='var(--green)';amt.style.color='var(--green)';}
+  else{tag.textContent='− despesa';tag.style.background='rgba(248,113,113,.12)';tag.style.color='var(--red)';amt.style.color='';}
   chkSplit();
 }
 
@@ -1730,20 +1735,25 @@ function getSLines() {
     const a=parseFloat(document.getElementById('sla'+n)?.value?.replace(',','.'))||0;
     const d=document.getElementById('sld'+n)?.value||'';
     const sub=document.getElementById('slsub'+n)?.value||null;
-    if(cat&&a) l.push({category:cat,subcategory:sub,amount:a,desc:d});
+    if(cat&&a) l.push({category:cat,subcategory:sub,amount:a,desc:d,type:INC.has(cat)?'income':'expense'});
   });
   return l;
 }
 
 function chkSplit() {
   const tot=parseFloat(document.getElementById('sTot').value.replace(',','.'))||0;
-  const sum=getSLines().reduce((s,l)=>s+l.amount,0);
+  const ls=getSLines();
+  const sExp=ls.filter(l=>l.type==='expense').reduce((s,l)=>s+l.amount,0);
+  const sInc=ls.filter(l=>l.type==='income').reduce((s,l)=>s+l.amount,0);
+  const net=sInc-sExp;
   const el=document.getElementById('sChk');
-  if(!tot||!sum){el.textContent='';return;}
-  const d=Math.abs(tot-sum);
-  if(d<0.02){el.textContent='✓ Confere';el.className='schk ok';}
-  else if(sum>tot){el.textContent=`✕ Excede R$ ${fmt(sum-tot)}`;el.className='schk over';}
-  else{el.textContent=`⚠ Faltam R$ ${fmt(tot-sum)}`;el.className='schk under';}
+  if(!tot||(!sExp&&!sInc)){el.textContent='';return;}
+  const d=Math.abs(tot-Math.abs(net));
+  const dir=net>=0?'entrada':'despesa';
+  const mix=sInc>0&&sExp>0?` (+R$ ${fmt(sInc)} −R$ ${fmt(sExp)})`:'';
+  if(d<0.02){el.textContent=`✓ Confere · ${dir} líquida R$ ${fmt(Math.abs(net))}${mix}`;el.className='schk ok';}
+  else if(Math.abs(net)>tot){el.textContent=`✕ Excede R$ ${fmt(Math.abs(net)-tot)}${mix}`;el.className='schk over';}
+  else{el.textContent=`⚠ Faltam R$ ${fmt(tot-Math.abs(net))}${mix}`;el.className='schk under';}
 }
 
 async function saveSplit() {
@@ -1753,11 +1763,12 @@ async function saveSplit() {
   const acct=document.getElementById('sAcct').value;
   const lines=getSLines();
   if(!tot||!date||!payee||!acct||!lines.length){toast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
-  if(Math.abs(tot-lines.reduce((s,l)=>s+l.amount,0))>0.05){toast('⚠ Total não confere','#fbbf24','#0d0f14');return;}
+  const _net=lines.reduce((s,l)=>s+(l.type==='income'?l.amount:-l.amount),0);
+  if(Math.abs(tot-Math.abs(_net))>0.05){toast('⚠ Total não confere com o líquido das linhas','#fbbf24','#0d0f14');return;}
   sync('busy');
   try {
     const gid=Date.now();
-    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,group_id:gid,type:'expense',amount:l.amount,date,payee,payee_display:payee,account:acct,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot,installments:1,installment_num:1,from_recorrente:false})));
+    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,group_id:gid,type:l.type,amount:l.amount,date,payee,payee_display:payee,account:acct,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:l.type==='expense'?isDeductible(l.category, l.subcategory||''):false,receipt_status:sB64?'attached':'na',is_split:true,split_total:tot,installments:1,installment_num:1,from_recorrente:false})));
     await upsertPayee(payee,null,null);
     sync('ok'); toast(`✓ ${lines.length} linhas salvas!`,'var(--green)','#0d0f14'); clearSplit();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
@@ -2360,7 +2371,7 @@ function applyFX() {
 // CAMBIO (Wise)
 // ============================================================
 function getWCur(){const s=document.getElementById('wCur').value;return s==='OTHER'?(document.getElementById('wCus')?.value||''):s;}
-document.addEventListener('DOMContentLoaded',()=>{const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
+document.addEventListener('DOMContentLoaded',()=>{const sl=document.getElementById('sLines');if(sl&&!sl.children.length){addSLine();addSLine();}const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
 function pnum(id){return parseFloat((document.getElementById(id).value||'').replace(/\./g,'').replace(',','.'))||0;}
 function calcCambio(){
   const fx=pnum('wFxAmt'),conv=pnum('wConv'),iof=pnum('wIof'),fee=pnum('wFee');
