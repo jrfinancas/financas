@@ -382,6 +382,20 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 <!-- ============================================================
      EDIT MODAL
      ============================================================ -->
+<div class="modal" id="recSplitModal" onclick="if(event.target===this)closeRecSplit()">
+  <div class="mbox">
+    <div class="mhd"><span>≈ Valores da recorrente</span><button class="mclose" onclick="closeRecSplit()">×</button></div>
+    <div id="rsmName" style="font-size:13px;color:var(--muted);margin-bottom:14px"></div>
+    <div id="rsmLines"></div>
+    <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--muted)">Total</span>
+      <span id="rsmTot" style="font-size:20px;font-family:'DM Serif Display',serif">R$ 0,00</span>
+    </div>
+    <button class="bsave" style="margin-top:16px" onclick="confirmRecSplit()">✓ Lançar</button>
+    <button class="bclear" onclick="closeRecSplit()">Cancelar</button>
+  </div>
+</div>
+
 <div class="modal" id="editModal" onclick="if(event.target===this)closeEdit()">
   <div class="mbox">
     <div class="mhd"><span>✎ Editar Lançamento</span><button class="mclose" onclick="closeEdit()">×</button></div>
@@ -2248,18 +2262,26 @@ function renderRecs() {
 
 async function launchRec(id) {
   const r=recs.find(x=>x.id===id);if(!r)return;
+  // Split estimado: abre modal para revisar o valor de cada linha
+  if(r.is_estimated && r.launch_type==='split' && r.split_lines?.length) { openRecSplit(r); return; }
   // If estimated, ask for real value
   if(r.is_estimated && r.launch_type!=='split') {
     const realAmt=prompt(`Valor estimado: R$ ${fmt(r.amount)}\nDigite o valor real (ou Enter para usar o estimado):`);
     if(realAmt===null) return; // cancelled
     if(realAmt.trim()) {
       const v=parseFloat(realAmt.replace(',','.'));
-      if(!isNaN(v) && v>0) r._realAmt=v;
+      if(!isNaN(v) && v>0) r={...r,_realAmt:v};
     }
   }
+  await doLaunchRec(r);
+}
+
+async function doLaunchRec(r) {
   const date=r.next_date;const gid=Date.now();const rows=[];
   if(r.launch_type==='split'&&r.split_lines){
-    r.split_lines.forEach((l,i)=>rows.push({id:gid+i,type:r.type,amount:l.amount,date,payee:r.name,account:r.account,category:l.category,subcategory:null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:r.amount,from_recorrente:true}));
+    const _lines=r._realLines||r.split_lines;
+    const _tot=_lines.reduce((s,l)=>s+(parseFloat(l.amount)||0),0);
+    _lines.forEach((l,i)=>rows.push({id:gid+i,group_id:gid,type:r.type,amount:l.amount,date,payee:r.name,payee_display:r.name,account:r.account,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:_tot,from_recorrente:true}));
   } else {
     rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:r.memo||null,is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }
@@ -2267,9 +2289,36 @@ async function launchRec(id) {
   try {
     await sbIns('transactions',rows);
     const nn=nextAfter(r,date);
-    await sbUpd('recorrentes',id,{next_date:nn,launch_history:[...(r.launch_history||[]),date]});
+    await sbUpd('recorrentes',r.id,{next_date:nn,launch_history:[...(r.launch_history||[]),date]});
     sync('ok');await loadRecs();toast(`✓ "${r.name}" lançado! Próximo: ${fmtDate(nn)}`,'var(--green)','#0d0f14');
   } catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+// ---- Modal de valores por linha (recorrente split estimada) ----
+let _rsmRec=null;
+function openRecSplit(r){
+  _rsmRec=r;
+  document.getElementById('rsmName').textContent=`${r.name} · ${fmtDate(r.next_date)} — confira o valor de cada linha`;
+  const box=document.getElementById('rsmLines');
+  box.innerHTML=r.split_lines.map((l,i)=>`<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px">
+    <div style="flex:1"><label class="fl" style="font-size:10px">${CLABEL[l.category]||l.category}${l.subcategory?' · '+l.subcategory:''}${l.desc?' — '+l.desc:''}</label>
+    <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="rsm${i}" value="${fmt(l.amount)}" oninput="calcRecSplit()"></div></div></div>`).join('');
+  calcRecSplit();
+  document.getElementById('recSplitModal').classList.add('open');
+}
+function calcRecSplit(){
+  if(!_rsmRec)return;
+  const t=_rsmRec.split_lines.reduce((s,l,i)=>s+(parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0),0);
+  document.getElementById('rsmTot').textContent='R$ '+fmt(t);
+}
+function closeRecSplit(){document.getElementById('recSplitModal').classList.remove('open');_rsmRec=null;}
+async function confirmRecSplit(){
+  if(!_rsmRec)return;
+  const r=_rsmRec;
+  const lines=r.split_lines.map((l,i)=>({...l,amount:parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0})).filter(l=>l.amount>0);
+  if(!lines.length){toast('⚠ Informe ao menos um valor','#fbbf24','#0d0f14');return;}
+  closeRecSplit();
+  await doLaunchRec({...r,_realLines:lines});
 }
 
 function editRec(id) {
