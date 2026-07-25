@@ -115,6 +115,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <a href="dashboard.html">Dashboard</a>
     <a href="lancamentos.html">Lançamentos</a>
     <a href="#" class="active">Faturas</a>
+    <span id="appVer" title="Versão carregada" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
   </nav>
 </header>
 
@@ -137,6 +138,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       </div>
       <div style="text-align:right">
         <div class="fatura-total" id="faturaTotal">R$ 0,00</div>
+        <div id="faturaEdgeNote" style="font-size:10px;color:var(--yellow);margin-top:2px"></div>
         <span class="status-badge" id="faturaBadge">aberta</span>
       </div>
     </div>
@@ -202,6 +204,8 @@ function addDaysStr(dateStr, n){
   const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);
   return d.toISOString().slice(0,10);
 }
+const APP_VERSION='v2026.07.25-d';
+document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
 function fatVal(t){const a=parseFloat(t.amount||0);return t.type==='income'?-a:a;}
 function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
@@ -316,7 +320,9 @@ async function loadFatura(){
     // Split into in-period and edge transactions
     const txs = allTxs.filter(t=>t.date>=from && t.date<=to);
     const edgeTxs = allTxs.filter(t=>t.date<from || t.date>to);
-    const total=txs.reduce((s,t)=>s+fatVal(t),0);
+    const baseTotal=txs.reduce((s,t)=>s+fatVal(t),0);
+    window._faturaBase=baseTotal; window._edgeTxs=edgeTxs;
+    const total=baseTotal+edgeTxs.filter(t=>t.reconciled).reduce((s,t)=>s+fatVal(t),0);
     const reconciled=txs.filter(t=>t.reconciled).length;
     document.getElementById('faturaTotal').textContent='R$ '+fmt(total);
     document.getElementById('faturaCount').textContent=txs.length;
@@ -330,12 +336,13 @@ async function loadFatura(){
     badge.className='status-badge status-'+(isPast?(reconciled===txs.length&&txs.length>0?'paga':'vencida'):'aberta');
     // Store for pagamento
     window._faturaTotal=total;window._faturaYM=ym;window._faturaTxs=txs;
+    setTimeout(refreshFaturaTotal,0);
     // Render transactions - edge transactions also respect hideReconciled
     const edgeTxsFiltered = edgeTxs; // shown in yellow always, but mark reconciled
     const edgeHtml = edgeTxsFiltered.length ? `
       <div style="margin-top:14px;padding:10px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.2);border-radius:8px">
         <div style="font-size:11px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ ${edgeTxs.length} lançamento(s) próximos ao fechamento — verifique se pertencem a esta fatura ou à anterior/próxima</div>
-        ${edgeTxsFiltered.map(t=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);${t.reconciled?'opacity:.4;text-decoration:line-through':''}"><input type="checkbox" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)" style="width:14px;height:14px;accent-color:var(--accent)"><span style="color:var(--muted);flex:1">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:${t.type==='income'?'var(--green)':'var(--yellow)'}">${t.type==='income'?'+':'-'}R$ ${fmt(t.amount)}</span></div>`).join('')}
+        ${edgeTxsFiltered.map(t=>`<div id="edgerow-${t.id}" style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);${t.reconciled?'opacity:.4;text-decoration:line-through':''}"><input type="checkbox" ${t.reconciled?'checked':''} onchange="toggleReconcile(${t.id},this.checked)" style="width:14px;height:14px;accent-color:var(--accent)"><span style="color:var(--muted);flex:1">${fmtDate(t.date)} · ${t.payee_display||t.payee}</span><span style="color:${t.type==='income'?'var(--green)':'var(--yellow)'}">${t.type==='income'?'+':'-'}R$ ${fmt(t.amount)}</span></div>`).join('')}
       </div>` : '';
     if(!txs.length){
       const allTxsList=window._txsData||[];
@@ -482,8 +489,30 @@ async function toggleReconcile(id,val){
     // Update local state optimistically instead of full reload
     (window._txsData||[]).forEach(function(t){ if(String(t.id)===String(id)) t.reconciled=val; });
     (window._faturaTxs||[]).forEach(function(t){ if(String(t.id)===String(id)) t.reconciled=val; });
-    window.renderTxList(window._txsData||[]);
+    let isEdge=false;
+    (window._edgeTxs||[]).forEach(function(t){ if(String(t.id)===String(id)){ t.reconciled=val; isEdge=true; } });
+    if(isEdge){
+      const row=document.getElementById('edgerow-'+id);
+      if(row){row.style.opacity=val?'.4':'';row.style.textDecoration=val?'line-through':'';}
+      refreshFaturaTotal();
+    } else {
+      window.renderTxList(window._txsData||[]);
+      refreshFaturaTotal();
+    }
   } catch(e){toast('✕ Erro: '+e.message,'var(--red)','white');}
+}
+
+// Total da fatura = lançamentos do período + lançamentos de borda marcados
+function refreshFaturaTotal(){
+  const base=window._faturaBase||0;
+  const edges=(window._edgeTxs||[]).filter(t=>t.reconciled);
+  const edgeSum=edges.reduce((s,t)=>s+fatVal(t),0);
+  const tot=base+edgeSum;
+  window._faturaTotal=tot;
+  const el=document.getElementById('faturaTotal');
+  if(el) el.textContent='R$ '+fmt(tot);
+  const note=document.getElementById('faturaEdgeNote');
+  if(note) note.textContent = edges.length ? `inclui ${edges.length} lançamento(s) fora do período · ${edgeSum<0?'−':'+'}R$ ${fmt(Math.abs(edgeSum))}` : '';
 }
 
 async function reconcileAll(){
@@ -525,8 +554,8 @@ async function confirmarPagamento(){
       memo:memo,is_deductible:false,receipt_status:'na',
       is_fatura_payment:true
     }]);
-    // Mark all as reconciled
-    await reconcileAll();
+    // NÃO reconcilia em massa: o que ficou sem tique pertence à próxima fatura.
+    // Use o botão "Reconciliar Todos" se quiser marcar tudo de uma vez.
     // B5: Update recorrente estimated value for this cartão
     try {
       const recs = await sbGet('recorrentes', `name=ilike.*${encodeURIComponent(ALABEL[curCartao]||curCartao)}*`);
