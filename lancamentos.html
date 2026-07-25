@@ -487,7 +487,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <div class="ipreview" id="nInstPrev"></div>
       <div class="fr">
         <div><label class="fl">Data <span class="aibadge" id="nDateBadge" style="display:none">IA</span></label><input type="date" class="fi" id="nDate"></div>
-        <div><label class="fl">Conta / Cartão</label><select class="fs" id="nAcct" onchange="if(fxOn)checkWise()">
+        <div><label class="fl">Conta / Cartão <span class="aibadge" id="nAcctBadge" style="display:none">IA</span></label><select class="fs" id="nAcct" onchange="if(fxOn)checkWise()">
           <option value="">Selecionar...</option>
           <optgroup label="Santander"><option value="santander-unique-visa">Santander Unique Visa</option><option value="santander-unique-master">Santander Unique Master</option><option value="santander-cc">Santander CC</option></optgroup>
           <optgroup label="Porto"><option value="porto-visa">Porto Visa Infinite</option></optgroup>
@@ -1368,6 +1368,12 @@ const SUBS = {
 };
 
 const CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações'};
+// Mapa: 4 últimos dígitos do cartão -> conta. Editar aqui quando renovar/trocar cartão.
+const CARDMAP = {
+  '7346': 'santander-unique-visa',   // Visa Santander Unique
+  '7348': 'santander-unique-master', // Mastercard Santander Unique
+  '0213': 'porto-visa'               // Visa Porto Infinite
+};
 const ALABEL = {'santander-unique-visa':'Santander Unique Visa','santander-unique-master':'Santander Unique Master','santander-cc':'Santander CC','porto-visa':'Porto Visa Infinite','xp':'XP','daycoval':'Daycoval','wise':'Wise'};
 const INCOPTS = ['Salário Bruto','13° Salário','Bônus','Férias','Outras Entradas'];
 const DEDOPTS = ['IR Retido na Fonte','INSS','Plano de Saúde','Vale Transporte','Previdência Privada','Outros Descontos'];
@@ -1449,6 +1455,15 @@ function fillNormal(d) {
   if(d.category){document.getElementById('nCat').value=d.category;onCatCh('n');badge('nCatBadge');}
   if(d.memo) document.getElementById('nMemo').value=d.memo;
   if(d.installments>1){document.getElementById('nInst').value=d.installments;calcInst();}
+  const acct=acctFromCard(d.card_last4);
+  if(acct){document.getElementById('nAcct').value=acct;badge('nAcctBadge');if(fxOn)checkWise();}
+}
+
+// Identifica a conta pelo final do cartão lido no comprovante
+function acctFromCard(last4){
+  if(!last4) return null;
+  const d=String(last4).replace(/\D/g,'').slice(-4);
+  return CARDMAP[d]||null;
 }
 
 function fillSplit(d) {
@@ -1680,7 +1695,7 @@ function clearNormal() {
   document.getElementById('nInstPrev').style.display='none';
   document.getElementById('nDedBadge').style.display='none';
   document.getElementById('nAiSt').style.display='none';
-  ['nAmtBadge','nDateBadge','nPayBadge','nCatBadge'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
+  ['nAmtBadge','nDateBadge','nPayBadge','nCatBadge','nAcctBadge'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
   nB64=null; pendFX=null; fxOn=false;
   document.getElementById('nImg').style.display='none';
   document.getElementById('nPh').style.display='block';
