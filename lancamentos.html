@@ -1,12 +1,11 @@
+<!DOCTYPE html>
 <html lang="pt-BR"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Finanças JR">
-<title>function fillPayslip(d) {
-  if(d.month) document.getElementById('pMonth').value=d.month;
-  if(d.income){document.getElementById('pIncLines').innerHTML='';d.income.forEach(i=_{if(i.amount_0)addPSLine('</title>
+<title>Finanças JR · Lançamentos</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&amp;family=DM+Sans:wght@300;400;500;600&amp;display=swap" rel="stylesheet">
 <style>
 /* ============================================================
@@ -434,6 +433,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
     <a href="index.html">← Início</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="#" class="active">Lançamentos</a>
+    <span id="appVer" title="Versão carregada" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
   </nav>
   <div class="sdot" id="sdot"></div>
 </header>
@@ -1219,6 +1219,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const APP_VERSION = 'v2026.07.25-c';  // atualizar a cada publicação
+document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
 const AUTH  = 'jr_auth_v3';
