@@ -204,7 +204,7 @@ function addDaysStr(dateStr, n){
   const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);
   return d.toISOString().slice(0,10);
 }
-const APP_VERSION='v2026.07.25-d';
+const APP_VERSION='v2026.07.25-e';
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
 function fatVal(t){const a=parseFloat(t.amount||0);return t.type==='income'?-a:a;}
@@ -316,7 +316,14 @@ async function loadFatura(){
     const toBuffer = addDaysStr(to, 2);
     const allTxs=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${fromBuffer}&date=lte.${toBuffer}&is_fatura_payment=eq.false&order=date.desc`);
     // Also load payments for this cartão in this period
-    const pagtos=await sbGet('transactions',`account=eq.${curCartao}&date=gte.${from}&date=lte.${to}&is_fatura_payment=eq.true&order=date.desc`);
+    // Pagamento é gravado na conta de origem e na data de vencimento (fora do período da fatura),
+    // por isso o vínculo é feito por fatura_cartao/fatura_ym — com fallback pelo memo (dados antigos).
+    let pagtos=await sbGet('transactions',`is_fatura_payment=eq.true&fatura_cartao=eq.${curCartao}&fatura_ym=eq.${ym}&order=date.desc`);
+    if(!pagtos.length){
+      const cand=await sbGet('transactions',`is_fatura_payment=eq.true&fatura_cartao=is.null&order=date.desc`);
+      const lbl=ALABEL[curCartao]||curCartao, mo=fmtMo(ym);
+      pagtos=cand.filter(p=>(p.memo||'').includes(lbl)&&(p.memo||'').includes(mo));
+    }
     // Split into in-period and edge transactions
     const txs = allTxs.filter(t=>t.date>=from && t.date<=to);
     const edgeTxs = allTxs.filter(t=>t.date<from || t.date>to);
@@ -332,8 +339,9 @@ async function loadFatura(){
     const badge=document.getElementById('faturaBadge');
     const isCurrentMonth=curAno===now.getFullYear()&&curMes===now.getMonth()+1;
     const isPast=new Date(curAno,curMes-1)<new Date(now.getFullYear(),now.getMonth());
-    badge.textContent=isPast?(reconciled===txs.length&&txs.length>0?'paga':'em aberto'):'aberta';
-    badge.className='status-badge status-'+(isPast?(reconciled===txs.length&&txs.length>0?'paga':'vencida'):'aberta');
+    const pago=(pagtos||[]).length>0;
+    badge.textContent=pago?'paga':(isPast?'vencida':'aberta');
+    badge.className='status-badge status-'+(pago?'paga':(isPast?'vencida':'aberta'));
     // Store for pagamento
     window._faturaTotal=total;window._faturaYM=ym;window._faturaTxs=txs;
     setTimeout(refreshFaturaTotal,0);
@@ -546,13 +554,15 @@ async function confirmarPagamento(){
   const conta=document.getElementById('pagConta').value;
   const memo=document.getElementById('pagMemo').value;
   if(!valor||!data||!conta){toast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
+  if((window._pagtos||[]).length && !confirm(`Esta fatura já tem ${window._pagtos.length} pagamento(s) registrado(s), somando R$ ${fmt(window._pagtos.reduce((s,p)=>s+parseFloat(p.amount||0),0))}.\n\nRegistrar mais um mesmo assim?`)) return;
   try{
     await sbIns('transactions',[{
       id:Date.now(),type:'transfer',amount:valor,date:data,
       payee:'Pagamento fatura '+(ALABEL[curCartao]||curCartao),
       account:conta,category:'transferencia',
       memo:memo,is_deductible:false,receipt_status:'na',
-      is_fatura_payment:true
+      is_fatura_payment:true,
+      fatura_cartao:curCartao, fatura_ym:(window._faturaYM||'')
     }]);
     // NÃO reconcilia em massa: o que ficou sem tique pertence à próxima fatura.
     // Use o botão "Reconciliar Todos" se quiser marcar tudo de uma vez.
