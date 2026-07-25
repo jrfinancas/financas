@@ -2262,17 +2262,8 @@ function renderRecs() {
 
 async function launchRec(id) {
   const r=recs.find(x=>x.id===id);if(!r)return;
-  // Split estimado: abre modal para revisar o valor de cada linha
-  if(r.is_estimated && r.launch_type==='split' && r.split_lines?.length) { openRecSplit(r); return; }
-  // If estimated, ask for real value
-  if(r.is_estimated && r.launch_type!=='split') {
-    const realAmt=prompt(`Valor estimado: R$ ${fmt(r.amount)}\nDigite o valor real (ou Enter para usar o estimado):`);
-    if(realAmt===null) return; // cancelled
-    if(realAmt.trim()) {
-      const v=parseFloat(realAmt.replace(',','.'));
-      if(!isNaN(v) && v>0) r={...r,_realAmt:v};
-    }
-  }
+  // Estimada: abre modal para revisar valores e descrições antes de gravar
+  if(r.is_estimated) { openRecLaunch(r); return; }
   await doLaunchRec(r);
 }
 
@@ -2283,7 +2274,7 @@ async function doLaunchRec(r) {
     const _tot=_lines.reduce((s,l)=>s+(parseFloat(l.amount)||0),0);
     _lines.forEach((l,i)=>rows.push({id:gid+i,group_id:gid,type:r.type,amount:l.amount,date,payee:r.name,payee_display:r.name,account:r.account,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:_tot,from_recorrente:true}));
   } else {
-    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:r.memo||null,is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
+    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:(r._realMemo!==undefined?(r._realMemo||null):(r.memo||null)),is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }
   sync('busy');
   try {
@@ -2294,31 +2285,43 @@ async function doLaunchRec(r) {
   } catch(e){sync('err');toast('✕ Erro: '+e.message,'var(--red)','white');}
 }
 
-// ---- Modal de valores por linha (recorrente split estimada) ----
-let _rsmRec=null;
-function openRecSplit(r){
+// ---- Modal de confirmação ao lançar recorrente estimada (valor + descrição) ----
+let _rsmRec=null, _rsmLines=[];
+function openRecLaunch(r){
   _rsmRec=r;
-  document.getElementById('rsmName').textContent=`${r.name} · ${fmtDate(r.next_date)} — confira o valor de cada linha`;
-  const box=document.getElementById('rsmLines');
-  box.innerHTML=r.split_lines.map((l,i)=>`<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px">
-    <div style="flex:1"><label class="fl" style="font-size:10px">${CLABEL[l.category]||l.category}${l.subcategory?' · '+l.subcategory:''}${l.desc?' — '+l.desc:''}</label>
-    <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="rsm${i}" value="${fmt(l.amount)}" oninput="calcRecSplit()"></div></div></div>`).join('');
+  const isSplit=r.launch_type==='split' && r.split_lines?.length;
+  _rsmLines = isSplit ? r.split_lines.map(l=>({...l}))
+                      : [{category:r.category,subcategory:r.subcategory,amount:r.amount,desc:r.memo||''}];
+  document.getElementById('rsmName').textContent=`${r.name} · ${fmtDate(r.next_date)} — confira valores e descrições antes de lançar`;
+  document.getElementById('rsmLines').innerHTML=_rsmLines.map((l,i)=>`<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
+    <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">${CLABEL[l.category]||l.category||'—'}${l.subcategory?' · '+l.subcategory:''}</div>
+    <div style="display:flex;gap:10px">
+      <div style="width:130px"><label class="fl" style="font-size:10px">Valor</label>
+        <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="rsm${i}" value="${fmt(l.amount)}" oninput="calcRecSplit()"></div></div>
+      <div style="flex:1"><label class="fl" style="font-size:10px">Descrição</label>
+        <input type="text" class="fi" id="rsmd${i}" value="${(l.desc||'').replace(/"/g,'&quot;')}" placeholder="Opcional" style="font-size:13px"></div>
+    </div></div>`).join('');
   calcRecSplit();
   document.getElementById('recSplitModal').classList.add('open');
 }
+const openRecSplit=openRecLaunch; // compatibilidade
 function calcRecSplit(){
   if(!_rsmRec)return;
-  const t=_rsmRec.split_lines.reduce((s,l,i)=>s+(parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0),0);
+  const t=_rsmLines.reduce((s,l,i)=>s+(parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0),0);
   document.getElementById('rsmTot').textContent='R$ '+fmt(t);
 }
-function closeRecSplit(){document.getElementById('recSplitModal').classList.remove('open');_rsmRec=null;}
+function closeRecSplit(){document.getElementById('recSplitModal').classList.remove('open');_rsmRec=null;_rsmLines=[];}
 async function confirmRecSplit(){
   if(!_rsmRec)return;
-  const r=_rsmRec;
-  const lines=r.split_lines.map((l,i)=>({...l,amount:parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0})).filter(l=>l.amount>0);
+  const r=_rsmRec, isSplit=r.launch_type==='split' && r.split_lines?.length;
+  const lines=_rsmLines.map((l,i)=>({...l,
+    amount:parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0,
+    desc:document.getElementById('rsmd'+i)?.value||''
+  })).filter(l=>l.amount>0);
   if(!lines.length){toast('⚠ Informe ao menos um valor','#fbbf24','#0d0f14');return;}
   closeRecSplit();
-  await doLaunchRec({...r,_realLines:lines});
+  if(isSplit) await doLaunchRec({...r,_realLines:lines});
+  else await doLaunchRec({...r,_realAmt:lines[0].amount,_realMemo:lines[0].desc});
 }
 
 function editRec(id) {
