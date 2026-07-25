@@ -69,7 +69,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .mbox{background:var(--surface);border-radius:16px;padding:22px;width:100%;max-width:580px}
 .mhd{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
 .mclose{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
-#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
+#toast{position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%) translateY(-70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:normal;max-width:92vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer}
 #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 </style>
 </head>
@@ -204,13 +204,13 @@ function addDaysStr(dateStr, n){
   const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);
   return d.toISOString().slice(0,10);
 }
-const APP_VERSION='v2026.07.25-e';
+const APP_VERSION='v2026.07.25-g';
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
 function fatVal(t){const a=parseFloat(t.amount||0);return t.type==='income'?-a:a;}
 function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
 function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
-function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');t.onclick=()=>t.classList.remove('show');clearTimeout(window._toastT);window._toastT=setTimeout(()=>t.classList.remove('show'),7000);}
 
 let cartoes=[], curCartao=null;
 const now=new Date();

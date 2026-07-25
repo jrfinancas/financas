@@ -334,10 +334,11 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 /* ============================================================
    TOAST
    ============================================================ */
-#toast { position: fixed; bottom: calc(20px + var(--sb)); left: 50%;
-  transform: translateX(-50%) translateY(70px); background: var(--green); color: #0d0f14;
+#toast { position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 50%;
+  transform: translateX(-50%) translateY(-70px); background: var(--green); color: #0d0f14;
   padding: 11px 18px; border-radius: 12px; font-weight: 600; font-size: 13px;
-  opacity: 0; transition: all .3s; z-index: 10000; white-space: nowrap; max-width: 90vw; text-align: center; }
+  opacity: 0; transition: all .3s; z-index: 10000; white-space: normal; max-width: 92vw;
+  text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.45); cursor: pointer; }
 #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 </style>
 <style id="claude-agent-animation-styles">
@@ -1219,7 +1220,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.07.25-f';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.07.25-g';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -2507,7 +2508,10 @@ function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai'
 function toast(msg,bg,col) {
   const t=document.getElementById('toast');
   t.textContent=msg;t.style.background=bg;t.style.color=col;
-  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);
+  t.classList.add('show');
+  t.onclick=()=>t.classList.remove('show');           // toque fecha
+  clearTimeout(window._toastT);
+  window._toastT=setTimeout(()=>t.classList.remove('show'),7000);
 }
 
 // ============================================================
