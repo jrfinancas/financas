@@ -1219,7 +1219,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.07.25-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.07.25-f';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -1483,10 +1483,10 @@ function acctFromCard(last4){
 }
 
 function fillSplit(d) {
-  if(d.total) document.getElementById('sTot').value=fmt(d.total);
+  if(d.total) document.getElementById('sTot').value=fmt(Math.abs(parseFloat(d.total)||0));
   if(d.date)  document.getElementById('sDate').value=d.date;
   if(d.payee) document.getElementById('sPay').value=d.payee;
-  if(d.lines?.length){document.getElementById('sLines').innerHTML='';splitN=0;d.lines.forEach(l=>addSLine(l));}
+  if(d.lines?.length){document.getElementById('sLines').innerHTML='';splitN=0;d.lines.filter(l=>Math.abs(parseFloat(l.amount)||0)>0).forEach(l=>addSLine(l));}
   chkSplit();
 }
 
@@ -1739,7 +1739,7 @@ function addSLine(pre) {
   div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n} <span id="sltag${n}" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:6px"></span></span><button class="rmvbtn" onclick="document.getElementById('sl${n}').remove();chkSplit()">×</button></div>
   <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="onSplitCat(${n})" style="font-size:13px"><option value="">Selecionar...</option><optgroup label="Despesas">${opt(DESP)}</optgroup><optgroup label="Receitas">${opt(RECE)}</optgroup></select></div>
   <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub${n}" style="font-size:13px"><option value="">—</option></select></div>
-  <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla${n}" placeholder="0,00" value="${pre?.amount?fmt(pre.amount):''}" oninput="chkSplit()"></div></div>
+  <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla${n}" placeholder="0,00" value="${pre?.amount?fmt(Math.abs(pre.amount)):''}" oninput="chkSplit()"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
   document.getElementById('sLines').appendChild(div);
   if(pre?.category){onSplitCat(n);if(pre?.subcategory)setTimeout(()=>{const s=document.getElementById('slsub'+n);if(s)s.value=pre.subcategory;},10);}
@@ -1763,7 +1763,7 @@ function getSLines() {
     if(!el.id.match(/^sl\d+$/)) return; // only sl1, sl2... not slc1, sla1 etc
     const n=el.id.slice(2);
     const cat=document.getElementById('slc'+n)?.value;
-    const a=parseFloat(document.getElementById('sla'+n)?.value?.replace(',','.'))||0;
+    const a=Math.abs(parseFloat((document.getElementById('sla'+n)?.value||'').replace(/\./g,'').replace(',','.'))||0);
     const d=document.getElementById('sld'+n)?.value||'';
     const sub=document.getElementById('slsub'+n)?.value||null;
     if(cat&&a) l.push({category:cat,subcategory:sub,amount:a,desc:d,type:INC.has(cat)?'income':'expense'});
@@ -1793,9 +1793,10 @@ async function saveSplit() {
   const payee=document.getElementById('sPay').value.trim();
   const acct=document.getElementById('sAcct').value;
   const lines=getSLines();
-  if(!tot||!date||!payee||!acct||!lines.length){toast('⚠ Preencha todos os campos','#fbbf24','#0d0f14');return;}
+  const falta=[!tot&&'valor líquido',!date&&'data',!payee&&'fornecedor',!acct&&'conta',!lines.length&&'linhas'].filter(Boolean);
+  if(falta.length){toast('⚠ Faltando: '+falta.join(', '),'#fbbf24','#0d0f14');return;}
   const _net=lines.reduce((s,l)=>s+(l.type==='income'?l.amount:-l.amount),0);
-  if(Math.abs(tot-Math.abs(_net))>0.05){toast('⚠ Total não confere com o líquido das linhas','#fbbf24','#0d0f14');return;}
+  if(Math.abs(tot-Math.abs(_net))>0.05){toast(`⚠ Líquido das linhas (R$ ${fmt(Math.abs(_net))}) ≠ total informado (R$ ${fmt(tot)})`,'#fbbf24','#0d0f14');return;}
   sync('busy');
   try {
     const gid=Date.now();
