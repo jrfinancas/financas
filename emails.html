@@ -97,7 +97,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.07.26-a';
+var APP_VERSION='v2026.07.26-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 var WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
 var SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
@@ -349,6 +349,16 @@ function renderEmails(emails) {
   });
 }
 
+// Busca o PDF anexado direto no Gmail (o app ja tem o token)
+async function fetchAttachment(messageId, attachmentId, token) {
+  var u = 'https://gmail.googleapis.com/gmail/v1/users/me/messages/'+messageId+'/attachments/'+attachmentId;
+  var r = await fetch(u, { headers:{'Authorization':'Bearer '+token} });
+  if (!r.ok) throw new Error('Anexo: HTTP '+r.status);
+  var d = await r.json();
+  // Gmail devolve base64url; converter para base64 padrao
+  return String(d.data||'').replace(/-/g,'+').replace(/_/g,'/');
+}
+
 async function getSuggestion(idx) {
   var card = document.getElementById('ec'+idx);
   var sugDiv = document.getElementById('sug'+idx);
@@ -356,15 +366,29 @@ async function getSuggestion(idx) {
   var hasPDF = email.has_pdf && email.attachments && email.attachments.length > 0;
   sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">\u27f3</span> '+(hasPDF ? 'Lendo PDF...' : 'Analisando...')+'</div>';
   try {
-    var access_token = await getValidToken();
-    var r = await fetch(WORKER, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({action:'analyze_email', email:email, access_token:access_token})
+    // Texto completo do email (sem cortes) direto para a Edge Function
+    var texto = 'De: '+(email.from||'')+'\nAssunto: '+(email.subject||'')+'\n\n'+(email.body||email.preview||'');
+    var payload = { type:'email', text: texto };
+
+    if (hasPDF) {
+      try {
+        var token = await getValidToken();
+        var b64 = await fetchAttachment(email.message_id, email.attachments[0].attachmentId, token);
+        if (b64) { payload.image_b64 = b64; payload.image_mime = 'application/pdf'; }
+      } catch(pe) {
+        sugDiv.innerHTML = '<div style="text-align:center;padding:10px;color:var(--muted)"><span class="spin">\u27f3</span> Anexo indisponivel, analisando o texto...</div>';
+      }
+    }
+
+    var r = await fetch(SB+'/functions/v1/analyze-receipt', {
+      method:'POST', headers:SBH, body: JSON.stringify(payload)
     });
     var sug = await r.json();
+    if (sug && sug.error) throw new Error(sug.error);
     renderSuggestion(idx, sug, email);
   } catch(e) {
-    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">\u26a0 '+e.message+'</div>';
+    sugDiv.innerHTML = '<div style="color:var(--red);font-size:13px">\u26a0 '+e.message+'</div>'
+      + '<button style="width:100%;margin-top:8px;padding:8px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:8px;color:var(--accent);font-size:12px;cursor:pointer" onclick="getSuggestion('+idx+')">Tentar de novo</button>';
   }
 }
 
