@@ -1,5 +1,19 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head>
+<script>
+// Ao ABRIR o app numa nova sessao, comeca sempre pela tela de inicio.
+// Navegacao dentro da mesma sessao continua normal.
+(function(){
+  try{
+    if(!sessionStorage.getItem('jr_sess')){
+      sessionStorage.setItem('jr_sess','1');
+      var p = location.pathname;
+      if(!/(^|\/)(index\.html)?$/.test(p)) { location.replace('index.html'); }
+    }
+  }catch(e){}
+})();
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">

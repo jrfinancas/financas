@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script>
+// Marca a sessao para que as demais telas nao redirecionem de volta
+try{ sessionStorage.setItem('jr_sess','1'); }catch(e){}
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -28,6 +33,14 @@
   .logo span { color: #4f8ef7; }
   .sub { font-size: 13px; color: #6b7280; margin-bottom: 52px; text-align: center; }
   .menu { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  /* Web: tres colunas lado a lado */
+  @media (min-width: 900px) {
+    .menu { max-width: 1160px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+    .col-title { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #6b7280; margin-bottom: 2px; padding-left: 4px; }
+  }
+  .col-title { display: none; }
+  @media (min-width: 900px) { .col-title { display: block; } }
   a {
     display: flex; align-items: center; gap: 16px;
     background: #13161e; border: 1px solid #252a38;
@@ -141,47 +154,16 @@
 
 
 <div class="logo">Finanças <span>JR</span></div>
-<div class="sub">Gestão Financeira Pessoal</div>
+<div class="sub">Gestão Financeira Pessoal <span style="opacity:.45;font-size:10px">v2026.07.26-c</span></div>
 
 <div class="menu">
+  <div class="col">
+    <div class="col-title">Análise</div>
   <a href="dashboard.html">
     <div class="icon blue">📊</div>
     <div class="label">
       <strong>Dashboard</strong>
       <span>Patrimônio, investimentos, budget e despesas</span>
-    </div>
-    <div class="arrow">›</div>
-  </a>
-
-  <a href="lancamentos.html">
-    <div class="icon green">📝</div>
-    <div class="label">
-      <strong>Lançamentos</strong>
-      <span>Normal · Split · Holerite · IR · Recorrentes</span>
-    </div>
-    <div class="arrow">›</div>
-  </a>
-  <a href="importar-quicken.html">
-    <div class="icon" style="background:rgba(251,191,36,.15)">📥</div>
-    <div class="label">
-      <strong>Importar Quicken</strong>
-      <span>Histórico CSV · All Dates · All Accounts</span>
-    </div>
-    <div class="arrow">›</div>
-  </a>
-  <a href="contas.html">
-    <div class="icon" style="background:rgba(52,211,153,.15)">🏦</div>
-    <div class="label">
-      <strong>Contas</strong>
-      <span>Setup de contas · Saldos · Carteira</span>
-    </div>
-    <div class="arrow">›</div>
-  </a>
-  <a href="faturas.html">
-    <div class="icon" style="background:rgba(248,113,113,.15)">💳</div>
-    <div class="label">
-      <strong>Faturas</strong>
-      <span>Cartões de crédito · Reconciliação</span>
     </div>
     <div class="arrow">›</div>
   </a>
@@ -193,14 +175,53 @@
     </div>
     <div class="arrow">›</div>
   </a>
+  </div>
+  <div class="col">
+    <div class="col-title">Dia a dia</div>
+  <a href="lancamentos.html">
+    <div class="icon green">📝</div>
+    <div class="label">
+      <strong>Lançamentos</strong>
+      <span>Normal · Dividido · Câmbio · Holerite · IR · Recorrentes</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
   <a href="emails.html">
     <div class="icon" style="background:rgba(52,211,153,.15)">📧</div>
     <div class="label">
       <strong>Captura de Emails</strong>
-      <span>Recibos · Sugestão por IA · Yahoo Mail</span>
+      <span>Recibos · Sugestão por IA · Gmail</span>
     </div>
     <div class="arrow">›</div>
   </a>
+  <a href="faturas.html">
+    <div class="icon" style="background:rgba(248,113,113,.15)">💳</div>
+    <div class="label">
+      <strong>Faturas</strong>
+      <span>Cartões de crédito · Reconciliação</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+  </div>
+  <div class="col">
+    <div class="col-title">Configuração</div>
+  <a href="contas.html">
+    <div class="icon" style="background:rgba(52,211,153,.15)">🏦</div>
+    <div class="label">
+      <strong>Contas</strong>
+      <span>Setup de contas · Saldos · Carteira</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+  <a href="importar-quicken.html">
+    <div class="icon" style="background:rgba(251,191,36,.15)">📥</div>
+    <div class="label">
+      <strong>Importar Quicken</strong>
+      <span>Histórico CSV · All Dates · All Accounts</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+  </div>
 </div>
 
 <div class="install-tip">
