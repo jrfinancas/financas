@@ -58,7 +58,8 @@
   <a href="index.html">&#8592; In&iacute;cio</a>
   <span style="color:var(--border)">&#8250;</span>
   <span class="cur">&#128231; Emails</span>
-</nav>
+  <span id="appVer" title="Versão carregada" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
+  </nav>
 
 <div class="page">
   <h1>&#128231; Captura de Emails</h1>
@@ -96,6 +97,8 @@
 <div class="toast" id="toast"></div>
 
 <script>
+var APP_VERSION='v2026.07.25-g';
+document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 var WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
 var SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
 var ANON = [
@@ -109,7 +112,53 @@ var REDIRECT = 'https://jrfinancas.github.io/financas/emails.html';
 var TOKEN_KEY = 'jr_gmail_tokens_v1';
 var CPF_KEY = 'jr_cpf_v1';
 var CPF_SALT = 'jrfinancas_cpf_2026';
-var CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos',automovel:'Autom\u00f3vel',contas:'Contas',educacao:'Educa\u00e7\u00e3o',hobbies:'Hobbies',impostos:'Impostos',juros:'Juros','outras-despesas':'Outras Despesas',saude:'Sa\u00fade',seguros:'Seguros','taxas-bancarias':'Taxas Banc\u00e1rias',utilitarios:'Utilit\u00e1rios',vestuario:'Vestu\u00e1rio',viagens:'Viagens',transferencia:'Transfer\u00eancia'};
+var CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações',transferencia:'Transferência'};
+
+// Mesmas listas da aba Lançamentos > Normal
+var SUBS = {
+  aluguel:['Condomínio','Mensalidade'], animais:['Veterinário','Ração e Petshop','Outros'],
+  arranjos:['Cuidados Domésticos','Manutenção','Móveis e Utensílios'],
+  automovel:['Combustível','Estacionamento','Manutenção','Multas','Seguro'],
+  contas:['Apartamento','Comestíveis','Internet','Mãe/Pai','Restaurantes','Supermercado','Telefone','TV a Cabo','Transporte'],
+  'despesas-trabalho':['Não Reembolsáveis','Reembolsáveis'], doacoes:['Doações'],
+  educacao:['Livros','Mensalidade'], hobbies:['Cinema','Diversão','Eventos','Jogos'],
+  impostos:['IR (Folha)','INSS (Folha)','IPTU','IPVA','Outros'],
+  juros:['Juros Empréstimos','Juros Pagamentos'], 'outras-despesas':['Cuidados Pessoais','Materiais','Presentes','Taxas'],
+  saude:['Academia','Dentista','Medicamentos','Médicos','Nutricionista/Psicólogo'],
+  seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias'],
+  utilitarios:['Água','Eletricidade','Gás'], vestuario:['Vestuário'], viagens:['Acomodação','Alimentação','Transporte'],
+  salario:['13° Salário','Salário Bruto'], bonus:['Bônus'], dividendos:['Dividendos','JCP'], 'outras-entradas':['Outros Créditos']
+};
+var DESP_CATS = [['aluguel','Aluguel'],['animais','Animais de Estimação'],['arranjos','Arranjos Domésticos'],['automovel','Automóvel'],['contas','Contas'],['despesas-trabalho','Desp. Trabalho'],['doacoes','Doações'],['educacao','Educação'],['hobbies','Hobbies e Lazer'],['impostos','Impostos'],['juros','Juros'],['outras-despesas','Outras Despesas'],['saude','Saúde e Fitness'],['seguros','Seguros'],['taxas-bancarias','Taxas Bancárias'],['utilitarios','Utilitários'],['vestuario','Vestuário'],['viagens','Viagens']];
+var RECE_CATS = [['salario','Salários'],['bonus','Bônus'],['dividendos','Dividendos'],['outras-entradas','Outras Entradas']];
+var INC = ['salario','bonus','dividendos','outras-entradas'];
+var DED = ['saude','educacao','impostos','salario','bonus','dividendos'];
+var NON_DED_SUBS = ['medicamentos','academia','outros_impostos'];
+
+function subKey(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+function isDeductible(cat, sub){
+  if(cat==='seguros'||cat==='outras-entradas') return false;
+  if(NON_DED_SUBS.indexOf(sub)>=0) return false;
+  return DED.indexOf(cat)>=0;
+}
+// Preenche o select de subcategoria conforme a categoria escolhida
+function fillSubEmail(idx, sel){
+  var cat=document.getElementById('sf_c'+idx).value;
+  var s=document.getElementById('sf_s'+idx);
+  if(!s) return;
+  s.innerHTML='<option value="">—</option>';
+  (SUBS[cat]||[]).forEach(function(x){
+    var o=document.createElement('option'); o.value=subKey(x); o.textContent=x;
+    if(sel && (subKey(x)===subKey(sel))) o.selected=true;
+    s.appendChild(o);
+  });
+  var tag=document.getElementById('sf_tag'+idx);
+  if(tag){ var ent=INC.indexOf(cat)>=0;
+    tag.textContent = cat ? (ent?'+ entrada':'− despesa') : '';
+    tag.style.color = ent?'var(--green)':'var(--red)';
+    tag.style.background = ent?'rgba(52,211,153,.15)':'rgba(248,113,113,.12)';
+  }
+}
 
 function toast(msg, color) {
   var el = document.getElementById('toast');
@@ -301,10 +350,11 @@ async function getSuggestion(idx) {
 
 function renderSuggestion(idx, sug, email) {
   var today = new Date().toISOString().slice(0,10);
-  var cats = ['aluguel','animais','arranjos','automovel','contas','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'];
-  var catOpts = cats.map(function(cat){
-    return '<option value="'+cat+'"'+(cat===sug.category?' selected':'')+'>'+( CLABEL[cat]||cat)+'</option>';
-  }).join('');
+  function optsOf(arr){ return arr.map(function(c){
+    return '<option value="'+c[0]+'"'+(c[0]===sug.category?' selected':'')+'>'+c[1]+'</option>'; }).join(''); }
+  var catOpts = '<option value="">Selecionar...</option>'
+    + '<optgroup label="Despesas">'+optsOf(DESP_CATS)+'</optgroup>'
+    + '<optgroup label="Receitas">'+optsOf(RECE_CATS)+'</optgroup>';
   var accts = [['santander-cc','Santander CC'],['santander-unique-visa','Santander Unique Visa'],['santander-unique-master','Santander Unique Master'],['porto-visa','Porto Visa Infinite'],['xp','XP'],['daycoval','Daycoval'],['wise','Wise'],['carteira','Carteira']];
   var acctOpts = accts.map(function(a){
     return '<option value="'+a[0]+'"'+(a[0]===(sug.account||'santander-cc')?' selected':'')+'>'+a[1]+'</option>';
@@ -323,9 +373,9 @@ function renderSuggestion(idx, sug, email) {
     +'<div class="sug-field"><label>Valor R$</label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'"></div>'
     +'<div class="sug-field"><label>Data</label><input type="date" id="sf_d'+idx+'" value="'+(sug.date||today)+'"></div>'
     +'<div class="sug-field full"><label>Conta</label><select id="sf_ac'+idx+'">'+acctOpts+'</select></div>'
-    +'<div class="sug-field full"><label>Categoria</label><select id="sf_c'+idx+'">'+catOpts+'</select></div>'
+    +'<div class="sug-field full"><label>Categoria <span id="sf_tag'+idx+'" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:4px"></span></label><select id="sf_c'+idx+'" onchange="fillSubEmail('+idx+')">'+catOpts+'</select></div>'
     +'<div class="sug-field"><label>Parcelas</label><select id="sf_in'+idx+'"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="6">6x</option><option value="12">12x</option></select></div>'
-    +'<div class="sug-field"><label>Subcategoria</label><input type="text" id="sf_s'+idx+'" placeholder="opcional"></div>'
+    +'<div class="sug-field"><label>Subcategoria</label><select id="sf_s'+idx+'"><option value="">—</option></select></div>'
     +'<div class="sug-field full"><label>Observa\u00e7\u00e3o</label><input type="text" id="sf_m'+idx+'" value="'+(sug.memo||'')+'"></div>'
     +'</div>'
     +'<div class="sug-actions">'
@@ -333,6 +383,7 @@ function renderSuggestion(idx, sug, email) {
     +'<button class="btn-skip" onclick="skip('+idx+',\''+email.message_id+'\')">Ignorar</button>'
     +'</div>'
     +'</div>';
+  fillSubEmail(idx, sug.subcategory||'');
 }
 
 async function approve(idx, msgId) {
@@ -347,19 +398,19 @@ async function approve(idx, msgId) {
   var subEl = document.getElementById('sf_s'+idx);
   var sub = subEl ? (subEl.value || null) : null;
   var memo = document.getElementById('sf_m'+idx).value;
-  if (!payee || !amount || !date) { toast('\u26a0 Preencha os campos obrigat\u00f3rios','var(--yellow)'); return; }
+  if (!payee || !amount || !date || !cat) { toast('\u26a0 Faltando: '+[!payee&&'fornecedor',!amount&&'valor',!date&&'data',!cat&&'categoria'].filter(Boolean).join(', '),'var(--yellow)'); return; }
   var gid = Date.now();
   var rows = [];
   for (var i=0; i<inst; i++) {
     var d = new Date(date+'T00:00:00'); d.setMonth(d.getMonth()+i);
     rows.push({
-      id: gid+i, type:'expense',
+      id: gid+i, type: (INC.indexOf(cat)>=0 ? 'income' : 'expense'),
       amount: Math.round((amount/inst)*100)/100,
       date: i===0 ? date : d.toISOString().slice(0,10),
       payee: payee, payee_display: payee,
       account: acct, category: cat, subcategory: sub,
       memo: inst>1 ? memo+' ('+(i+1)+'/'+inst+')' : memo,
-      is_deductible: ['saude','educacao','impostos'].indexOf(cat) >= 0,
+      is_deductible: isDeductible(cat, sub||''),
       receipt_status:'attached', installments:inst, installment_num:i+1,
       group_id:gid, from_recorrente:false, is_split:false
     });
