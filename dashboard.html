@@ -127,6 +127,7 @@ nav a.active, nav a:hover { background:var(--surface2); color:var(--accent); }
     <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
     <div class="lerr" id="pinErr"></div>
     <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <button class="lbtn" id="bioBtn" style="display:none;margin-top:8px;background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.3)" onclick="bioLogin()">🔓 Entrar com Face ID / Touch ID</button>
     <button class="lreset" onclick="toggleReset()">🔑 Esqueci meu PIN</button>
     <div class="rpanel" id="resetPanel">
       <p>Digite seu email para receber um link de redefinição.</p>
@@ -144,6 +145,7 @@ nav a.active, nav a:hover { background:var(--surface2); color:var(--accent); }
     <a href="index.html">← Início</a>
     <a href="#" class="active">Dashboard</a>
     <a href="lancamentos.html">Lançamentos</a>
+    <span id="appVer" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
   </nav>
 </header>
 
@@ -238,6 +240,60 @@ const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SALT = 'jrfinancas_2026';
 const AUTH = 'jr_auth_v3';
+const APP_VERSION='v2026.08.02-d';
+document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
+
+// ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
+const BIOKEY='jr_bio_cred';
+function bioSupported(){ return !!(window.PublicKeyCredential && navigator.credentials); }
+function bioEnabled(){ try{ return !!localStorage.getItem(BIOKEY); }catch(e){ return false; } }
+function b64u(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function unb64u(s){ s=String(s).replace(/-/g,'+').replace(/_/g,'/'); const b=atob(s); const a=new Uint8Array(b.length); for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i); return a; }
+async function bioRegister(){
+  if(!bioSupported()){ alert('Este dispositivo nao suporta Face ID / Touch ID'); return; }
+  try{
+    const cred = await navigator.credentials.create({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name:'Financas JR' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name:'jr', displayName:'Financas JR' },
+      pubKeyCredParams: [{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+      timeout: 60000, attestation:'none'
+    }});
+    if(!cred) throw new Error('cancelado');
+    localStorage.setItem(BIOKEY, b64u(cred.rawId));
+    refreshBioUI();
+    if(typeof toast==='function') toast('\u2713 Face ID / Touch ID ativado neste dispositivo','var(--green)','#0d0f14'); else alert('Ativado!');
+  }catch(e){ alert('Nao foi possivel ativar: '+(e.message||e.name)); }
+}
+async function bioLogin(){
+  if(!bioEnabled()) return;
+  const err=document.getElementById('pinErr');
+  try{
+    const id = unb64u(localStorage.getItem(BIOKEY));
+    const a = await navigator.credentials.get({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type:'public-key', id, transports:['internal'] }],
+      userVerification:'required', timeout: 60000
+    }});
+    if(!a) throw new Error('cancelado');
+    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
+    hideLogin(); startApp();
+  }catch(e){ if(err) err.textContent='Falhou. Use o PIN.'; }
+}
+function bioForget(){ try{ localStorage.removeItem(BIOKEY); }catch(e){} refreshBioUI(); }
+function refreshBioUI(){
+  const b=document.getElementById('bioBtn');
+  if(b) b.style.display = (bioSupported() && bioEnabled()) ? 'block' : 'none';
+  const t=document.getElementById('bioToggle');
+  if(t){
+    if(!bioSupported()){ t.style.display='none'; return; }
+    t.style.display='block';
+    t.textContent = bioEnabled() ? '\ud83d\udd12 Desativar Face ID / Touch ID neste dispositivo' : '\ud83d\udd13 Ativar Face ID / Touch ID neste dispositivo';
+    t.onclick = bioEnabled() ? bioForget : bioRegister;
+  }
+}
+
 const SBH  = { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json' };
 
 // ============================================================

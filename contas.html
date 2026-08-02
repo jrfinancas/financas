@@ -97,6 +97,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <input type="password" inputmode="numeric" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
     <div class="lerr" id="pinErr"></div>
     <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <button class="lbtn" id="bioBtn" style="display:none;margin-top:8px;background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.3)" onclick="bioLogin()">🔓 Entrar com Face ID / Touch ID</button>
     <div class="lhint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
   </div>
 </div>
@@ -108,10 +109,23 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <a href="dashboard.html">Dashboard</a>
     <a href="lancamentos.html">Lançamentos</a>
     <a href="#" class="active">Contas</a>
+    <span id="appVer" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
   </nav>
 </header>
 
 <div class="main">
+
+  <!-- SEGURANCA -->
+  <div class="card">
+    <div class="card-title">🔐 Segurança</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+      Use o Face ID (iPhone) ou Touch ID (Mac) para abrir o app sem digitar o PIN.
+      O registro vale só para <b>este dispositivo</b> — repita no outro aparelho se quiser usar lá também.
+      O PIN continua funcionando como alternativa.
+    </div>
+    <button class="bsave" id="bioToggle" style="display:none;background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.3)"></button>
+    <div id="bioUnsupported" style="display:none;font-size:12px;color:var(--yellow)">Este navegador/dispositivo não oferece Face ID ou Touch ID.</div>
+  </div>
 
   <!-- FORM NOVA CONTA -->
   <div class="card">
@@ -169,11 +183,67 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const SALT='jrfinancas_2026';
 const AUTH='jr_auth_v3';
+const APP_VERSION='v2026.08.02-d';
+document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
+
+// ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
+const BIOKEY='jr_bio_cred';
+function bioSupported(){ return !!(window.PublicKeyCredential && navigator.credentials); }
+function bioEnabled(){ try{ return !!localStorage.getItem(BIOKEY); }catch(e){ return false; } }
+function b64u(buf){ return btoa(String.fromCharCode.apply(null, new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function unb64u(s){ s=String(s).replace(/-/g,'+').replace(/_/g,'/'); var b=atob(s), a=new Uint8Array(b.length); for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i); return a; }
+async function bioRegister(){
+  if(!bioSupported()){ alert('Este dispositivo nao suporta Face ID / Touch ID'); return; }
+  try{
+    var cred = await navigator.credentials.create({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name:'Financas JR' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name:'jr', displayName:'Financas JR' },
+      pubKeyCredParams: [{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+      timeout: 60000, attestation:'none'
+    }});
+    if(!cred) throw new Error('cancelado');
+    localStorage.setItem(BIOKEY, b64u(cred.rawId));
+    refreshBioUI();
+    toast('\u2713 Face ID / Touch ID ativado neste dispositivo','var(--green)','#0d0f14');
+  }catch(e){ alert('Nao foi possivel ativar: '+(e.message||e.name)); }
+}
+async function bioLogin(){
+  if(!bioEnabled()) return;
+  var err=document.getElementById('pinErr');
+  try{
+    var id = unb64u(localStorage.getItem(BIOKEY));
+    var a = await navigator.credentials.get({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type:'public-key', id: id, transports:['internal'] }],
+      userVerification:'required', timeout: 60000
+    }});
+    if(!a) throw new Error('cancelado');
+    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
+    hideLogin(); startApp();
+  }catch(e){ if(err) err.textContent='Falhou. Use o PIN.'; }
+}
+function bioForget(){ try{ localStorage.removeItem(BIOKEY); }catch(e){} refreshBioUI(); }
+function refreshBioUI(){
+  var uns=document.getElementById('bioUnsupported');
+  if(uns) uns.style.display = bioSupported() ? 'none' : 'block';
+  var b=document.getElementById('bioBtn');
+  if(b) b.style.display = (bioSupported() && bioEnabled()) ? 'block' : 'none';
+  var t=document.getElementById('bioToggle');
+  if(t){
+    if(!bioSupported()){ t.style.display='none'; return; }
+    t.style.display='block';
+    t.textContent = bioEnabled() ? '\ud83d\udd12 Desativar Face ID / Touch ID neste dispositivo' : '\ud83d\udd13 Ativar Face ID / Touch ID neste dispositivo';
+    t.onclick = bioEnabled() ? bioForget : bioRegister;
+  }
+}
+
 
 async function hashPin(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+SALT));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return p+'_'+SALT;}}
 function isAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(!s)return false;if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(AUTH);return false;}return true;}catch(e){return false;}}
 async function doLogin(){const inp=document.getElementById('pinInput'),err=document.getElementById('pinErr');const pin=inp.value.trim();if(!pin){err.textContent='Digite o PIN';return;}const hash=await hashPin(pin),stored=localStorage.getItem('jr_pin_hash');if(!stored){localStorage.setItem('jr_pin_hash',hash);localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else if(hash===stored){localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else{inp.classList.add('err');err.textContent='PIN incorreto.';inp.value='';setTimeout(()=>inp.classList.remove('err'),400);}}
-function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';setTimeout(()=>{try{document.getElementById('pinInput').focus();}catch(e){}},100);}
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';refreshBioUI();if(bioSupported()&&bioEnabled()){setTimeout(function(){bioLogin();},250);}else{setTimeout(function(){try{document.getElementById('pinInput').focus();}catch(e){}},100);}}
 function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
 function checkAuth(){if(!isAuth())showLogin();else{hideLogin();startApp();}}
 
@@ -192,6 +262,7 @@ function toast(msg,bg,col){const t=document.getElementById('toast');t.textConten
 let contas=[];
 
 function startApp(){
+  try{refreshBioUI();}catch(e){}
   buildColorGrid();
   loadContas();
 }
