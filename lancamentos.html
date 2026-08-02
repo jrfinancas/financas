@@ -691,6 +691,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <div class="pstot"><span class="pl">Total Bruto</span><span class="pv pos" id="pGross">R$ 0,00</span></div>
       <div class="pstot"><span class="pl">Total Descontos</span><span class="pv neg" id="pDeds">- R$ 0,00</span></div>
       <div class="pstot" style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.15)"><span class="pl" style="color:var(--accent);font-weight:600">Líquido</span><span class="pv" style="color:var(--accent)" id="pNet">R$ 0,00</span></div>
+      <div id="pNetWarn" style="display:none;font-size:11px;color:var(--yellow);margin-top:8px;line-height:1.4"></div>
       <button class="bsave" style="margin-top:14px" onclick="savePayslip()">✓ Registrar Holerite</button>
       <button class="bclear" style="margin-top:8px" onclick="clearPayslip()">Limpar</button>
     </div>
@@ -1234,7 +1235,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.07.25-g';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.02-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -1410,6 +1411,13 @@ const INCOPTS = ['Salário Bruto','13° Salário','Bônus','Férias','Outras Ent
 const DEDOPTS = ['IR Retido na Fonte','INSS','Plano de Saúde','Vale Transporte','Previdência Privada','Outros Descontos'];
 const DEDMAP  = {'IR Retido na Fonte':'impostos','INSS':'impostos','Plano de Saúde':'saude','Vale Transporte':'contas','Previdência Privada':'seguros','Outros Descontos':'outras-despesas'};
 const INCMAP  = {'Salário Bruto':'salario','13° Salário':'salario','Bônus':'bonus','Férias':'salario','Outras Entradas':'outras-entradas'};
+// Rótulo do holerite -> subcategoria oficial (mesmas chaves das outras abas)
+function subKeyOf(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+const SUBKEY = {
+  'Salário Bruto':'sal_rio_bruto', '13° Salário':'13__sal_rio', 'Bônus':'b_nus', 'Férias':'sal_rio_bruto', 'Outras Entradas':'outros_cr_ditos',
+  'IR Retido na Fonte':'ir__folha_', 'INSS':'inss__folha_', 'Plano de Saúde':'m_dicos', 'Vale Transporte':'transporte',
+  'Previdência Privada':'previd_ncia_privada', 'Outros Descontos':'taxas'
+};
 
 // ============================================================
 // STATE
@@ -1505,11 +1513,41 @@ function fillSplit(d) {
   chkSplit();
 }
 
+// A IA devolve rotulos livres ("IRRF", "Desconto INSS", "Unimed"...).
+// Aqui casamos com a opcao mais proxima da lista para nao cair na primeira por engano.
+const PSMATCH = {
+  inc: [[/13|decimo|d\u00e9cimo/i,'13\u00b0 Sal\u00e1rio'],[/bonus|b\u00f4nus|premia|plr|participa/i,'B\u00f4nus'],[/f\u00e9rias|ferias/i,'F\u00e9rias'],[/sal[a\u00e1]rio|vencimento|remunera/i,'Sal\u00e1rio Bruto']],
+  ded: [[/irrf|i\.r\.r\.f|imposto de renda|\bir\b/i,'IR Retido na Fonte'],[/inss|previd[e\u00ea]ncia social/i,'INSS'],
+        [/sa[u\u00fa]de|unimed|amil|bradesco sa|plano m|odonto|dental|assist[e\u00ea]ncia m/i,'Plano de Sa\u00fade'],
+        [/vale.?transp|vt\b|transporte/i,'Vale Transporte'],
+        [/previd[e\u00ea]ncia privada|pgbl|vgbl|fundo de pens/i,'Previd\u00eancia Privada']]
+};
+function psLabel(tipo, raw){
+  const lista = tipo==='inc'?INCOPTS:DEDOPTS;
+  if(lista.includes(raw)) return raw;
+  const hit=(PSMATCH[tipo]||[]).find(([re])=>re.test(String(raw||'')));
+  return hit ? hit[1] : (tipo==='inc'?'Outras Entradas':'Outros Descontos');
+}
+
 function fillPayslip(d) {
   if(d.month) document.getElementById('pMonth').value=d.month;
-  if(d.income){document.getElementById('pIncLines').innerHTML='';d.income.forEach(i=>{if(i.amount>0)addPSLine('inc',i.label,i.amount);});}
-  if(d.deductions){document.getElementById('pDedLines').innerHTML='';d.deductions.forEach(i=>{if(i.amount>0)addPSLine('ded',i.label,i.amount);});}
+  const norm=(v)=>Math.abs(parseFloat(v)||0);
+  if(d.income){document.getElementById('pIncLines').innerHTML='';d.income.forEach(i=>{const a=norm(i.amount);if(a>0)addPSLine('inc',psLabel('inc',i.label),a,i.label);});}
+  if(d.deductions){document.getElementById('pDedLines').innerHTML='';d.deductions.forEach(i=>{const a=norm(i.amount);if(a>0)addPSLine('ded',psLabel('ded',i.label),a,i.label);});}
   calcPS();
+  // Avisar se o liquido lido no documento nao bate com a soma das linhas
+  if(d.net){
+    const liq=norm(d.net);
+    let g=0,x=0;
+    document.querySelectorAll('#pIncLines .fi').forEach(i=>g+=psNum(i.value));
+    document.querySelectorAll('#pDedLines .fi').forEach(i=>x+=psNum(i.value));
+    const el=document.getElementById('pNetWarn');
+    if(el){
+      const dif=Math.abs((g-x)-liq);
+      el.textContent = dif>0.05 ? `\u26a0 L\u00edquido do holerite: R$ ${fmt(liq)} \u2014 difere R$ ${fmt(dif)} da soma das linhas. Confira antes de salvar.` : '';
+      el.style.display = dif>0.05 ? 'block' : 'none';
+    }
+  }
 }
 
 // ============================================================
@@ -1837,20 +1875,22 @@ function clearSplit() {
 // ============================================================
 // PAYSLIP
 // ============================================================
-function addPSLine(t,label,val) {
+function addPSLine(t,label,val,orig) {
   const cont=document.getElementById(t==='inc'?'pIncLines':'pDedLines');
   const opts=(t==='inc'?INCOPTS:DEDOPTS).map(o=>`<option value="${o}"${label===o?' selected':''}>${o}</option>`).join('');
   const div=document.createElement('div');div.className='psrow';
-  div.innerHTML=`<div><select class="fs" style="font-size:13px">${opts}</select></div>
+  const dica=(orig&&orig!==label)?`<div style="font-size:10px;color:var(--muted);margin-top:2px" title="Como aparece no holerite">${String(orig).slice(0,40)}</div>`:'';
+  div.innerHTML=`<div><select class="fs" style="font-size:13px">${opts}</select>${dica}</div>
   <div><div class="aw"><span class="ap" style="font-size:13px">R$</span><input type="text" inputmode="decimal" class="fi ${t==='inc'?'pos':'neg'}" style="padding-left:28px;font-size:15px" placeholder="0,00" value="${val?fmt(val):''}" oninput="calcPS()"></div></div>
   <div style="display:flex;align-items:flex-end"><button class="rmvbtn" onclick="this.closest('.psrow').remove();calcPS()">×</button></div>`;
   cont.appendChild(div);if(val)calcPS();
 }
 
+function psNum(v){ return Math.abs(parseFloat(String(v||'').replace(/\./g,'').replace(',','.'))||0); }
 function calcPS() {
   let g=0,d=0;
-  document.querySelectorAll('#pIncLines .fi').forEach(i=>g+=parseFloat(i.value.replace(',','.'))||0);
-  document.querySelectorAll('#pDedLines .fi').forEach(i=>d+=parseFloat(i.value.replace(',','.'))||0);
+  document.querySelectorAll('#pIncLines .fi').forEach(i=>g+=psNum(i.value));
+  document.querySelectorAll('#pDedLines .fi').forEach(i=>d+=psNum(i.value));
   const f=v=>'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:2});
   document.getElementById('pGross').textContent=f(g);
   document.getElementById('pDeds').textContent='- '+f(d);
@@ -1865,13 +1905,13 @@ async function savePayslip() {
   const gid=Date.now();let idx=0;const rows=[];
   document.querySelectorAll('#pIncLines .psrow').forEach(row=>{
     const lbl=row.querySelector('select').value;
-    const amt=parseFloat(row.querySelector('input').value.replace(',','.'))||0;
-    if(amt>0) rows.push({id:gid+(idx++),type:'income',amount:amt,date,payee:label,account:ac,category:INCMAP[lbl]||'salario',subcategory:lbl,memo:label,is_deductible:true,receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
+    const amt=psNum(row.querySelector('input').value);
+    if(amt>0) rows.push({id:gid+(idx++),type:'income',amount:amt,date,payee:label,account:ac,category:INCMAP[lbl]||'salario',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:isDeductible(INCMAP[lbl]||'salario',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
   });
   document.querySelectorAll('#pDedLines .psrow').forEach(row=>{
     const lbl=row.querySelector('select').value;
-    const amt=parseFloat(row.querySelector('input').value.replace(',','.'))||0;
-    if(amt>0) rows.push({id:gid+(idx++),type:'expense',amount:amt,date,payee:label,account:ac,category:DEDMAP[lbl]||'outras-despesas',subcategory:lbl,memo:label,is_deductible:true,receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
+    const amt=psNum(row.querySelector('input').value);
+    if(amt>0) rows.push({id:gid+(idx++),type:'expense',amount:amt,date,payee:label,account:ac,category:DEDMAP[lbl]||'outras-despesas',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:isDeductible(DEDMAP[lbl]||'outras-despesas',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
   });
   if(!rows.length){toast('⚠ Preencha pelo menos um valor','#fbbf24','#0d0f14');return;}
   sync('busy');
