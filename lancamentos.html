@@ -677,7 +677,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
     <div class="card">
       <div class="card-title">💼 Holerite</div>
       <div class="fr">
-        <div><label class="fl">Mês</label><input type="month" class="fi" id="pMonth"></div>
+        <div><label class="fl">Mês de referência</label><input type="month" class="fi" id="pMonth" onchange="onPMonth()"></div>
+        <div><label class="fl">Data do pagamento</label><input type="date" class="fi" id="pDate"><div id="pDateHint" style="font-size:10px;color:var(--muted);margin-top:2px">último dia útil do mês</div></div>
         <div><label class="fl">Conta</label><select class="fs" id="pAcct"><option value="santander-cc">Santander CC</option><option value="santander-unique-visa">Santander Unique Visa</option><option value="xp">XP</option></select></div>
       </div>
       <div class="div"></div>
@@ -1235,7 +1236,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.08.02-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.02-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -1530,7 +1531,7 @@ function psLabel(tipo, raw){
 }
 
 function fillPayslip(d) {
-  if(d.month) document.getElementById('pMonth').value=d.month;
+  if(d.month){ document.getElementById('pMonth').value=d.month; onPMonth(); }
   const norm=(v)=>Math.abs(parseFloat(v)||0);
   if(d.income){document.getElementById('pIncLines').innerHTML='';d.income.forEach(i=>{const a=norm(i.amount);if(a>0)addPSLine('inc',psLabel('inc',i.label),a,i.label);});}
   if(d.deductions){document.getElementById('pDedLines').innerHTML='';d.deductions.forEach(i=>{const a=norm(i.amount);if(a>0)addPSLine('ded',psLabel('ded',i.label),a,i.label);});}
@@ -1886,6 +1887,19 @@ function addPSLine(t,label,val,orig) {
   cont.appendChild(div);if(val)calcPS();
 }
 
+// Ultimo dia util do mes (nao considera feriados: campo fica editavel)
+function lastBusinessDay(ym){
+  if(!ym) return '';
+  const [y,m]=ym.split('-').map(Number);
+  const d=new Date(y, m, 0);            // ultimo dia do mes
+  while(d.getDay()===0||d.getDay()===6) d.setDate(d.getDate()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function onPMonth(){
+  const mo=document.getElementById('pMonth').value;
+  const dt=document.getElementById('pDate');
+  if(mo&&dt) dt.value=lastBusinessDay(mo);
+}
 function psNum(v){ return Math.abs(parseFloat(String(v||'').replace(/\./g,'').replace(',','.'))||0); }
 function calcPS() {
   let g=0,d=0;
@@ -1901,7 +1915,8 @@ async function savePayslip() {
   const mo=document.getElementById('pMonth').value;
   const ac=document.getElementById('pAcct').value;
   if(!mo){toast('⚠ Selecione o mês','#fbbf24','#0d0f14');return;}
-  const date=mo+'-05';const label='Holerite '+fmtMo(mo);
+  const date=document.getElementById('pDate').value||lastBusinessDay(mo);
+  const label='Holerite '+fmtMo(mo);
   const gid=Date.now();let idx=0;const rows=[];
   document.querySelectorAll('#pIncLines .psrow').forEach(row=>{
     const lbl=row.querySelector('select').value;
@@ -1920,7 +1935,7 @@ async function savePayslip() {
 }
 
 function clearPayslip() {
-  document.getElementById('pMonth').value=THIS_MONTH;
+  document.getElementById('pMonth').value=THIS_MONTH; onPMonth();
   document.getElementById('pIncLines').innerHTML=''; document.getElementById('pDedLines').innerHTML='';
   pB64=null;document.getElementById('pImg').style.display='none';
   document.getElementById('pPh').style.display='block';
@@ -2496,7 +2511,7 @@ function applyFX() {
 // CAMBIO (Wise)
 // ============================================================
 function getWCur(){const s=document.getElementById('wCur').value;return s==='OTHER'?(document.getElementById('wCus')?.value||''):s;}
-document.addEventListener('DOMContentLoaded',()=>{const sl=document.getElementById('sLines');if(sl&&!sl.children.length){addSLine();addSLine();}const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
+document.addEventListener('DOMContentLoaded',()=>{onPMonth();const sl=document.getElementById('sLines');if(sl&&!sl.children.length){addSLine();addSLine();}const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
 function pnum(id){return parseFloat((document.getElementById(id).value||'').replace(/\./g,'').replace(',','.'))||0;}
 function calcCambio(){
   const fx=pnum('wFxAmt'),conv=pnum('wConv'),iof=pnum('wIof'),fee=pnum('wFee');
