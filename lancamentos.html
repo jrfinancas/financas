@@ -1236,7 +1236,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.08.02-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.02-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -2511,7 +2511,7 @@ function applyFX() {
 // CAMBIO (Wise)
 // ============================================================
 function getWCur(){const s=document.getElementById('wCur').value;return s==='OTHER'?(document.getElementById('wCus')?.value||''):s;}
-document.addEventListener('DOMContentLoaded',()=>{onPMonth();const sl=document.getElementById('sLines');if(sl&&!sl.children.length){addSLine();addSLine();}const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
+document.addEventListener('DOMContentLoaded',()=>{const sl=document.getElementById('sLines');if(sl&&!sl.children.length){addSLine();addSLine();}const c=document.getElementById('wCur');if(c)c.addEventListener('change',()=>{document.getElementById('wCusRow').style.display=c.value==='OTHER'?'block':'none';calcCambio();});const d=document.getElementById('wDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);});
 function pnum(id){return parseFloat((document.getElementById(id).value||'').replace(/\./g,'').replace(',','.'))||0;}
 function calcCambio(){
   const fx=pnum('wFxAmt'),conv=pnum('wConv'),iof=pnum('wIof'),fee=pnum('wFee');
@@ -2593,6 +2593,7 @@ function init() {
     document.getElementById('sDate').value=TODAY;
     document.getElementById('nFirst').value=THIS_MONTH;
     document.getElementById('pMonth').value=THIS_MONTH;
+    onPMonth(); // data do pagamento = ultimo dia util do mes
     // irYear select populated on first loadIR call
   } catch(e){}
   // Init split default lines
