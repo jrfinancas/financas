@@ -321,6 +321,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 .recact.launch { background: rgba(52,211,153,.15); color: var(--green); }
 .recact.edit   { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 .recact.del    { background: rgba(248,113,113,.1); color: var(--red); }
+.recact.skip   { background: rgba(251,191,36,.12); color: var(--yellow); }
 
 /* ============================================================
    FX
@@ -1237,7 +1238,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.08.02-d';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.02-e';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -2383,11 +2384,13 @@ function renderRecs() {
     const pos=r.type==='income';
     const endBadge=r.end_date?`<span style="font-size:10px;color:var(--muted);margin-left:6px">até ${fmtDate(r.end_date)}</span>`:'';
     const estBadge=r.is_estimated?`<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(251,191,36,.12);color:var(--yellow);margin-left:4px">≈ estimado</span>`:'';
+    const nSkips=(r.skip_history||[]).length;
+    const skipBadge=nSkips?`<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(107,114,128,.15);color:var(--muted);margin-left:4px" title="${(r.skip_history||[]).map(s=>fmtDate(s)).join(', ')}">⏭ ${nSkips} pulo(s)</span>`:'';
     // Check if ended
     if(r.end_date && r.end_date < TODAY) sc='ended';
     return `<div class="reccard ${sc}" style="${sc==='ended'?'opacity:0.5':''}">
       <div class="rechd">
-        <div><div class="recname">${r.name}${estBadge}</div>
+        <div><div class="recname">${r.name}${estBadge}${skipBadge}</div>
           <div class="recmeta"><span class="recbadge ${r.frequency}">${FLAB[r.frequency]||r.frequency}</span> ${r.account?'· '+(ALABEL[r.account]||r.account):''} ${r.category?'· '+(CLABEL[r.category]||r.category):''}${endBadge}</div>
           <div class="recnext ${nc}">${sc==='ended'?'✓ Encerrada':''+nt}</div>
         </div>
@@ -2396,11 +2399,26 @@ function renderRecs() {
       ${r.memo?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${r.memo}</div>`:''}
       <div class="recacts">
         <button class="recact launch" onclick="launchRec(${r.id})">▶ Lançar</button>
+        <button class="recact skip" onclick="skipRec(${r.id})" title="Avança para a próxima data sem lançar">⏭ Pular</button>
         <button class="recact edit" onclick="editRec(${r.id})">✎ Editar</button>
         <button class="recact del" onclick="delRec(${r.id})">✕</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// Pula o lancamento atual: avanca a data sem gravar transacao
+async function skipRec(id) {
+  const r=recs.find(x=>x.id===id); if(!r) return;
+  const atual=fmtDate(r.next_date);
+  const prox=nextAfter(r,r.next_date);
+  if(!confirm(`Pular o lançamento de ${r.name} previsto para ${atual}?\n\nNada será lançado e a próxima data passa para ${fmtDate(prox)}.`)) return;
+  try{
+    await sbUpd('recorrentes',r.id,{next_date:prox, skip_history:[...(r.skip_history||[]), r.next_date]});
+    sync('ok');
+    toast(`⏭ ${r.name}: ${atual} pulado · próximo em ${fmtDate(prox)}`,'#fbbf24','#0d0f14');
+    await loadRecs();
+  }catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
 }
 
 async function launchRec(id) {
