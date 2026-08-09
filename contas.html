@@ -190,7 +190,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const SALT='jrfinancas_2026';
 const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.02-h';
+const APP_VERSION='v2026.08.02-i';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -290,21 +290,43 @@ function onTipoChange(){
   document.getElementById('cCartaoFields').style.display=t==='cartao'?'block':'none';
 }
 
-// Soma os lancamentos de cada conta a partir da data de partida
+// Soma os lancamentos de cada conta a partir da data de partida.
+// Regras: conta comum -> entrada soma, despesa subtrai.
+//         cartao de credito -> saldo e DIVIDA: despesa soma, estorno e pagamento de fatura subtraem.
 async function calcMovimentos(){
   const mov={};
-  const datas=contas.map(c=>c.data_base).filter(Boolean).sort();
-  const desde=datas[0]||'2026-05-01';
+  const isCartao=(id)=>{ const c=contas.find(x=>x.id===id); return c && (c.tipo==='cartao'); };
+  const desde=(contas.map(c=>c.data_base).filter(Boolean).sort()[0])||'2026-05-01';
   let from=0;
   while(true){
-    const r=await sbGet('transactions',`date=gte.${desde}&select=date,account,amount,type&limit=1000&offset=${from}`);
+    const r=await sbGet('transactions',`date=gte.${desde}&select=date,account,amount,type,is_fatura_payment,fatura_cartao&limit=1000&offset=${from}`);
     if(!r.length) break;
     r.forEach(t=>{
-      const c=contas.find(x=>x.id===t.account); if(!c) return;
-      const base=c.data_base||'2026-05-01';
-      if(t.date < base) return;                       // anterior a partida: ignora
-      const v=(t.type==='income'?1:-1)*parseFloat(t.amount||0);
-      mov[t.account]=(mov[t.account]||0)+v;
+      const val=parseFloat(t.amount||0);
+      const base=(contas.find(x=>x.id===t.account)||{}).data_base||'2026-05-01';
+
+      // Pagamento de fatura: sai da conta de origem E abate a divida do cartao
+      if(t.is_fatura_payment){
+        if(t.date>=base) mov[t.account]=(mov[t.account]||0)-val;      // dinheiro saiu
+        if(t.fatura_cartao){
+          const bc=(contas.find(x=>x.id===t.fatura_cartao)||{}).data_base||'2026-05-01';
+          if(t.date>=bc) mov[t.fatura_cartao]=(mov[t.fatura_cartao]||0)-val;  // divida caiu
+        }
+        return;
+      }
+
+      if(!contas.find(x=>x.id===t.account)) return;
+      if(t.date < base) return;
+
+      if(isCartao(t.account)){
+        // Divida: compra aumenta, estorno/credito diminui
+        mov[t.account]=(mov[t.account]||0)+(t.type==='income'?-val:val);
+      }else{
+        // Conta comum: transfer segue o sinal ja embutido no lancamento
+        if(t.type==='income') mov[t.account]=(mov[t.account]||0)+val;
+        else if(t.type==='expense') mov[t.account]=(mov[t.account]||0)-val;
+        else mov[t.account]=(mov[t.account]||0)-val;   // transfer = saida
+      }
     });
     if(r.length<1000) break;
     from+=1000; if(from>30000) break;
@@ -331,7 +353,8 @@ async function loadContas(){
       const base = parseFloat(c.saldo_base||0);
       const m = mov[c.id]||0;
       const saldo = temBase ? (base+m) : parseFloat(c.saldo_inicial||0);
-      const pos=saldo>=0;
+      const isCartaoTipo=(c.tipo==='cartao');
+      const pos=isCartaoTipo ? saldo<=0 : saldo>=0;
       const isCartao=c.tipo==='cartao'||CONTAS_CARTAO.has(c.id);
       return `<div class="conta-card">
         <div class="conta-icon" style="background:${c.cor}22">${TIPO_ICONS[c.tipo]||'🏦'}</div>
@@ -345,7 +368,7 @@ async function loadContas(){
         </div>
         <div>
           <div class="conta-saldo">
-            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Fatura atual':'Saldo atual'}</div>
+            <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Devendo hoje':'Saldo atual'}</div>
             <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
             ${temBase?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Saldo de partida em ${fmtD(c.data_base)} mais os lançamentos desde então">R$ ${fmt(base)} em ${fmtD(c.data_base)} ${m>=0?'+':'−'} R$ ${fmt(Math.abs(m))}</div>`
               :`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Defina o saldo de partida</div>`}
