@@ -408,6 +408,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <span id="rsmTot" style="font-size:20px;font-family:'DM Serif Display',serif">R$ 0,00</span>
     </div>
     <button class="bsave" style="margin-top:16px" onclick="confirmRecSplit()">✓ Lançar</button>
+    <button class="bclear" id="rsmDirect" style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:var(--green)" onclick="launchDirect()" title="Grava com os valores e descrições originais, sem alterações">⚡ Lançar direto (sem revisar)</button>
     <button class="bclear" onclick="closeRecSplit()">Cancelar</button>
   </div>
 </div>
@@ -1238,7 +1239,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.08.02-e';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.02-g';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -2423,9 +2424,8 @@ async function skipRec(id) {
 
 async function launchRec(id) {
   const r=recs.find(x=>x.id===id);if(!r)return;
-  // Estimada: abre modal para revisar valores e descrições antes de gravar
-  if(r.is_estimated) { openRecLaunch(r); return; }
-  await doLaunchRec(r);
+  // Sempre abre o modal para revisar valores e descrições antes de gravar
+  openRecLaunch(r);
 }
 
 async function doLaunchRec(r) {
@@ -2453,25 +2453,50 @@ function openRecLaunch(r){
   const isSplit=r.launch_type==='split' && r.split_lines?.length;
   _rsmLines = isSplit ? r.split_lines.map(l=>({...l}))
                       : [{category:r.category,subcategory:r.subcategory,amount:r.amount,desc:r.memo||''}];
-  document.getElementById('rsmName').textContent=`${r.name} · ${fmtDate(r.next_date)} — confira valores e descrições antes de lançar`;
+  document.getElementById('rsmName').textContent=`${r.name} · ${fmtDate(r.next_date)} — ` + (r.is_estimated ? 'valor estimado: confira antes de lançar' : 'revise a descrição (e o valor, se mudou)');
+  const dir=document.getElementById('rsmDirect');
+  if(dir) dir.style.display = r.is_estimated ? 'none' : 'block';  // estimada exige conferencia
   document.getElementById('rsmLines').innerHTML=_rsmLines.map((l,i)=>`<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
     <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">${CLABEL[l.category]||l.category||'—'}${l.subcategory?' · '+l.subcategory:''}</div>
     <div style="display:flex;gap:10px">
       <div style="width:130px"><label class="fl" style="font-size:10px">Valor</label>
         <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="rsm${i}" value="${fmt(l.amount)}" oninput="calcRecSplit()"></div></div>
       <div style="flex:1"><label class="fl" style="font-size:10px">Descrição</label>
-        <input type="text" class="fi" id="rsmd${i}" value="${(l.desc||'').replace(/"/g,'&quot;')}" placeholder="Opcional" style="font-size:13px"></div>
+        <div style="display:flex;gap:6px">
+          <input type="text" class="fi" id="rsmd${i}" value="${(l.desc||'').replace(/"/g,'&quot;')}" placeholder="Opcional" style="font-size:13px;flex:1">
+          <button type="button" onclick="addRefMes(${i})" title="Inserir referência do mês" style="padding:0 10px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);border-radius:8px;color:var(--accent);font-size:11px;cursor:pointer;white-space:nowrap">+ Ref.</button>
+        </div></div>
     </div></div>`).join('');
   calcRecSplit();
   document.getElementById('recSplitModal').classList.add('open');
 }
 const openRecSplit=openRecLaunch; // compatibilidade
+// Acrescenta "Ref. Mes/AA" na descricao, usando o mes da data do lancamento
+function addRefMes(i){
+  const inp=document.getElementById('rsmd'+i); if(!inp) return;
+  const d=_rsmRec?.next_date||TODAY;
+  const [y,m]=d.split('-');
+  const nome=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m,10)-1];
+  const ref='Ref. '+nome+'/'+y.slice(2);
+  if(inp.value.includes(ref)) return;
+  inp.value = inp.value.trim() ? inp.value.trim()+' · '+ref : ref;
+  inp.focus();
+}
+
 function calcRecSplit(){
   if(!_rsmRec)return;
   const t=_rsmLines.reduce((s,l,i)=>s+(parseFloat((document.getElementById('rsm'+i)?.value||'').replace(/\./g,'').replace(',','.'))||0),0);
   document.getElementById('rsmTot').textContent='R$ '+fmt(t);
 }
 function closeRecSplit(){document.getElementById('recSplitModal').classList.remove('open');_rsmRec=null;_rsmLines=[];}
+// Grava a recorrente como esta cadastrada, ignorando edicoes feitas no modal
+async function launchDirect(){
+  if(!_rsmRec) return;
+  const r=_rsmRec;
+  closeRecSplit();
+  await doLaunchRec(r);
+}
+
 async function confirmRecSplit(){
   if(!_rsmRec)return;
   const r=_rsmRec, isSplit=r.launch_type==='split' && r.split_lines?.length;

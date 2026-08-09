@@ -143,9 +143,16 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     </div>
     <div class="fr">
       <div><label class="fl">Banco / Instituição</label><input type="text" class="fi" id="cBanco" placeholder="Ex: Santander, XP..."></div>
-      <div id="cSaldoWrap"><label class="fl">Saldo atual da conta R$ <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(valor real hoje — começou a usar o app)</span></label>
+      <div id="cSaldoWrap"><label class="fl">Saldo de partida R$ <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(saldo real na data de partida, conforme o extrato)</span></label>
         <div class="aw"><span class="ap">R$</span><input type="text" inputmode="decimal" class="fi" id="cSaldo" placeholder="0,00" style="padding-left:32px"></div>
       </div>
+    </div>
+    <div class="fr">
+      <div><label class="fl">Data de partida</label>
+        <input type="date" class="fi" id="cDataBase" value="2026-05-01">
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">a partir desta data o app soma os lançamentos</div>
+      </div>
+      <div></div>
     </div>
     <!-- Campos cartão -->
     <div id="cCartaoFields" style="display:none">
@@ -183,7 +190,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const SALT='jrfinancas_2026';
 const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.02-d';
+const APP_VERSION='v2026.08.02-h';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -283,6 +290,30 @@ function onTipoChange(){
   document.getElementById('cCartaoFields').style.display=t==='cartao'?'block':'none';
 }
 
+// Soma os lancamentos de cada conta a partir da data de partida
+async function calcMovimentos(){
+  const mov={};
+  const datas=contas.map(c=>c.data_base).filter(Boolean).sort();
+  const desde=datas[0]||'2026-05-01';
+  let from=0;
+  while(true){
+    const r=await sbGet('transactions',`date=gte.${desde}&select=date,account,amount,type&limit=1000&offset=${from}`);
+    if(!r.length) break;
+    r.forEach(t=>{
+      const c=contas.find(x=>x.id===t.account); if(!c) return;
+      const base=c.data_base||'2026-05-01';
+      if(t.date < base) return;                       // anterior a partida: ignora
+      const v=(t.type==='income'?1:-1)*parseFloat(t.amount||0);
+      mov[t.account]=(mov[t.account]||0)+v;
+    });
+    if(r.length<1000) break;
+    from+=1000; if(from>30000) break;
+  }
+  return mov;
+}
+
+function fmtD(d){ if(!d) return ''; const p=String(d).split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2); }
+
 async function loadContas(){
   try{
     contas=await sbGet('contas','order=ordem.asc');
@@ -294,8 +325,12 @@ async function loadContas(){
     // NÃO soma transações históricas (evita distorção pelo Quicken desde 2011)
     // O saldo_inicial deve ser o saldo real cadastrado pelo usuário
     const CONTAS_CARTAO = new Set(['santander-unique-visa','santander-unique-master','porto-visa']);
+    const mov = await calcMovimentos();
     list.innerHTML=contas.map(c=>{
-      const saldo=parseFloat(c.saldo_inicial||0);
+      const temBase = c.data_base!=null && c.saldo_base!=null;
+      const base = parseFloat(c.saldo_base||0);
+      const m = mov[c.id]||0;
+      const saldo = temBase ? (base+m) : parseFloat(c.saldo_inicial||0);
       const pos=saldo>=0;
       const isCartao=c.tipo==='cartao'||CONTAS_CARTAO.has(c.id);
       return `<div class="conta-card">
@@ -312,8 +347,9 @@ async function loadContas(){
           <div class="conta-saldo">
             <div style="font-size:10px;color:var(--muted);text-align:right;margin-bottom:2px">${isCartao?'Fatura atual':'Saldo atual'}</div>
             <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
+            ${temBase?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Saldo de partida em ${fmtD(c.data_base)} mais os lançamentos desde então">R$ ${fmt(base)} em ${fmtD(c.data_base)} ${m>=0?'+':'−'} R$ ${fmt(Math.abs(m))}</div>`
+              :`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Defina o saldo de partida</div>`}
             ${isCartao&&c.limite?`<div style="font-size:10px;color:var(--muted);text-align:right">limite: R$ ${fmt(c.limite)}</div>`:''}
-            ${!isCartao&&saldo===0?`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Atualize o saldo</div>`:''}
           </div>
         </div>
       </div>`;
@@ -331,7 +367,8 @@ async function saveConta(){
   if(!nome){toast('⚠ Digite o nome da conta','#fbbf24','#0d0f14');return;}
   // When editing, don't overwrite saldo_atual (it's calculated from transactions)
   const isEdit = !!document.getElementById('cEditId').value;
-  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,cor,ativo:true};
+  const dataBase=document.getElementById('cDataBase').value||null;
+  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,saldo_base:saldo,data_base:dataBase,cor,ativo:true};
   if(!isEdit) conta.saldo_atual=saldo; // only set on create
   if(tipo==='cartao'){
     conta.dia_fechamento=parseInt(document.getElementById('cFechamento').value)||null;
@@ -358,7 +395,8 @@ function editConta(id){
   document.getElementById('cNome').value=c.nome;
   document.getElementById('cTipo').value=c.tipo;
   document.getElementById('cBanco').value=c.banco||'';
-  document.getElementById('cSaldo').value=c.saldo_inicial?fmt(c.saldo_inicial):'';
+  document.getElementById('cSaldo').value=(c.saldo_base!=null?fmt(c.saldo_base):(c.saldo_inicial?fmt(c.saldo_inicial):''));
+  document.getElementById('cDataBase').value=c.data_base||'2026-05-01';
   document.getElementById('cCor').value=c.cor||'#4f8ef7';
   document.getElementById('cEditId').value=c.id;
   document.getElementById('formTitle').textContent='✎ Editar Conta';
