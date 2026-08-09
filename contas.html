@@ -190,7 +190,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const SALT='jrfinancas_2026';
 const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.02-i';
+const APP_VERSION='v2026.08.02-j';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -293,8 +293,10 @@ function onTipoChange(){
 // Soma os lancamentos de cada conta a partir da data de partida.
 // Regras: conta comum -> entrada soma, despesa subtrai.
 //         cartao de credito -> saldo e DIVIDA: despesa soma, estorno e pagamento de fatura subtraem.
+const HOJE_ISO = new Date().toISOString().slice(0,10);
+
 async function calcMovimentos(){
-  const mov={};
+  const mov={}; window._aVencer={};
   const isCartao=(id)=>{ const c=contas.find(x=>x.id===id); return c && (c.tipo==='cartao'); };
   const desde=(contas.map(c=>c.data_base).filter(Boolean).sort()[0])||'2026-05-01';
   let from=0;
@@ -302,6 +304,10 @@ async function calcMovimentos(){
     const r=await sbGet('transactions',`date=gte.${desde}&select=date,account,amount,type,is_fatura_payment,fatura_cartao&limit=1000&offset=${from}`);
     if(!r.length) break;
     r.forEach(t=>{
+      if(t.date > HOJE_ISO){          // parcelas futuras: fora do saldo, mostradas a parte
+        if(t.type!=='income' && !t.is_fatura_payment) window._aVencer[t.account]=(window._aVencer[t.account]||0)+parseFloat(t.amount||0);
+        return;
+      }
       const val=parseFloat(t.amount||0);
       const base=(contas.find(x=>x.id===t.account)||{}).data_base||'2026-05-01';
 
@@ -372,6 +378,7 @@ async function loadContas(){
             <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
             ${temBase?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Saldo de partida em ${fmtD(c.data_base)} mais os lançamentos desde então">R$ ${fmt(base)} em ${fmtD(c.data_base)} ${m>=0?'+':'−'} R$ ${fmt(Math.abs(m))}</div>`
               :`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Defina o saldo de partida</div>`}
+            ${(window._aVencer&&window._aVencer[c.id])?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Parcelas lançadas com data futura">+ R$ ${fmt(window._aVencer[c.id])} a vencer</div>`:''}
             ${isCartao&&c.limite?`<div style="font-size:10px;color:var(--muted);text-align:right">limite: R$ ${fmt(c.limite)}</div>`:''}
           </div>
         </div>
