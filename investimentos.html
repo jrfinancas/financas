@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script>
+// Ao ABRIR o app numa nova sessao, comeca sempre pela tela de inicio.
+// Navegacao dentro da mesma sessao continua normal.
+(function(){
+  try{
+    if(!sessionStorage.getItem('jr_sess')){
+      sessionStorage.setItem('jr_sess','1');
+      var p = location.pathname;
+      if(!/(^|\/)(index\.html)?$/.test(p)) { location.replace('index.html'); }
+    }
+  }catch(e){}
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Finanças JR · Investimentos</title>
+
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0d0f14;--surface:#13161e;--surface2:#1a1e29;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+#loginOverlay{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--bg);z-index:99999;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+.ll{font-family:'DM Serif Display',serif;font-size:36px;letter-spacing:-1px;margin-bottom:6px}.ll span{color:var(--accent)}
+.ls{font-size:13px;color:var(--muted);margin-bottom:44px}.lb{width:100%;max-width:320px}
+.ll2{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:8px;display:block}
+.li{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:22px;outline:none;text-align:center;letter-spacing:6px;margin-bottom:10px;-webkit-appearance:none}
+.li:focus{border-color:var(--accent)}.li.err{border-color:var(--red)}
+.lbtn{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.lerr{color:var(--red);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px}
+.lhint{color:#374151;font-size:11px;text-align:center}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(14px + var(--st));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,.97);backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px}nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all .2s}
+nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
+.main{max-width:1000px;margin:0 auto;padding:20px 16px calc(20px + var(--sb))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+/* SALDO CONTAS */
+.saldo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+.saldo-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px}
+.saldo-nome{font-size:11px;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saldo-val{font-family:'DM Serif Display',serif;font-size:18px}
+.saldo-total{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+/* ALERTA */
+.alerta-neg{background:rgba(248,113,113,.1);border:1.5px solid rgba(248,113,113,.4);border-radius:12px;padding:14px;margin-bottom:14px}
+.alerta-title{font-size:14px;font-weight:700;color:var(--red);margin-bottom:6px}
+.alerta-item{font-size:12px;color:var(--text);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.alerta-item:last-child{border-bottom:none}
+/* PROJECAO */
+.proj-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:10px}
+.proj-row:last-child{border-bottom:none}
+.proj-data{font-size:12px;color:var(--muted);min-width:80px;flex-shrink:0}
+.proj-desc{flex:1;min-width:0}
+.proj-nome{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-cat{font-size:11px;color:var(--muted)}
+.proj-val{font-size:13px;font-weight:600;flex-shrink:0}
+.proj-saldo{font-size:11px;padding:3px 8px;border-radius:8px;flex-shrink:0;min-width:80px;text-align:right}
+.saldo-pos{background:rgba(52,211,153,.1);color:var(--green)}
+.saldo-neg{background:rgba(248,113,113,.1);color:var(--red)}
+.saldo-warn{background:rgba(251,191,36,.1);color:var(--yellow)}
+/* CHART */
+.chart-wrap{position:relative;height:220px;margin-top:14px}
+/* FILTROS */
+.filtros{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.fbt{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:all .2s}
+.fbt.on{background:rgba(79,142,247,.15);border-color:var(--accent);color:var(--accent)}
+#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* INVESTIMENTOS */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kpi-l{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px}
+.kpi-v{font-family:'DM Serif Display',serif;font-size:22px}
+.cart-hd{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:4px}
+.cart-nome{font-size:14px;font-weight:600}
+.at-row{display:grid;grid-template-columns:1fr 92px 108px 92px;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px}
+.at-row:last-child{border-bottom:none}
+.at-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.at-sub{font-size:10px;color:var(--muted)}
+.at-num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--muted);margin-left:5px}
+.tag.auto{background:rgba(52,211,153,.12);color:var(--green)}
+.tag.man{background:rgba(251,191,36,.12);color:var(--yellow)}
+.btn{padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;cursor:pointer}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+.btn:disabled{opacity:.5;cursor:default}
+@media(max-width:640px){.at-row{grid-template-columns:1fr 96px;row-gap:2px}.at-row .hide-m{display:none}}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div class="ll">Finanças <span>JR</span></div>
+  <div class="ls">Gestão Financeira Pessoal</div>
+  <div class="lb">
+    <label class="ll2">PIN de acesso</label>
+    <input type="password" inputmode="numeric" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="lerr" id="pinErr"></div>
+    <button class="lbtn" onclick="doLogin()">Entrar</button>
+    <button class="lbtn" id="bioBtn" style="display:none;margin-top:8px;background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.3)" onclick="bioLogin()">🔓 Entrar com Face ID / Touch ID</button>
+    <div class="lhint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="lancamentos.html">Lançamentos</a>
+    <a href="#" class="active">Investimentos</a>
+    <span id="appVer" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
+  </nav>
+</header>
+
+<div class="main">
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-l">Valor investido</div><div class="kpi-v" id="kValor">—</div></div>
+    <div class="kpi"><div class="kpi-l">Custo de aquisição</div><div class="kpi-v" id="kCusto">—</div></div>
+    <div class="kpi"><div class="kpi-l">Ganho não realizado</div><div class="kpi-v" id="kGanho">—</div></div>
+    <div class="kpi"><div class="kpi-l">Rentabilidade</div><div class="kpi-v" id="kPct">—</div></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <div class="card-title" style="margin-bottom:4px">🔄 Atualização de preços</div>
+        <div style="font-size:11px;color:var(--muted)" id="atualInfo">—</div>
+      </div>
+      <button class="btn pri" id="btnAtualizar" onclick="atualizarPrecos()">↻ Atualizar carteira</button>
+    </div>
+    <div id="atualLog" style="display:none;margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6;max-height:200px;overflow:auto"></div>
+  </div>
+
+  <div id="carteiras"><div style="text-align:center;padding:24px;color:var(--muted)">⟳ Carregando...</div></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
+const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
+const APP_VERSION='v2026.08.29-c';
+document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
+
+// ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
+const BIOKEY='jr_bio_cred';
+function bioSupported(){ return !!(window.PublicKeyCredential && navigator.credentials); }
+function bioEnabled(){ try{ return !!localStorage.getItem(BIOKEY); }catch(e){ return false; } }
+function b64u(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+function unb64u(s){ s=String(s).replace(/-/g,'+').replace(/_/g,'/'); const b=atob(s); const a=new Uint8Array(b.length); for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i); return a; }
+async function bioRegister(){
+  if(!bioSupported()){ alert('Este dispositivo nao suporta Face ID / Touch ID'); return; }
+  try{
+    const cred = await navigator.credentials.create({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name:'Financas JR' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name:'jr', displayName:'Financas JR' },
+      pubKeyCredParams: [{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection: { authenticatorAttachment:'platform', userVerification:'required', residentKey:'preferred' },
+      timeout: 60000, attestation:'none'
+    }});
+    if(!cred) throw new Error('cancelado');
+    localStorage.setItem(BIOKEY, b64u(cred.rawId));
+    refreshBioUI();
+    if(typeof toast==='function') toast('\u2713 Face ID / Touch ID ativado neste dispositivo','var(--green)','#0d0f14'); else alert('Ativado!');
+  }catch(e){ alert('Nao foi possivel ativar: '+(e.message||e.name)); }
+}
+async function bioLogin(){
+  if(!bioEnabled()) return;
+  const err=document.getElementById('pinErr');
+  try{
+    const id = unb64u(localStorage.getItem(BIOKEY));
+    const a = await navigator.credentials.get({ publicKey:{
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: [{ type:'public-key', id, transports:['internal'] }],
+      userVerification:'required', timeout: 60000
+    }});
+    if(!a) throw new Error('cancelado');
+    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
+    hideLogin(); startApp();
+  }catch(e){ if(err) err.textContent='Falhou. Use o PIN.'; }
+}
+function bioForget(){ try{ localStorage.removeItem(BIOKEY); }catch(e){} refreshBioUI(); }
+function refreshBioUI(){
+  const b=document.getElementById('bioBtn');
+  if(b) b.style.display = (bioSupported() && bioEnabled()) ? 'block' : 'none';
+  const t=document.getElementById('bioToggle');
+  if(t){
+    if(!bioSupported()){ t.style.display='none'; return; }
+    t.style.display='block';
+    t.textContent = bioEnabled() ? '\ud83d\udd12 Desativar Face ID / Touch ID neste dispositivo' : '\ud83d\udd13 Ativar Face ID / Touch ID neste dispositivo';
+    t.onclick = bioEnabled() ? bioForget : bioRegister;
+  }
+}
+
+const ALABEL={'santander-unique-visa':'Santander Unique Visa','santander-unique-master':'Santander Unique Master','santander-cc':'Santander CC','porto-visa':'Porto Visa Infinite','xp':'XP','daycoval':'Daycoval','wise':'Wise','carteira':'Carteira'};
+const CLABEL={aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação','outras-despesas':'Outras Desp.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos'};
+
+async function hashPin(p){try{const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+SALT));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');}catch(e){return p+'_'+SALT;}}
+function isAuth(){try{const s=JSON.parse(localStorage.getItem(AUTH)||'null');if(!s)return false;if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(AUTH);return false;}return true;}catch(e){return false;}}
+async function doLogin(){const inp=document.getElementById('pinInput'),err=document.getElementById('pinErr');const pin=inp.value.trim();if(!pin){err.textContent='Digite o PIN';return;}const hash=await hashPin(pin),stored=localStorage.getItem('jr_pin_hash');if(!stored){localStorage.setItem('jr_pin_hash',hash);localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else if(hash===stored){localStorage.setItem(AUTH,JSON.stringify({t:Date.now()}));hideLogin();startApp();}else{inp.classList.add('err');err.textContent='PIN incorreto.';inp.value='';setTimeout(()=>inp.classList.remove('err'),400);}}
+function showLogin(){document.getElementById('loginOverlay').style.display='flex';document.body.style.overflow='hidden';refreshBioUI();if(bioSupported()&&bioEnabled()){setTimeout(()=>bioLogin(),250);}else{setTimeout(()=>{try{document.getElementById('pinInput').focus();}catch(e){}},100);}}
+function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
+function checkAuth(){if(!isAuth())showLogin();else{hideLogin();startApp();}}
+async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
+function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function fmtMo(ym){const[y,m]=ym.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m)-1]+'/'+y.slice(2);}
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg;t.style.color=col;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+function addDays(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function addMonths(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().slice(0,10);}
+function addYears(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setFullYear(d.getFullYear()+n);return d.toISOString().slice(0,10);}
+
+
+const TODAY=new Date().toISOString().slice(0,10);
+let CARTEIRAS=[], ATIVOS=[];
+
+// Tipos que o app consegue atualizar sozinho
+const AUTO_TIPOS={tesouro:'Tesouro Direto', acao:'B3', poupanca:'regra da poupança', cdb:'índice', lca_lci:'índice', cra_cri:'índice', debenture:'índice'};
+
+async function startApp(){ await carregar(); }
+
+async function carregar(){
+  try{
+    CARTEIRAS = await sbGet('carteiras','order=ordem.asc');
+    ATIVOS    = await sbGet('ativos','ativo=is.true&order=valor_atual.desc');
+    render();
+  }catch(e){
+    document.getElementById('carteiras').innerHTML='<div class="card" style="color:var(--red)">Erro ao carregar: '+e.message+'</div>';
+  }
+}
+
+function tipoLabel(t){
+  return {tesouro:'Tesouro',acao:'Ação',poupanca:'Poupança',cdb:'CDB',lca_lci:'LCA/LCI',cra_cri:'CRA/CRI',debenture:'Debênture'}[t]||t||'—';
+}
+
+function render(){
+  const totV=ATIVOS.reduce((s,a)=>s+ +(a.valor_atual||0),0);
+  const totC=ATIVOS.reduce((s,a)=>s+ +(a.custo_total||0),0);
+  const g=totV-totC;
+  document.getElementById('kValor').textContent='R$ '+fmt(totV);
+  document.getElementById('kCusto').textContent='R$ '+fmt(totC);
+  const kg=document.getElementById('kGanho');
+  kg.textContent=(g>=0?'+':'−')+' R$ '+fmt(Math.abs(g));
+  kg.style.color=g>=0?'var(--green)':'var(--red)';
+  const kp=document.getElementById('kPct');
+  kp.textContent=totC? ((g/totC*100).toFixed(1).replace('.',',')+'%') : '—';
+  kp.style.color=g>=0?'var(--green)':'var(--red)';
+
+  const datas=[...new Set(ATIVOS.map(a=>a.data_preco).filter(Boolean))].sort();
+  document.getElementById('atualInfo').textContent = datas.length
+    ? 'Preços de '+fmtDate(datas[datas.length-1])+(datas.length>1?' (algumas posições mais antigas)':'')
+    : 'Sem preços registrados';
+
+  document.getElementById('carteiras').innerHTML = CARTEIRAS.map(c=>{
+    const its=ATIVOS.filter(a=>a.carteira_id===c.id);
+    if(!its.length) return '';
+    const v=its.reduce((s,a)=>s+ +(a.valor_atual||0),0);
+    const cu=its.reduce((s,a)=>s+ +(a.custo_total||0),0);
+    const gg=v-cu;
+    return '<div class="card">'
+      +'<div class="cart-hd"><div><span class="cart-nome">'+c.nome+'</span>'
+      +'<span class="at-sub" style="margin-left:8px">'+its.length+' ativos · '+(c.instituicao||'')+'</span></div>'
+      +'<div style="text-align:right"><div style="font-family:\'DM Serif Display\',serif;font-size:18px">R$ '+fmt(v)+'</div>'
+      +'<div class="at-sub" style="color:'+(gg>=0?'var(--green)':'var(--red)')+'">'+(gg>=0?'+':'−')+' R$ '+fmt(Math.abs(gg))+' ('+(cu?(gg/cu*100).toFixed(1).replace('.',','):'0')+'%)</div></div></div>'
+      + its.map(a=>{
+          const ag=(+a.valor_atual||0)-(+a.custo_total||0);
+          const auto=AUTO_TIPOS[a.tipo];
+          return '<div class="at-row">'
+            +'<div class="at-nome"><div>'+a.nome+'</div>'
+            +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
+            +'<span class="tag '+(auto?'auto':'man')+'">'+(auto?'auto':'manual')+'</span></div></div>'
+            +'<div class="at-num hide-m at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:4}):'—')+'</div>'
+            +'<div class="at-num">R$ '+fmt(a.valor_atual)+'</div>'
+            +'<div class="at-num hide-m" style="color:'+(ag>=0?'var(--green)':'var(--red)')+'">'+(ag>=0?'+':'−')+fmt(Math.abs(ag))+'</div>'
+            +'</div>';
+        }).join('')
+      +'</div>';
+  }).join('');
+}
+
+// ---------- Atualizacao automatica de precos ----------
+function log(msg,cor){
+  const el=document.getElementById('atualLog');
+  el.style.display='block';
+  el.innerHTML += '<div'+(cor?' style="color:'+cor+'"':'')+'>'+msg+'</div>';
+  el.scrollTop=el.scrollHeight;
+}
+
+async function cotacoesB3(tickers){
+  if(!tickers.length) return {};
+  try{
+    const r=await fetch('https://brapi.dev/api/quote/'+tickers.join(','));
+    const d=await r.json();
+    const out={};
+    (d.results||[]).forEach(x=>{ if(x.regularMarketPrice) out[x.symbol]=x.regularMarketPrice; });
+    return out;
+  }catch(e){ return {}; }
+}
+
+async function serieBCB(codigo){
+  try{
+    const r=await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.'+codigo+'/dados/ultimos/1?formato=json');
+    const d=await r.json();
+    return parseFloat(String(d[0].valor).replace(',','.'));
+  }catch(e){ return null; }
+}
+
+// Rende um ativo de renda fixa pro-rata ate hoje, usando o indexador
+function rendeRF(a, cdiAno, selicAno, ipcaMes){
+  const base=a.data_preco; if(!base) return null;
+  const dias=Math.max(0,(new Date(TODAY)-new Date(base))/86400000);
+  if(!dias) return null;
+  const du=dias*(252/365);              // dias uteis aproximados
+  let taxaAno=null;
+  if(a.taxa) taxaAno=+a.taxa;                                   // prefixado com taxa conhecida
+  else if(a.indexador==='selic') taxaAno=selicAno;
+  else if(a.indexador==='cdi')   taxaAno=cdiAno;
+  else if(a.indexador==='ipca')  taxaAno=(ipcaMes*12)+5.5;      // IPCA + spread tipico
+  else taxaAno=cdiAno;                                          // fallback conservador
+  if(!taxaAno) return null;
+  const fator=Math.pow(1+taxaAno/100, du/252);
+  return +(a.valor_atual*fator).toFixed(2);
+}
+
+async function atualizarPrecos(){
+  const btn=document.getElementById('btnAtualizar');
+  btn.disabled=true; btn.textContent='⟳ Atualizando...';
+  document.getElementById('atualLog').innerHTML='';
+  try{
+    log('Buscando índices no Banco Central...');
+    const [selic,cdiDia,ipca]=await Promise.all([serieBCB(432),serieBCB(12),serieBCB(433)]);
+    const cdiAno = cdiDia!=null ? (Math.pow(1+cdiDia/100,252)-1)*100 : null;
+    log('Selic '+(selic??'?')+'% · CDI '+(cdiAno?cdiAno.toFixed(2):'?')+'% a.a. · IPCA '+(ipca??'?')+'% no mês','var(--muted)');
+
+    const tks=[...new Set(ATIVOS.filter(a=>a.ticker).map(a=>a.ticker))];
+    log('Buscando cotações de '+tks.length+' ações...');
+    const precos=await cotacoesB3(tks);
+
+    let n=0, upd=[];
+    for(const a of ATIVOS){
+      let novo=null, origem='';
+      if(a.ticker && precos[a.ticker]){
+        novo=+(precos[a.ticker]*(+a.quantidade||0)).toFixed(2);
+        origem='B3 (R$ '+precos[a.ticker].toFixed(2)+')';
+      } else if(['cdb','lca_lci','cra_cri','debenture','tesouro','poupanca'].includes(a.tipo)){
+        novo=rendeRF(a,cdiAno,selic,ipca);
+        origem='rendimento estimado';
+      }
+      if(novo && Math.abs(novo-(+a.valor_atual||0))>0.01){
+        upd.push({id:a.id, valor_atual:novo, preco_unit:a.quantidade?+(novo/a.quantidade).toFixed(6):a.preco_unit, data_preco:TODAY});
+        const dif=novo-(+a.valor_atual||0);
+        log('• '+a.nome.slice(0,42)+' → R$ '+fmt(novo)+' <span style="color:'+(dif>=0?'var(--green)':'var(--red)')+'">('+(dif>=0?'+':'')+fmt(dif)+')</span> <span class="at-sub">'+origem+'</span>');
+        n++;
+      }
+    }
+    if(!n){ log('Nada a atualizar.','var(--yellow)'); }
+    else{
+      for(const u of upd){
+        await fetch(SB+'/rest/v1/ativos?id=eq.'+u.id,{method:'PATCH',headers:SBH,body:JSON.stringify({valor_atual:u.valor_atual,preco_unit:u.preco_unit,data_preco:u.data_preco})});
+        await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:u.id,data:TODAY,preco_unit:u.preco_unit,valor:u.valor_atual})});
+      }
+      log('✓ '+n+' ativos atualizados e posição do dia registrada.','var(--green)');
+      await carregar();
+    }
+  }catch(e){ log('✕ Erro: '+e.message,'var(--red)'); }
+  btn.disabled=false; btn.textContent='↻ Atualizar carteira';
+}
+
+checkAuth();
+</script>
+</body>
+</html>
