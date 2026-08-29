@@ -111,7 +111,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.07.26-b';
+var APP_VERSION='v2026.08.09-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 var WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
 var SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
@@ -423,8 +423,32 @@ function renderSuggestion(idx, sug, email) {
   var acctOpts = accts.map(function(a){
     return '<option value="'+a[0]+'"'+(a[0]===acctSel?' selected':'')+'>'+a[1]+'</option>';
   }).join('');
-  var hasFX = sug.currency && sug.currency !== 'BRL' && sug.fx_rate > 0;
-  var fxBadge = hasFX ? '<div style="grid-column:1/-1;background:rgba(124,106,247,.1);border:1px solid rgba(124,106,247,.2);border-radius:8px;padding:8px;font-size:12px;color:var(--purple)">\ud83d\udcb1 '+sug.currency+' '+sug.amount_original+' \u00d7 R$ '+parseFloat(sug.fx_rate).toFixed(4)+' = R$ '+sug.amount+'</div>' : '';
+  // Compra em moeda estrangeira: bloco editavel (abre sozinho quando a IA detecta)
+  var moeda = (sug.currency && sug.currency !== 'BRL') ? sug.currency : '';
+  var vOrig = sug.amount_original || '';
+  var cot   = sug.fx_rate || sug.usd_rate || '';
+  var abreFX = !!moeda;
+  var curs = ['USD','EUR','GBP','ARS','MXN','CLP','CHF','CAD','AUD','JPY'];
+  if (moeda && curs.indexOf(moeda)<0) curs.unshift(moeda);
+  var fxOpts = curs.map(function(c){ return '<option value="'+c+'"'+(c===moeda?' selected':'')+'>'+c+'</option>'; }).join('');
+  var fxBadge =
+     '<div style="grid-column:1/-1">'
+    +  '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer">'
+    +    '<input type="checkbox" id="sf_fxon'+idx+'" '+(abreFX?'checked':'')+' onchange="toggleFXEmail('+idx+')"> \ud83d\udcb1 Compra em moeda estrangeira'
+    +  '</label>'
+    +  '<div id="sf_fxbox'+idx+'" style="display:'+(abreFX?'block':'none')+';margin-top:8px;background:rgba(124,106,247,.08);border:1px solid rgba(124,106,247,.2);border-radius:8px;padding:10px">'
+    +    '<div style="display:grid;grid-template-columns:80px 1fr 1fr;gap:8px">'
+    +      '<div><label style="font-size:10px;color:var(--muted)">Moeda</label><select id="sf_fxc'+idx+'" onchange="calcFXEmail('+idx+')" style="width:100%">'+fxOpts+'</select></div>'
+    +      '<div><label style="font-size:10px;color:var(--muted)">Valor na moeda</label><input type="number" step="0.01" id="sf_fxa'+idx+'" value="'+vOrig+'" oninput="calcFXEmail('+idx+')" style="width:100%"></div>'
+    +      '<div><label style="font-size:10px;color:var(--muted)">Cotação R$</label><input type="number" step="0.0001" id="sf_fxr'+idx+'" value="'+cot+'" oninput="calcFXEmail('+idx+')" style="width:100%"></div>'
+    +    '</div>'
+    +    '<div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap">'
+    +      '<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="sf_fxi'+idx+'" checked onchange="calcFXEmail('+idx+')"> IOF 3,5%</label>'
+    +      '<button type="button" onclick="fetchRateEmail('+idx+')" style="font-size:11px;padding:4px 8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);border-radius:6px;color:var(--accent);cursor:pointer">↻ Buscar cotação</button>'
+    +      '<span id="sf_fxout'+idx+'" style="font-size:11px;color:var(--purple);margin-left:auto"></span>'
+    +    '</div>'
+    +  '</div>'
+    +'</div>';
   var pdfBadge = email.has_pdf ? ' <span style="font-size:10px;background:rgba(52,211,153,.1);color:var(--green);border-radius:4px;padding:1px 5px">PDF lido</span>' : '';
   var conf = sug.confidence || 0;
   var confLabel = conf >= 0.8 ? '\u00b7 Alta confian\u00e7a \u2713' : conf >= 0.5 ? '\u00b7 Verifique' : '\u00b7 Baixa confian\u00e7a';
@@ -451,6 +475,35 @@ function renderSuggestion(idx, sug, email) {
   fillSubEmail(idx, sug.subcategory||'');
 }
 
+// ---------- Moeda estrangeira nos e-mails ----------
+function toggleFXEmail(idx){
+  var on=document.getElementById('sf_fxon'+idx).checked;
+  document.getElementById('sf_fxbox'+idx).style.display = on ? 'block' : 'none';
+  if(on) calcFXEmail(idx); else document.getElementById('sf_fxout'+idx).textContent='';
+}
+function calcFXEmail(idx){
+  var a=parseFloat(document.getElementById('sf_fxa'+idx).value)||0;
+  var r=parseFloat(document.getElementById('sf_fxr'+idx).value)||0;
+  var iof=document.getElementById('sf_fxi'+idx).checked;
+  var out=document.getElementById('sf_fxout'+idx);
+  if(!a||!r){ out.textContent=''; return; }
+  var brl=a*r, iv=iof?brl*0.035:0, tot=brl+iv;
+  out.textContent='= R$ '+tot.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+(iof?' (c/ IOF)':'');
+  document.getElementById('sf_a'+idx).value=(Math.round(tot*100)/100);   // preenche o valor em R$
+}
+async function fetchRateEmail(idx){
+  var cur=document.getElementById('sf_fxc'+idx).value;
+  try{
+    var d=await fetch('https://api.exchangerate-api.com/v4/latest/'+cur).then(function(r){return r.json();});
+    var rate=d && d.rates && d.rates.BRL;
+    if(!rate){ d=await fetch('https://open.er-api.com/v6/latest/'+cur).then(function(r){return r.json();}); rate=d && d.rates && d.rates.BRL; }
+    if(!rate) throw new Error('sem cotação');
+    document.getElementById('sf_fxr'+idx).value=rate.toFixed(4);
+    calcFXEmail(idx);
+    toast('\u2713 '+cur+': R$ '+rate.toFixed(4),'var(--accent)');
+  }catch(e){ toast('\u2715 Cotação não encontrada','var(--red)'); }
+}
+
 async function approve(idx, msgId) {
   var payee = document.getElementById('sf_p'+idx).value.trim();
   var amount = parseFloat(String(document.getElementById('sf_a'+idx).value).replace(',','.'));
@@ -463,6 +516,14 @@ async function approve(idx, msgId) {
   var subEl = document.getElementById('sf_s'+idx);
   var sub = subEl ? (subEl.value || null) : null;
   var memo = document.getElementById('sf_m'+idx).value;
+  // metadados de moeda estrangeira (mesmo formato da aba Normal)
+  var fxEl=document.getElementById('sf_fxon'+idx), fxData=null;
+  if(fxEl && fxEl.checked){
+    var fa=parseFloat(document.getElementById('sf_fxa'+idx).value)||0;
+    var fr=parseFloat(document.getElementById('sf_fxr'+idx).value)||0;
+    if(fa && fr) fxData={originalAmount:fa, currency:document.getElementById('sf_fxc'+idx).value,
+                         rate:fr, iof:document.getElementById('sf_fxi'+idx).checked, brl:amount};
+  }
   if (!payee || !amount || !date || !cat) { toast('\u26a0 Faltando: '+[!payee&&'fornecedor',!amount&&'valor',!date&&'data',!cat&&'categoria'].filter(Boolean).join(', '),'var(--yellow)'); return; }
   var gid = Date.now();
   var rows = [];
@@ -477,7 +538,7 @@ async function approve(idx, msgId) {
       memo: inst>1 ? memo+' ('+(i+1)+'/'+inst+')' : memo,
       is_deductible: isDeductible(cat, sub||''),
       receipt_status:'attached', installments:inst, installment_num:i+1,
-      group_id:gid, from_recorrente:false, is_split:false
+      group_id:gid, from_recorrente:false, is_split:false, fx:fxData
     });
   }
   try {
