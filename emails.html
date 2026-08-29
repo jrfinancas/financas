@@ -111,8 +111,8 @@
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.08.09-a';
-document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
+var APP_VERSION='v2026.08.29-a';
+document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;try{loadContasCache();}catch(err){}});
 var WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
 var SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
 var ANON = [
@@ -315,6 +315,13 @@ function updateUI(connected) {
   }
 }
 
+async function loadContasCache(){
+  try{
+    var r=await fetch(SB+'/rest/v1/contas?select=id,nome,sem_iof',{headers:SBH});
+    window.contasCache=await r.json();
+  }catch(e){ window.contasCache=[]; }
+}
+
 async function checkEmails() {
   var tokens = getTokens();
   if (!tokens) { toast('\u26a0 Conecte o Gmail primeiro','var(--yellow)'); return; }
@@ -443,7 +450,7 @@ function renderSuggestion(idx, sug, email) {
     +      '<div><label style="font-size:10px;color:var(--muted)">Cotação R$</label><input type="number" step="0.0001" id="sf_fxr'+idx+'" value="'+cot+'" oninput="calcFXEmail('+idx+')" style="width:100%"></div>'
     +    '</div>'
     +    '<div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap">'
-    +      '<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="sf_fxi'+idx+'" checked onchange="calcFXEmail('+idx+')"> IOF 3,5%</label>'
+    +      '<label id="sf_fxilbl'+idx+'" style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="sf_fxi'+idx+'" onchange="calcFXEmail('+idx+')"> IOF 3,5%</label>'
     +      '<button type="button" onclick="fetchRateEmail('+idx+')" style="font-size:11px;padding:4px 8px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.25);border-radius:6px;color:var(--accent);cursor:pointer">↻ Buscar cotação</button>'
     +      '<span id="sf_fxout'+idx+'" style="font-size:11px;color:var(--purple);margin-left:auto"></span>'
     +    '</div>'
@@ -461,7 +468,7 @@ function renderSuggestion(idx, sug, email) {
     +'<div class="sug-field"><label>Valor R$</label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'"></div>'
     +'<div class="sug-field"><label>Data</label><input type="date" id="sf_d'+idx+'" value="'+(sug.date||today)+'"></div>'
     +cardNote
-    +'<div class="sug-field full"><label>Conta</label><select id="sf_ac'+idx+'">'+acctOpts+'</select></div>'
+    +'<div class="sug-field full"><label>Conta</label><select id="sf_ac'+idx+'" onchange="onAcctFX('+idx+')">'+acctOpts+'</select></div>'
     +'<div class="sug-field full"><label>Categoria <span id="sf_tag'+idx+'" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:4px"></span></label><select id="sf_c'+idx+'" onchange="fillSubEmail('+idx+')">'+catOpts+'</select></div>'
     +'<div class="sug-field"><label>Parcelas</label><select id="sf_in'+idx+'"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="6">6x</option><option value="12">12x</option></select></div>'
     +'<div class="sug-field"><label>Subcategoria</label><select id="sf_s'+idx+'"><option value="">—</option></select></div>'
@@ -473,9 +480,25 @@ function renderSuggestion(idx, sug, email) {
     +'</div>'
     +'</div>';
   fillSubEmail(idx, sug.subcategory||'');
+  onAcctFX(idx);   // define IOF conforme a conta (algumas sao isentas)
 }
 
 // ---------- Moeda estrangeira nos e-mails ----------
+// Contas marcadas como isentas (ex.: Porto Visa, Wise) nao aplicam IOF
+function contaIsentaIOF(id){
+  var c=(window.contasCache||[]).find(function(x){return x.id===id;});
+  return c ? !!c.sem_iof : (id==='wise');
+}
+function onAcctFX(idx){
+  var acEl=document.getElementById('sf_ac'+idx), iofEl=document.getElementById('sf_fxi'+idx);
+  if(!acEl||!iofEl) return;
+  var isento=contaIsentaIOF(acEl.value);
+  iofEl.checked = !isento;
+  iofEl.disabled = isento;
+  var lbl=document.getElementById('sf_fxilbl'+idx);
+  if(lbl){ lbl.style.opacity = isento?'.45':'1'; lbl.title = isento?'Esta conta é isenta de IOF':''; }
+  if(document.getElementById('sf_fxa'+idx)) calcFXEmail(idx);
+}
 function toggleFXEmail(idx){
   var on=document.getElementById('sf_fxon'+idx).checked;
   document.getElementById('sf_fxbox'+idx).style.display = on ? 'block' : 'none';

@@ -1239,7 +1239,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.08.02-g';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.08.29-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 const SALT  = 'jrfinancas_2026';
@@ -2234,6 +2234,11 @@ async function exportIR() {
 // ============================================================
 // RECORRENTES
 // ============================================================
+// Guarda as contas para consultar regras (ex.: isencao de IOF)
+async function loadContasCache(){
+  try{ window.contasCache = await sbGet('contas','select=id,nome,sem_iof'); if(typeof checkWise==='function') checkWise(); }catch(e){ window.contasCache=[]; }
+}
+
 async function loadRecs() {
   try { recs=await sbGet('recorrentes','order=next_date.asc'); renderRecs(); } catch(e){}
 }
@@ -2561,10 +2566,14 @@ function toggleFX() {
 }
 
 function checkWise() {
-  const w=document.getElementById('nAcct').value==='wise';
-  document.getElementById('wiseBadge').style.display=w?'block':'none';
-  document.getElementById('iofRow').style.display=w?'none':'flex';
-  if(w)document.getElementById('iofChk').checked=false;
+  // Contas marcadas como "isenta de IOF" (Contas > editar) nao aplicam o imposto
+  const id=document.getElementById('nAcct').value;
+  const c=(window.contasCache||[]).find(x=>x.id===id);
+  const isento = c ? !!c.sem_iof : (id==='wise');   // fallback enquanto as contas nao carregam
+  const badge=document.getElementById('wiseBadge');
+  if(badge){ badge.textContent='✦ '+((c&&c.nome)||'Esta conta')+' — sem IOF'; badge.style.display=isento?'block':'none'; }
+  document.getElementById('iofRow').style.display=isento?'none':'flex';
+  if(isento)document.getElementById('iofChk').checked=false;
 }
 
 function onFxCur() {
@@ -2709,6 +2718,7 @@ function init() {
     onPMonth(); // data do pagamento = ultimo dia util do mes
     // irYear select populated on first loadIR call
   } catch(e){}
+  try{ loadContasCache(); }catch(e){}
   // Init split default lines
   try { addSLine(); addSLine(); } catch(e){}
   // Init payslip default lines
