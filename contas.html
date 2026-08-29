@@ -152,6 +152,10 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
         <input type="date" class="fi" id="cDataBase" value="2026-05-01">
         <div style="font-size:10px;color:var(--muted);margin-top:2px">a partir desta data o app soma os lançamentos</div>
       </div>
+      <div><label class="fl">Encerramento <span style="font-size:10px;color:var(--muted);font-weight:400;text-transform:none">(deixe vazio se a conta está ativa)</span></label>
+        <input type="date" class="fi" id="cEncerra">
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">a conta some das listas e o saldo congela nesta data</div>
+      </div>
       <div><label class="fl">Compras internacionais</label>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:10px 0">
           <input type="checkbox" id="cSemIof" style="width:16px;height:16px;accent-color:var(--accent)">
@@ -196,7 +200,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const SALT='jrfinancas_2026';
 const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.29-a';
+const APP_VERSION='v2026.08.29-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -310,6 +314,8 @@ async function calcMovimentos(){
     const r=await sbGet('transactions',`date=gte.${desde}&select=date,account,amount,type,is_fatura_payment,fatura_cartao&limit=1000&offset=${from}`);
     if(!r.length) break;
     r.forEach(t=>{
+      const cc=contas.find(x=>x.id===t.account);
+      if(cc && cc.data_encerramento && t.date > cc.data_encerramento) return;  // apos o encerramento, ignora
       if(t.date > HOJE_ISO){          // parcelas futuras: fora do saldo, mostradas a parte
         if(t.type!=='income' && !t.is_fatura_payment) window._aVencer[t.account]=(window._aVencer[t.account]||0)+parseFloat(t.amount||0);
         return;
@@ -360,15 +366,17 @@ async function loadContas(){
     // O saldo_inicial deve ser o saldo real cadastrado pelo usuário
     const CONTAS_CARTAO = new Set(['santander-unique-visa','santander-unique-master','porto-visa']);
     const mov = await calcMovimentos();
-    list.innerHTML=contas.map(c=>{
+    const ordenadas=[...contas].sort((a,b)=>(a.data_encerramento?1:0)-(b.data_encerramento?1:0));
+    list.innerHTML=ordenadas.map(c=>{
       const temBase = c.data_base!=null && c.saldo_base!=null;
       const base = parseFloat(c.saldo_base||0);
       const m = mov[c.id]||0;
       const saldo = temBase ? (base+m) : parseFloat(c.saldo_inicial||0);
+      const encerrada=!!c.data_encerramento;
       const isCartaoTipo=(c.tipo==='cartao');
       const pos=isCartaoTipo ? saldo<=0 : saldo>=0;
       const isCartao=c.tipo==='cartao'||CONTAS_CARTAO.has(c.id);
-      return `<div class="conta-card">
+      return `<div class="conta-card" style="${encerrada?'opacity:.55':''}">
         <div class="conta-icon" style="background:${c.cor}22">${TIPO_ICONS[c.tipo]||'🏦'}</div>
         <div class="conta-body">
           <div class="conta-nome">${c.nome}</div>
@@ -384,6 +392,7 @@ async function loadContas(){
             <div style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
             ${temBase?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Saldo de partida em ${fmtD(c.data_base)} mais os lançamentos desde então">R$ ${fmt(base)} em ${fmtD(c.data_base)} ${m>=0?'+':'−'} R$ ${fmt(Math.abs(m))}</div>`
               :`<div style="font-size:10px;color:var(--yellow);text-align:right">⚠ Defina o saldo de partida</div>`}
+            ${c.data_encerramento?`<div style="font-size:10px;color:var(--muted);text-align:right">🔒 encerrada em ${fmtD(c.data_encerramento)}</div>`:''}
             ${c.sem_iof?`<div style="font-size:10px;color:var(--green);text-align:right">✦ isenta de IOF</div>`:''}
             ${(window._aVencer&&window._aVencer[c.id])?`<div style="font-size:10px;color:var(--muted);text-align:right" title="Parcelas lançadas com data futura">+ R$ ${fmt(window._aVencer[c.id])} a vencer</div>`:''}
             ${isCartao&&c.limite?`<div style="font-size:10px;color:var(--muted);text-align:right">limite: R$ ${fmt(c.limite)}</div>`:''}
@@ -406,7 +415,8 @@ async function saveConta(){
   const isEdit = !!document.getElementById('cEditId').value;
   const dataBase=document.getElementById('cDataBase').value||null;
   const semIof=document.getElementById('cSemIof').checked;
-  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,saldo_base:saldo,data_base:dataBase,sem_iof:semIof,cor,ativo:true};
+  const encerra=document.getElementById('cEncerra').value||null;
+  const conta={nome,tipo,banco:banco||null,saldo_inicial:saldo,saldo_base:saldo,data_base:dataBase,sem_iof:semIof,data_encerramento:encerra,cor,ativo:!encerra};
   if(!isEdit) conta.saldo_atual=saldo; // only set on create
   if(tipo==='cartao'){
     conta.dia_fechamento=parseInt(document.getElementById('cFechamento').value)||null;
@@ -436,6 +446,7 @@ function editConta(id){
   document.getElementById('cSaldo').value=(c.saldo_base!=null?fmt(c.saldo_base):(c.saldo_inicial?fmt(c.saldo_inicial):''));
   document.getElementById('cDataBase').value=c.data_base||'2026-05-01';
   document.getElementById('cSemIof').checked=!!c.sem_iof;
+  document.getElementById('cEncerra').value=c.data_encerramento||'';
   document.getElementById('cCor').value=c.cor||'#4f8ef7';
   document.getElementById('cEditId').value=c.id;
   document.getElementById('formTitle').textContent='✎ Editar Conta';
