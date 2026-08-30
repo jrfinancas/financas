@@ -245,6 +245,56 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
   </div>
 </div>
 
+
+<div id="cupomModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:460px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0">💰 Cupom / juros recebidos</div>
+      <button onclick="fecharCupom()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="cpNome" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+    <div class="fr2">
+      <div><label class="fl2">Data do pagamento</label><input type="date" class="fi2" id="cpData"></div>
+      <div><label class="fl2">Valor bruto R$</label><input type="number" step="0.01" class="fi2" id="cpValor" oninput="calcCupom()"></div>
+    </div>
+    <div class="fr2">
+      <div><label class="fl2">IR retido R$</label><input type="number" step="0.01" class="fi2" id="cpIR" placeholder="0,00" oninput="calcCupom()"></div>
+      <div><label class="fl2">Dinheiro entrou em</label><select class="fi2" id="cpConta"></select></div>
+    </div>
+    <div class="fr2">
+      <div style="grid-column:1/-1"><label class="fl2">Valor de mercado APÓS o pagamento R$ <span class="at-sub">(do extrato)</span></label>
+        <input type="number" step="0.01" class="fi2" id="cpNovoValor" placeholder="deixe vazio para manter" oninput="calcCupom()"></div>
+    </div>
+    <div id="cpResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn pri" style="flex:1" onclick="salvarCupom()">✓ Registrar cupom</button>
+      <button class="btn" onclick="fecharCupom()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="ajusteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:420px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0">✎ Valor de mercado</div>
+      <button onclick="fecharAjuste()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="ajNome" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+    <div class="fr2">
+      <div><label class="fl2">Data</label><input type="date" class="fi2" id="ajData"></div>
+      <div><label class="fl2">Valor atual R$</label><input type="number" step="0.01" class="fi2" id="ajValor"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:14px">
+      <input type="checkbox" id="ajManual" style="width:16px;height:16px;accent-color:var(--accent)">
+      <span>Não estimar automaticamente este ativo (uso o extrato)</span>
+    </label>
+    <div style="display:flex;gap:8px">
+      <button class="btn pri" style="flex:1" onclick="salvarAjuste()">✓ Salvar</button>
+      <button class="btn" onclick="fecharAjuste()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -253,7 +303,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.30-b';
+const APP_VERSION='v2026.08.30-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -409,9 +459,13 @@ function render(){
       + its.map(a=>{
           const auto=AUTO_TIPOS[a.tipo];
           return '<div class="at-row">'
-            +'<div class="at-nome"><div>'+a.nome+' <span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 4px">↩</span></div>'
+            +'<div class="at-nome"><div>'+a.nome
+            +' <span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">↩</span>'
+            +(a.paga_cupom?' <span onclick="abrirCupom('+a.id+')" title="Registrar cupom/juros recebidos" style="cursor:pointer;color:var(--green);font-size:11px;padding:0 3px">💰</span>':'')
+            +' <span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span></div>'
             +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
-            +'<span class="tag '+(auto?'auto':'man')+'">'+(auto?'auto':'manual')+'</span></div></div>'
+            +(a.paga_cupom?' · <span style="color:var(--green)">cupom '+(a.periodicidade||'')+'</span>':'')
+            +'<span class="tag '+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'man')+'">'+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'manual')+'</span></div></div>'
             +'<div class="at-num"><div>R$ '+fmt(a.valor_atual)+'</div><div class="at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:2}):'')+'</div></div>'
             +'<div class="hide-s">'+celGanho(ganhoPeriodo(a,30))+'</div>'
             +'<div class="hide-m">'+celGanho(ganhoPeriodo(a,90))+'</div>'
@@ -540,6 +594,99 @@ async function serieBCB(codigo){
     const d=await r.json();
     return parseFloat(String(d[0].valor).replace(',','.'));
   }catch(e){ return null; }
+}
+
+// ---------- Cupom / juros ----------
+let _cpAtivo=null;
+function abrirCupom(id){
+  _cpAtivo=ATIVOS.find(a=>String(a.id)===String(id)); if(!_cpAtivo) return;
+  document.getElementById('cpNome').textContent=_cpAtivo.nome+' · posição atual R$ '+fmt(_cpAtivo.valor_atual);
+  document.getElementById('cpData').value=TODAY;
+  ['cpValor','cpIR','cpNovoValor'].forEach(i=>document.getElementById(i).value='');
+  prepForm().then(()=>{
+    document.getElementById('cpConta').innerHTML='<option value="">(não lançar no caixa)</option>'+
+      CONTAS.filter(c=>c.tipo!=='cartao').map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('');
+  });
+  calcCupom();
+  document.getElementById('cupomModal').style.display='flex';
+}
+function fecharCupom(){ document.getElementById('cupomModal').style.display='none'; _cpAtivo=null; }
+function calcCupom(){
+  if(!_cpAtivo) return;
+  const bruto=parseFloat(document.getElementById('cpValor').value)||0;
+  const ir=parseFloat(document.getElementById('cpIR').value)||0;
+  const novo=parseFloat(document.getElementById('cpNovoValor').value);
+  const posic=+_cpAtivo.valor_atual||0;
+  document.getElementById('cpResumo').innerHTML=
+     'Entra no caixa: <b>R$ '+fmt(bruto-ir)+'</b>'+(ir?' <span class="at-sub">(bruto R$ '+fmt(bruto)+' − IR R$ '+fmt(ir)+')</span>':'')+'<br>'
+    +'O cupom é <b>rendimento</b>: não reduz o custo de aquisição.<br>'
+    +(isNaN(novo)? '<span style="color:var(--yellow)">Posição mantida em R$ '+fmt(posic)+' — informe o valor do extrato para corrigir.</span>'
+                 : 'Nova posição: <b>R$ '+fmt(novo)+'</b> <span class="at-sub">(era R$ '+fmt(posic)+')</span>');
+}
+async function salvarCupom(){
+  if(!_cpAtivo) return;
+  const a=_cpAtivo;
+  const data=document.getElementById('cpData').value;
+  const bruto=parseFloat(document.getElementById('cpValor').value)||0;
+  const ir=parseFloat(document.getElementById('cpIR').value)||0;
+  const novo=parseFloat(document.getElementById('cpNovoValor').value);
+  const conta=document.getElementById('cpConta').value;
+  if(!data||!bruto){ toast('⚠ Informe data e valor do cupom','#fbbf24','#0d0f14'); return; }
+  try{
+    if(!isNaN(novo)){
+      await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({valor_atual:novo,preco_unit:a.quantidade?+(novo/a.quantidade).toFixed(6):a.preco_unit,data_preco:data})});
+      await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:data,valor:novo})});
+    }
+    await fetch(SB+'/rest/v1/movimentos',{method:'POST',headers:SBH,body:JSON.stringify({
+      ativo_id:a.id,data:data,tipo:'cupom',valor:bruto,ganho:bruto,conta_id:conta||null,
+      memo:'Cupom de '+a.nome+(ir?' · IR R$ '+ir.toFixed(2):'')})});
+    if(conta){
+      const gid=Date.now();
+      await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+        id:gid,type:'income',amount:+(bruto-ir).toFixed(2),date:data,
+        payee:'Juros — '+a.nome,payee_display:'Juros — '+a.nome,
+        account:conta,category:'outras-entradas',subcategory:'outros_cr_ditos',
+        memo:'Cupom semestral'+(ir?' · IR retido R$ '+ir.toFixed(2):''),
+        is_deductible:false,receipt_status:'na',installments:1,installment_num:1,
+        group_id:gid,from_recorrente:false,is_split:false})});
+      if(ir>0) await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+        id:gid+1,type:'expense',amount:ir,date:data,
+        payee:'IR sobre juros',payee_display:'IR sobre juros',
+        account:conta,category:'impostos',subcategory:'outros',
+        memo:'Retido no cupom de '+a.nome,is_deductible:false,receipt_status:'na',
+        installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:false})});
+    }
+    toast('✓ Cupom de R$ '+fmt(bruto)+' registrado','var(--green)','#0d0f14');
+    fecharCupom(); await carregar();
+  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
+}
+
+// ---------- Ajuste manual de valor ----------
+let _ajAtivo=null;
+function abrirAjuste(id){
+  _ajAtivo=ATIVOS.find(a=>String(a.id)===String(id)); if(!_ajAtivo) return;
+  document.getElementById('ajNome').textContent=_ajAtivo.nome+' · hoje R$ '+fmt(_ajAtivo.valor_atual);
+  document.getElementById('ajData').value=TODAY;
+  document.getElementById('ajValor').value=(+_ajAtivo.valor_atual).toFixed(2);
+  document.getElementById('ajManual').checked=!!_ajAtivo.preco_manual;
+  document.getElementById('ajusteModal').style.display='flex';
+}
+function fecharAjuste(){ document.getElementById('ajusteModal').style.display='none'; _ajAtivo=null; }
+async function salvarAjuste(){
+  if(!_ajAtivo) return;
+  const a=_ajAtivo;
+  const data=document.getElementById('ajData').value;
+  const v=parseFloat(document.getElementById('ajValor').value);
+  const manual=document.getElementById('ajManual').checked;
+  if(!data||isNaN(v)){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
+  try{
+    await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
+      body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual})});
+    await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:data,valor:v})});
+    toast('✓ Valor atualizado','var(--green)','#0d0f14');
+    fecharAjuste(); await carregar();
+  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
 }
 
 // ---------- Resgate ----------
@@ -708,9 +855,10 @@ async function atualizarPrecos(){
     if(tks.length) log('Buscando cotações: '+tks.join(', '));
     const precos=await cotacoesB3(tks);
 
-    let n=0, upd=[];
+    let n=0, upd=[], pulados=0;
     for(const a of ATIVOS){
       let novo=null, origem='';
+      if(a.preco_manual || a.paga_cupom){ pulados++; continue; }   // valor vem do extrato
       if(a.ticker && precos[a.ticker]){
         novo=+(precos[a.ticker]*(+a.quantidade||0)).toFixed(2);
         origem='B3 · R$ '+precos[a.ticker].toFixed(2);
@@ -730,6 +878,7 @@ async function atualizarPrecos(){
         n++;
       }
     }
+    if(pulados) log('↷ '+pulados+' ativo(s) com cupom ou valor manual não foram estimados — use ✎ ou 💰 para informar o valor do extrato.','var(--yellow)');
     if(!n){ log('Nada a atualizar.','var(--yellow)'); }
     else{
       for(const u of upd){
