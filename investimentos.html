@@ -81,7 +81,9 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .kpi-v{font-family:'DM Serif Display',serif;font-size:22px}
 .cart-hd{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:4px}
 .cart-nome{font-size:14px;font-weight:600}
-.at-row{display:grid;grid-template-columns:1fr 92px 108px 92px;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px}
+.at-row{display:grid;grid-template-columns:1fr 108px 84px 84px 84px 84px;gap:6px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px}
+.at-hd{display:grid;grid-template-columns:1fr 108px 84px 84px 84px 84px;gap:6px;padding:4px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border)}
+.at-hd div:not(:first-child){text-align:right}
 .at-row:last-child{border-bottom:none}
 .at-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .at-sub{font-size:10px;color:var(--muted)}
@@ -92,7 +94,8 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .btn{padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;cursor:pointer}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 .btn:disabled{opacity:.5;cursor:default}
-@media(max-width:640px){.at-row{grid-template-columns:1fr 96px;row-gap:2px}.at-row .hide-m{display:none}}
+@media(max-width:900px){.at-row,.at-hd{grid-template-columns:1fr 100px 80px}.at-row .hide-m,.at-hd .hide-m{display:none}}
+@media(max-width:560px){.at-row,.at-hd{grid-template-columns:1fr 100px}.at-row .hide-s,.at-hd .hide-s{display:none}}
 </style>
 </head>
 <body>
@@ -150,7 +153,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.29-c';
+const APP_VERSION='v2026.08.29-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -224,7 +227,34 @@ function addYears(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setFullYear
 
 
 const TODAY=new Date().toISOString().slice(0,10);
-let CARTEIRAS=[], ATIVOS=[];
+let CARTEIRAS=[], ATIVOS=[], HIST=[];
+
+// Valor do ativo na data mais proxima ANTES do corte (ou o mais antigo disponivel)
+function valorEm(ativoId, alvo){
+  const h=HIST.filter(x=>x.ativo_id===ativoId && x.data<=alvo);
+  if(!h.length) return null;
+  return +h[h.length-1].valor;
+}
+// Ganho no periodo: valor de hoje menos o valor na data de corte
+function ganhoPeriodo(a, dias){
+  const d=new Date(); d.setDate(d.getDate()-dias);
+  const alvo=d.toISOString().slice(0,10);
+  const v=valorEm(a.id, alvo);
+  if(v===null) return null;
+  return {abs:(+a.valor_atual||0)-v, pct:v? ((+a.valor_atual||0)-v)/v*100 : null};
+}
+function ganhoYTD(a){
+  const ini=(new Date().getFullYear()-1)+'-12-31';
+  const v=valorEm(a.id, ini);
+  if(v===null) return null;
+  return {abs:(+a.valor_atual||0)-v, pct:v? ((+a.valor_atual||0)-v)/v*100 : null};
+}
+function celGanho(g){
+  if(!g) return '<div class="at-num at-sub">—</div>';
+  const c=g.abs>=0?'var(--green)':'var(--red)';
+  return '<div class="at-num" style="color:'+c+'"><div>'+(g.abs>=0?'+':'−')+fmt(Math.abs(g.abs))+'</div>'
+    +(g.pct!==null?'<div class="at-sub" style="color:'+c+'">'+(g.pct>=0?'+':'')+g.pct.toFixed(1).replace('.',',')+'%</div>':'')+'</div>';
+}
 
 // Tipos que o app consegue atualizar sozinho
 const AUTO_TIPOS={tesouro:'Tesouro Direto', acao:'B3', poupanca:'regra da poupança', cdb:'índice', lca_lci:'índice', cra_cri:'índice', debenture:'índice'};
@@ -235,6 +265,7 @@ async function carregar(){
   try{
     CARTEIRAS = await sbGet('carteiras','order=ordem.asc');
     ATIVOS    = await sbGet('ativos','ativo=is.true&order=valor_atual.desc');
+    HIST      = await sbGet('posicoes_hist','select=ativo_id,data,valor&order=data.asc&limit=5000');
     render();
   }catch(e){
     document.getElementById('carteiras').innerHTML='<div class="card" style="color:var(--red)">Erro ao carregar: '+e.message+'</div>';
@@ -274,16 +305,18 @@ function render(){
       +'<span class="at-sub" style="margin-left:8px">'+its.length+' ativos · '+(c.instituicao||'')+'</span></div>'
       +'<div style="text-align:right"><div style="font-family:\'DM Serif Display\',serif;font-size:18px">R$ '+fmt(v)+'</div>'
       +'<div class="at-sub" style="color:'+(gg>=0?'var(--green)':'var(--red)')+'">'+(gg>=0?'+':'−')+' R$ '+fmt(Math.abs(gg))+' ('+(cu?(gg/cu*100).toFixed(1).replace('.',','):'0')+'%)</div></div></div>'
+      +'<div class="at-hd"><div>Ativo</div><div>Valor hoje</div><div class="hide-s">1 mês</div><div class="hide-m">3 meses</div><div class="hide-m">No ano</div><div class="hide-m">12 meses</div></div>'
       + its.map(a=>{
-          const ag=(+a.valor_atual||0)-(+a.custo_total||0);
           const auto=AUTO_TIPOS[a.tipo];
           return '<div class="at-row">'
             +'<div class="at-nome"><div>'+a.nome+'</div>'
             +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
             +'<span class="tag '+(auto?'auto':'man')+'">'+(auto?'auto':'manual')+'</span></div></div>'
-            +'<div class="at-num hide-m at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:4}):'—')+'</div>'
-            +'<div class="at-num">R$ '+fmt(a.valor_atual)+'</div>'
-            +'<div class="at-num hide-m" style="color:'+(ag>=0?'var(--green)':'var(--red)')+'">'+(ag>=0?'+':'−')+fmt(Math.abs(ag))+'</div>'
+            +'<div class="at-num"><div>R$ '+fmt(a.valor_atual)+'</div><div class="at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:2}):'')+'</div></div>'
+            +'<div class="hide-s">'+celGanho(ganhoPeriodo(a,30))+'</div>'
+            +'<div class="hide-m">'+celGanho(ganhoPeriodo(a,90))+'</div>'
+            +'<div class="hide-m">'+celGanho(ganhoYTD(a))+'</div>'
+            +'<div class="hide-m">'+celGanho(ganhoPeriodo(a,365))+'</div>'
             +'</div>';
         }).join('')
       +'</div>';
