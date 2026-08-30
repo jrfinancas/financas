@@ -74,6 +74,12 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 #toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;white-space:nowrap}
 #toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
+
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.fl2{display:block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:5px}
+.fi2{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13.5px;outline:none}
+.fi2:focus{border-color:var(--accent)}
+@media(max-width:560px){.fr2{grid-template-columns:1fr}}
 /* INVESTIMENTOS */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
@@ -142,6 +148,61 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <div id="atualLog" style="display:none;margin-top:12px;font-size:11.5px;color:var(--muted);line-height:1.6;max-height:200px;overflow:auto"></div>
   </div>
 
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleForm()">
+      <div class="card-title" style="margin-bottom:0">➕ Registrar aplicação / aporte</div>
+      <span id="formTgl" style="color:var(--accent);font-size:18px">+</span>
+    </div>
+    <div id="formBox" style="display:none;margin-top:16px">
+      <div class="fr2">
+        <div><label class="fl2">Data</label><input type="date" class="fi2" id="apData"></div>
+        <div><label class="fl2">Carteira</label><select class="fi2" id="apCart"></select></div>
+      </div>
+      <div class="fr2">
+        <div style="grid-column:1/-1"><label class="fl2">Ativo</label>
+          <select class="fi2" id="apAtivo" onchange="onAtivoSel()"><option value="">— novo ativo —</option></select></div>
+      </div>
+      <div id="apNovoBox">
+        <div class="fr2">
+          <div style="grid-column:1/-1"><label class="fl2">Nome do ativo</label>
+            <input type="text" class="fi2" id="apNome" placeholder="Ex: XP CDB BANCO MASTER - DEZ/2028"></div>
+        </div>
+        <div class="fr2">
+          <div><label class="fl2">Tipo</label><select class="fi2" id="apTipo">
+            <option value="cdb">CDB</option><option value="lca_lci">LCA / LCI</option><option value="tesouro">Tesouro Direto</option>
+            <option value="cra_cri">CRA / CRI</option><option value="debenture">Debênture</option><option value="acao">Ação</option>
+            <option value="fundo">Fundo</option><option value="poupanca">Poupança</option><option value="outro">Outro</option>
+          </select></div>
+          <div><label class="fl2">Indexador</label><select class="fi2" id="apIdx">
+            <option value="">—</option><option value="cdi">CDI</option><option value="selic">Selic</option>
+            <option value="ipca">IPCA+</option><option value="pre">Prefixado</option>
+          </select></div>
+        </div>
+        <div class="fr2">
+          <div><label class="fl2">Taxa % a.a. <span class="at-sub">(opcional)</span></label><input type="number" step="0.01" class="fi2" id="apTaxa" placeholder="14,30"></div>
+          <div><label class="fl2">Vencimento <span class="at-sub">(opcional)</span></label><input type="date" class="fi2" id="apVenc"></div>
+        </div>
+        <div class="fr2">
+          <div><label class="fl2">Ticker <span class="at-sub">(se for ação)</span></label><input type="text" class="fi2" id="apTicker" placeholder="PETR4" style="text-transform:uppercase"></div>
+          <div></div>
+        </div>
+      </div>
+      <div class="fr2">
+        <div><label class="fl2">Valor aplicado R$</label><input type="number" step="0.01" class="fi2" id="apValor" placeholder="0,00"></div>
+        <div><label class="fl2">Quantidade <span class="at-sub">(opcional)</span></label><input type="number" step="0.00000001" class="fi2" id="apQtd" placeholder="1"></div>
+      </div>
+      <div class="fr2">
+        <div style="grid-column:1/-1"><label class="fl2">Dinheiro saiu de</label><select class="fi2" id="apConta"></select>
+          <div class="at-sub" style="margin-top:4px">gera o lançamento de saída no caixa, para o saldo da conta ficar correto</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn pri" style="flex:1" onclick="salvarAplicacao()">✓ Registrar</button>
+        <button class="btn" onclick="toggleForm()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="carteiras"><div style="text-align:center;padding:24px;color:var(--muted)">⟳ Carregando...</div></div>
 </div>
 
@@ -153,7 +214,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.29-d';
+const APP_VERSION='v2026.08.29-e';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -321,6 +382,96 @@ function render(){
         }).join('')
       +'</div>';
   }).join('');
+}
+
+
+// ---------- Registro de aplicacao / aporte ----------
+let CONTAS=[];
+function toggleForm(){
+  const b=document.getElementById('formBox'), t=document.getElementById('formTgl');
+  const abrir=b.style.display==='none';
+  b.style.display=abrir?'block':'none'; t.textContent=abrir?'−':'+';
+  if(abrir){ document.getElementById('apData').value=TODAY; prepForm(); }
+}
+async function prepForm(){
+  if(!CONTAS.length){ try{ CONTAS=await sbGet('contas','select=id,nome,tipo&order=ordem.asc'); }catch(e){ CONTAS=[]; } }
+  const sc=document.getElementById('apConta');
+  if(sc && !sc.options.length){
+    sc.innerHTML='<option value="">(não lançar no caixa)</option>'+
+      CONTAS.filter(c=>c.tipo!=='cartao').map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('');
+  }
+  const cc=document.getElementById('apCart');
+  if(cc && !cc.options.length) cc.innerHTML=CARTEIRAS.map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('');
+  atualizaListaAtivos();
+  document.getElementById('apCart').onchange=atualizaListaAtivos;
+}
+function atualizaListaAtivos(){
+  const cart=document.getElementById('apCart').value;
+  const sel=document.getElementById('apAtivo');
+  sel.innerHTML='<option value="">— novo ativo —</option>'+
+    ATIVOS.filter(a=>a.carteira_id===cart).map(a=>'<option value="'+a.id+'">'+a.nome+'</option>').join('');
+  onAtivoSel();
+}
+function onAtivoSel(){
+  const novo=!document.getElementById('apAtivo').value;
+  document.getElementById('apNovoBox').style.display=novo?'block':'none';
+}
+async function salvarAplicacao(){
+  const data=document.getElementById('apData').value;
+  const cart=document.getElementById('apCart').value;
+  const idExist=document.getElementById('apAtivo').value;
+  const valor=parseFloat(document.getElementById('apValor').value)||0;
+  const qtd=parseFloat(document.getElementById('apQtd').value)||null;
+  const conta=document.getElementById('apConta').value;
+  if(!data||!cart||!valor){ toast('⚠ Informe data, carteira e valor','#fbbf24','#0d0f14'); return; }
+
+  try{
+    let ativoId=idExist, nomeAtivo='';
+    if(idExist){
+      const a=ATIVOS.find(x=>String(x.id)===String(idExist));
+      nomeAtivo=a.nome;
+      const novoCusto=(+a.custo_total||0)+valor, novoValor=(+a.valor_atual||0)+valor;
+      const novaQtd=qtd!=null?((+a.quantidade||0)+qtd):a.quantidade;
+      await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({custo_total:novoCusto,valor_atual:novoValor,quantidade:novaQtd,
+          preco_unit:novaQtd?+(novoValor/novaQtd).toFixed(6):a.preco_unit,data_preco:data})});
+    }else{
+      const nome=document.getElementById('apNome').value.trim();
+      if(!nome){ toast('⚠ Informe o nome do ativo','#fbbf24','#0d0f14'); return; }
+      nomeAtivo=nome;
+      const body={carteira_id:cart,nome:nome,tipo:document.getElementById('apTipo').value,
+        indexador:document.getElementById('apIdx').value||null,
+        taxa:parseFloat(document.getElementById('apTaxa').value)||null,
+        vencimento:document.getElementById('apVenc').value||null,
+        ticker:(document.getElementById('apTicker').value||'').trim().toUpperCase()||null,
+        quantidade:qtd, custo_total:valor, valor_atual:valor,
+        preco_unit:qtd?+(valor/qtd).toFixed(6):null, data_preco:data, ativo:true};
+      const r=await fetch(SB+'/rest/v1/ativos',{method:'POST',headers:{...SBH,'Prefer':'return=representation'},body:JSON.stringify(body)});
+      const j=await r.json(); ativoId=j[0]?.id;
+    }
+
+    if(ativoId) await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,
+      body:JSON.stringify({ativo_id:ativoId,data:data,valor:valor})});
+
+    // Saida do caixa, para o saldo da conta refletir a aplicacao
+    if(conta){
+      const gid=Date.now();
+      const cNome=(CONTAS.find(c=>c.id===conta)||{}).nome||conta;
+      await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+        id:gid,type:'expense',amount:valor,date:data,
+        payee:'Aplicação — '+nomeAtivo, payee_display:'Aplicação — '+nomeAtivo,
+        account:conta,category:'transferencia',subcategory:null,
+        memo:'Aplicação em '+nomeAtivo,is_deductible:false,receipt_status:'na',
+        installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:false
+      })});
+      toast('✓ Aplicação registrada e saída lançada em '+cNome,'var(--green)','#0d0f14');
+    } else {
+      toast('✓ Aplicação registrada','var(--green)','#0d0f14');
+    }
+    ['apNome','apValor','apQtd','apTaxa','apTicker','apVenc'].forEach(id=>{const e=document.getElementById(id); if(e)e.value='';});
+    toggleForm();
+    await carregar();
+  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
 }
 
 // ---------- Atualizacao automatica de precos ----------
