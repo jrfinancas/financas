@@ -180,12 +180,22 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
           </select></div>
         </div>
         <div class="fr2">
-          <div><label class="fl2">Taxa % a.a. <span class="at-sub">(opcional)</span></label><input type="number" step="0.01" class="fi2" id="apTaxa" placeholder="14,30"></div>
+          <div><label class="fl2">Remuneração</label>
+            <div style="display:flex;gap:6px">
+              <input type="number" step="0.01" class="fi2" id="apPct" placeholder="84" style="flex:1" title="% do indexador (ex: 84% do CDI)">
+              <span style="align-self:center;font-size:11px;color:var(--muted)">% do índice</span>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input type="number" step="0.01" class="fi2" id="apTaxa" placeholder="14,30" style="flex:1" title="taxa fixa: prefixado ou spread sobre IPCA">
+              <span style="align-self:center;font-size:11px;color:var(--muted)">% a.a. fixo</span>
+            </div>
+            <div class="at-sub" style="margin-top:4px">CDB a 84% do CDI → 84 em cima · Prefixado 12,28% ou IPCA+6% → embaixo</div>
+          </div>
           <div><label class="fl2">Vencimento <span class="at-sub">(opcional)</span></label><input type="date" class="fi2" id="apVenc"></div>
         </div>
         <div class="fr2">
           <div><label class="fl2">Ticker <span class="at-sub">(se for ação)</span></label><input type="text" class="fi2" id="apTicker" placeholder="PETR4" style="text-transform:uppercase"></div>
-          <div></div>
+          <div><label class="fl2">Dia do aniversário <span class="at-sub">(poupança)</span></label><input type="number" min="1" max="31" class="fi2" id="apAniv" placeholder="15"></div>
         </div>
       </div>
       <div class="fr2">
@@ -206,6 +216,35 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
   <div id="carteiras"><div style="text-align:center;padding:24px;color:var(--muted)">⟳ Carregando...</div></div>
 </div>
 
+
+<div id="resgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:460px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0">↩ Registrar resgate</div>
+      <button onclick="fecharResgate()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="rgNome" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+    <div class="fr2">
+      <div><label class="fl2">Data</label><input type="date" class="fi2" id="rgData"></div>
+      <div><label class="fl2">Tipo</label><select class="fi2" id="rgTipo" onchange="onTipoResg()">
+        <option value="total">Resgate total</option><option value="parcial">Resgate parcial</option>
+      </select></div>
+    </div>
+    <div class="fr2">
+      <div><label class="fl2">Valor bruto recebido R$</label><input type="number" step="0.01" class="fi2" id="rgValor" oninput="calcResg()"></div>
+      <div><label class="fl2">IR / IOF retido R$</label><input type="number" step="0.01" class="fi2" id="rgIR" placeholder="0,00" oninput="calcResg()"></div>
+    </div>
+    <div class="fr2">
+      <div style="grid-column:1/-1"><label class="fl2">Dinheiro entrou em</label><select class="fi2" id="rgConta"></select></div>
+    </div>
+    <div id="rgResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn pri" style="flex:1" onclick="salvarResgate()">✓ Registrar resgate</button>
+      <button class="btn" onclick="fecharResgate()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -214,7 +253,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.08.29-e';
+const APP_VERSION='v2026.08.30-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -370,7 +409,7 @@ function render(){
       + its.map(a=>{
           const auto=AUTO_TIPOS[a.tipo];
           return '<div class="at-row">'
-            +'<div class="at-nome"><div>'+a.nome+'</div>'
+            +'<div class="at-nome"><div>'+a.nome+' <span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 4px">↩</span></div>'
             +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
             +'<span class="tag '+(auto?'auto':'man')+'">'+(auto?'auto':'manual')+'</span></div></div>'
             +'<div class="at-num"><div>R$ '+fmt(a.valor_atual)+'</div><div class="at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:2}):'')+'</div></div>'
@@ -442,6 +481,8 @@ async function salvarAplicacao(){
       const body={carteira_id:cart,nome:nome,tipo:document.getElementById('apTipo').value,
         indexador:document.getElementById('apIdx').value||null,
         taxa:parseFloat(document.getElementById('apTaxa').value)||null,
+        pct_indexador:parseFloat(document.getElementById('apPct').value)||null,
+        aniversario:parseInt(document.getElementById('apAniv').value)||null,
         vencimento:document.getElementById('apVenc').value||null,
         ticker:(document.getElementById('apTicker').value||'').trim().toUpperCase()||null,
         quantidade:qtd, custo_total:valor, valor_atual:valor,
@@ -468,7 +509,7 @@ async function salvarAplicacao(){
     } else {
       toast('✓ Aplicação registrada','var(--green)','#0d0f14');
     }
-    ['apNome','apValor','apQtd','apTaxa','apTicker','apVenc'].forEach(id=>{const e=document.getElementById(id); if(e)e.value='';});
+    ['apNome','apValor','apQtd','apTaxa','apPct','apTicker','apVenc','apAniv'].forEach(id=>{const e=document.getElementById(id); if(e)e.value='';});
     toggleForm();
     await carregar();
   }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
@@ -501,21 +542,147 @@ async function serieBCB(codigo){
   }catch(e){ return null; }
 }
 
-// Rende um ativo de renda fixa pro-rata ate hoje, usando o indexador
+// ---------- Resgate ----------
+let _rgAtivo=null;
+function abrirResgate(id){
+  _rgAtivo=ATIVOS.find(a=>String(a.id)===String(id)); if(!_rgAtivo) return;
+  document.getElementById('rgNome').textContent=_rgAtivo.nome+' · posição atual R$ '+fmt(_rgAtivo.valor_atual)+' · custo R$ '+fmt(_rgAtivo.custo_total);
+  document.getElementById('rgData').value=TODAY;
+  document.getElementById('rgValor').value=(+_rgAtivo.valor_atual).toFixed(2);
+  document.getElementById('rgIR').value='';
+  document.getElementById('rgTipo').value='total';
+  prepForm().then(()=>{
+    const sc=document.getElementById('rgConta');
+    sc.innerHTML='<option value="">(não lançar no caixa)</option>'+
+      CONTAS.filter(c=>c.tipo!=='cartao').map(c=>'<option value="'+c.id+'">'+c.nome+'</option>').join('');
+  });
+  calcResg();
+  document.getElementById('resgModal').style.display='flex';
+}
+function fecharResgate(){ document.getElementById('resgModal').style.display='none'; _rgAtivo=null; }
+function onTipoResg(){
+  if(document.getElementById('rgTipo').value==='total' && _rgAtivo)
+    document.getElementById('rgValor').value=(+_rgAtivo.valor_atual).toFixed(2);
+  calcResg();
+}
+function calcResg(){
+  if(!_rgAtivo) return;
+  const bruto=parseFloat(document.getElementById('rgValor').value)||0;
+  const ir=parseFloat(document.getElementById('rgIR').value)||0;
+  const total=document.getElementById('rgTipo').value==='total';
+  const posic=+_rgAtivo.valor_atual||0, custo=+_rgAtivo.custo_total||0;
+  const prop = total?1:(posic? Math.min(1,bruto/posic):0);
+  const custoBaixado=+(custo*prop).toFixed(2);
+  const ganho=+(bruto-custoBaixado).toFixed(2);
+  const liquido=+(bruto-ir).toFixed(2);
+  document.getElementById('rgResumo').innerHTML=
+     'Custo baixado: <b>R$ '+fmt(custoBaixado)+'</b><br>'
+    +'Ganho na operação: <b style="color:'+(ganho>=0?'var(--green)':'var(--red)')+'">'+(ganho>=0?'+':'−')+' R$ '+fmt(Math.abs(ganho))+'</b>'+(ir?' · IR/IOF R$ '+fmt(ir):'')+'<br>'
+    +'Entra no caixa: <b>R$ '+fmt(liquido)+'</b>'
+    +(total?'<br><span style="color:var(--yellow)">O ativo será marcado como resgatado.</span>':'<br>Resta na carteira: R$ '+fmt(Math.max(0,posic-bruto)));
+}
+async function salvarResgate(){
+  if(!_rgAtivo) return;
+  const a=_rgAtivo;
+  const data=document.getElementById('rgData').value;
+  const bruto=parseFloat(document.getElementById('rgValor').value)||0;
+  const ir=parseFloat(document.getElementById('rgIR').value)||0;
+  const total=document.getElementById('rgTipo').value==='total';
+  const conta=document.getElementById('rgConta').value;
+  if(!data||!bruto){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
+  const posic=+a.valor_atual||0, custo=+a.custo_total||0;
+  const prop= total?1:(posic?Math.min(1,bruto/posic):0);
+  const custoBaixado=+(custo*prop).toFixed(2);
+  const ganho=+(bruto-custoBaixado).toFixed(2);
+  const liquido=+(bruto-ir).toFixed(2);
+  try{
+    if(total){
+      await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({resgatado:true,data_resgate:data,ativo:false,valor_atual:0,quantidade:0})});
+    }else{
+      const novaQtd=a.quantidade?+(a.quantidade*(1-prop)).toFixed(8):null;
+      await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({valor_atual:+(posic-bruto).toFixed(2),custo_total:+(custo-custoBaixado).toFixed(2),quantidade:novaQtd,data_preco:data})});
+    }
+    await fetch(SB+'/rest/v1/movimentos',{method:'POST',headers:SBH,body:JSON.stringify({
+      ativo_id:a.id,data:data,tipo:total?'resgate_total':'resgate_parcial',
+      valor:bruto,custo_baixado:custoBaixado,ganho:ganho,conta_id:conta||null,
+      memo:'Resgate '+a.nome+(ir?' · IR/IOF R$ '+ir.toFixed(2):'')})});
+
+    if(conta){
+      const gid=Date.now();
+      await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+        id:gid,type:'income',amount:liquido,date:data,
+        payee:'Resgate — '+a.nome,payee_display:'Resgate — '+a.nome,
+        account:conta,category:'transferencia',subcategory:null,
+        memo:'Resgate de '+a.nome+(ganho?' · ganho R$ '+ganho.toFixed(2):'')+(ir?' · IR/IOF R$ '+ir.toFixed(2):''),
+        is_deductible:false,receipt_status:'na',installments:1,installment_num:1,
+        group_id:gid,from_recorrente:false,is_split:false})});
+      if(ir>0){
+        // IR/IOF vai para Impostos > Outros
+        await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+          id:gid+1,type:'expense',amount:ir,date:data,
+          payee:'IR/IOF sobre resgate',payee_display:'IR/IOF sobre resgate',
+          account:conta,category:'impostos',subcategory:'outros',
+          memo:'Retido no resgate de '+a.nome,is_deductible:false,receipt_status:'na',
+          installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:false})});
+      }
+    }
+    toast('✓ Resgate registrado · ganho R$ '+fmt(ganho),'var(--green)','#0d0f14');
+    fecharResgate();
+    await carregar();
+  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
+}
+
+// ---- Motor de atualizacao ----
+
+// Casa o ativo com o titulo oficial do Tesouro (por familia + ano de vencimento)
+function casaTesouro(a, titulos){
+  if(a.tesouro_ref){ const x=titulos.find(t=>t.chave===a.tesouro_ref); if(x) return x; }
+  const u=(a.nome||'').toUpperCase();
+  const ano=((a.vencimento||a.nome||'').match(/\b(20\d{2})\b/)||[])[1];
+  if(!ano) return null;
+  const fam = /SELIC/.test(u)?'Tesouro Selic' : /PREFIXADO/.test(u)?'Tesouro Prefixado' : (/IPCA|NTN-?B/.test(u)?'Tesouro IPCA+':null);
+  if(!fam) return null;
+  return titulos.find(t=>t.chave===fam+' '+ano)
+      || titulos.find(t=>t.chave===fam+' com Juros Semestrais '+ano)
+      || null;
+}
+
+// Poupanca: credita no aniversario. Selic > 8,5% => 0,5% a.m. + TR
+function rendePoupanca(a, trMes){
+  const base=a.data_preco; if(!base) return null;
+  const dia=a.aniversario||new Date(base+'T12:00').getDate();
+  const ini=new Date(base+'T12:00'), hoje=new Date(TODAY+'T12:00');
+  let meses=(hoje.getFullYear()-ini.getFullYear())*12+(hoje.getMonth()-ini.getMonth());
+  if(hoje.getDate() < dia) meses--;                       // aniversario do mes ainda nao chegou
+  if(meses<=0) return null;
+  const taxaMes=0.005+((trMes||0)/100);
+  return { valor:+((+a.valor_atual)*Math.pow(1+taxaMes, meses)).toFixed(2), nota:meses+' aniversário(s)' };
+}
+
+// Renda fixa privada: % do indexador, ou taxa fixa, ou indice + spread
 function rendeRF(a, cdiAno, selicAno, ipcaMes){
   const base=a.data_preco; if(!base) return null;
   const dias=Math.max(0,(new Date(TODAY)-new Date(base))/86400000);
   if(!dias) return null;
-  const du=dias*(252/365);              // dias uteis aproximados
-  let taxaAno=null;
-  if(a.taxa) taxaAno=+a.taxa;                                   // prefixado com taxa conhecida
-  else if(a.indexador==='selic') taxaAno=selicAno;
-  else if(a.indexador==='cdi')   taxaAno=cdiAno;
-  else if(a.indexador==='ipca')  taxaAno=(ipcaMes*12)+5.5;      // IPCA + spread tipico
-  else taxaAno=cdiAno;                                          // fallback conservador
-  if(!taxaAno) return null;
-  const fator=Math.pow(1+taxaAno/100, du/252);
-  return +(a.valor_atual*fator).toFixed(2);
+  const du=dias*(252/365);
+  let taxaAno=null, nota='';
+  if(a.pct_indexador){
+    const idx = a.indexador==='selic'?selicAno : cdiAno;
+    if(idx==null) return null;
+    taxaAno = idx*(a.pct_indexador/100);
+    nota = a.pct_indexador+'% do '+(a.indexador==='selic'?'Selic':'CDI');
+  } else if(a.indexador==='ipca'){
+    taxaAno = (Math.pow(1+(ipcaMes||0)/100,12)-1)*100 + (+a.taxa||0);
+    nota = 'IPCA'+(a.taxa?'+'+a.taxa+'%':'');
+  } else if(a.taxa){
+    taxaAno = +a.taxa; nota = a.taxa+'% a.a.';
+  } else if(a.indexador==='selic'){ taxaAno=selicAno; nota='Selic'; }
+  else if(a.indexador==='cdi'){ taxaAno=cdiAno; nota='CDI'; }
+  else { taxaAno=cdiAno; nota='CDI (estimado)'; }
+  if(taxaAno==null) return null;
+  return { valor:+((+a.valor_atual)*Math.pow(1+taxaAno/100, du/252)).toFixed(2), nota:nota };
 }
 
 async function atualizarPrecos(){
@@ -524,12 +691,21 @@ async function atualizarPrecos(){
   document.getElementById('atualLog').innerHTML='';
   try{
     log('Buscando índices no Banco Central...');
-    const [selic,cdiDia,ipca]=await Promise.all([serieBCB(432),serieBCB(12),serieBCB(433)]);
+    const [selic,cdiDia,ipca,tr]=await Promise.all([serieBCB(432),serieBCB(12),serieBCB(433),serieBCB(226)]);
     const cdiAno = cdiDia!=null ? (Math.pow(1+cdiDia/100,252)-1)*100 : null;
-    log('Selic '+(selic??'?')+'% · CDI '+(cdiAno?cdiAno.toFixed(2):'?')+'% a.a. · IPCA '+(ipca??'?')+'% no mês','var(--muted)');
+    log('Selic '+(selic??'?')+'% · CDI '+(cdiAno?cdiAno.toFixed(2):'?')+'% a.a. · IPCA '+(ipca??'?')+'%/mês · TR '+(tr??0)+'%','var(--muted)');
+
+    log('Buscando preços oficiais do Tesouro Direto...');
+    let td=null;
+    try{
+      const rt=await fetch(SB+'/functions/v1/tesouro-precos',{headers:SBH});
+      td=await rt.json();
+      if(td.error) throw new Error(td.error);
+      log('Tesouro: '+td.total+' títulos, preços de '+fmtDate(td.data_base),'var(--muted)');
+    }catch(e){ log('⚠ Tesouro indisponível ('+e.message+') — usando estimativa','var(--yellow)'); }
 
     const tks=[...new Set(ATIVOS.filter(a=>a.ticker).map(a=>a.ticker))];
-    log('Buscando cotações de '+tks.length+' ações...');
+    if(tks.length) log('Buscando cotações: '+tks.join(', '));
     const precos=await cotacoesB3(tks);
 
     let n=0, upd=[];
@@ -537,22 +713,27 @@ async function atualizarPrecos(){
       let novo=null, origem='';
       if(a.ticker && precos[a.ticker]){
         novo=+(precos[a.ticker]*(+a.quantidade||0)).toFixed(2);
-        origem='B3 (R$ '+precos[a.ticker].toFixed(2)+')';
-      } else if(['cdb','lca_lci','cra_cri','debenture','tesouro','poupanca'].includes(a.tipo)){
-        novo=rendeRF(a,cdiAno,selic,ipca);
-        origem='rendimento estimado';
+        origem='B3 · R$ '+precos[a.ticker].toFixed(2);
+      } else if(a.tipo==='tesouro' && td && td.titulos){
+        const t=casaTesouro(a, td.titulos);
+        if(t && a.quantidade){ novo=+(a.quantidade*t.pu_venda).toFixed(2); origem='oficial · '+t.chave+' PU '+t.pu_venda; }
+        else { const r=rendeRF(a,cdiAno,selic,ipca); if(r){novo=r.valor;origem='estimado · '+r.nota;} }
+      } else if(a.tipo==='poupanca'){
+        const r=rendePoupanca(a,tr); if(r){ novo=r.valor; origem='poupança · '+r.nota; }
+      } else if(['cdb','lca_lci','cra_cri','debenture','fundo'].includes(a.tipo)){
+        const r=rendeRF(a,cdiAno,selic,ipca); if(r){ novo=r.valor; origem='estimado · '+r.nota; }
       }
       if(novo && Math.abs(novo-(+a.valor_atual||0))>0.01){
-        upd.push({id:a.id, valor_atual:novo, preco_unit:a.quantidade?+(novo/a.quantidade).toFixed(6):a.preco_unit, data_preco:TODAY});
+        upd.push({id:a.id, valor_atual:novo, preco_unit:a.quantidade?+(novo/a.quantidade).toFixed(6):a.preco_unit});
         const dif=novo-(+a.valor_atual||0);
-        log('• '+a.nome.slice(0,42)+' → R$ '+fmt(novo)+' <span style="color:'+(dif>=0?'var(--green)':'var(--red)')+'">('+(dif>=0?'+':'')+fmt(dif)+')</span> <span class="at-sub">'+origem+'</span>');
+        log('• '+a.nome.slice(0,40)+' → R$ '+fmt(novo)+' <span style="color:'+(dif>=0?'var(--green)':'var(--red)')+'">('+(dif>=0?'+':'')+fmt(dif)+')</span> <span class="at-sub">'+origem+'</span>');
         n++;
       }
     }
     if(!n){ log('Nada a atualizar.','var(--yellow)'); }
     else{
       for(const u of upd){
-        await fetch(SB+'/rest/v1/ativos?id=eq.'+u.id,{method:'PATCH',headers:SBH,body:JSON.stringify({valor_atual:u.valor_atual,preco_unit:u.preco_unit,data_preco:u.data_preco})});
+        await fetch(SB+'/rest/v1/ativos?id=eq.'+u.id,{method:'PATCH',headers:SBH,body:JSON.stringify({valor_atual:u.valor_atual,preco_unit:u.preco_unit,data_preco:TODAY})});
         await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:u.id,data:TODAY,preco_unit:u.preco_unit,valor:u.valor_atual})});
       }
       log('✓ '+n+' ativos atualizados e posição do dia registrada.','var(--green)');
