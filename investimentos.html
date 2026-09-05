@@ -284,6 +284,11 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       <div><label class="fl2">Data</label><input type="date" class="fi2" id="ajData"></div>
       <div><label class="fl2">Valor atual R$</label><input type="number" step="0.01" class="fi2" id="ajValor"></div>
     </div>
+    <div class="fr2">
+      <div style="grid-column:1/-1"><label class="fl2">Data de compra <span class="at-sub">(quando entrou na carteira)</span></label>
+        <input type="date" class="fi2" id="ajCompra">
+        <div class="at-sub" style="margin-top:4px">períodos anteriores a esta data aparecem como “—”, em vez de rendimento inventado</div></div>
+    </div>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:14px">
       <input type="checkbox" id="ajManual" style="width:16px;height:16px;accent-color:var(--accent)">
       <span>Não estimar automaticamente este ativo (uso o extrato)</span>
@@ -303,7 +308,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.05-a';
+const APP_VERSION='v2026.09.05-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -392,6 +397,7 @@ function cuponsDesde(ativoId, alvo){
 }
 // Retorno total no periodo = variacao da posicao + cupons recebidos
 function ganhoDesde(a, alvo){
+  if(a.data_compra && alvo < a.data_compra) return null;   // ainda nao existia na carteira
   const v=valorEm(a.id, alvo);
   if(v===null) return null;
   const cup=cuponsDesde(a.id, alvo);
@@ -473,6 +479,7 @@ function render(){
             +' <span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span></div>'
             +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
             +(a.paga_cupom?' · <span style="color:var(--green)">cupom '+(a.periodicidade||'')+'</span>':'')
+            +(a.data_compra?' · desde '+fmtDate(a.data_compra):'')
             +'<span class="tag '+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'man')+'">'+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'manual')+'</span></div></div>'
             +'<div class="at-num"><div>R$ '+fmt(a.valor_atual)+'</div><div class="at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:2}):'')+'</div></div>'
             +'<div class="hide-s">'+celGanho(ganhoPeriodo(a,30))+'</div>'
@@ -678,6 +685,7 @@ function abrirAjuste(id){
   document.getElementById('ajData').value=TODAY;
   document.getElementById('ajValor').value=(+_ajAtivo.valor_atual).toFixed(2);
   document.getElementById('ajManual').checked=!!_ajAtivo.preco_manual;
+  document.getElementById('ajCompra').value=_ajAtivo.data_compra||'';
   document.getElementById('ajusteModal').style.display='flex';
 }
 function fecharAjuste(){ document.getElementById('ajusteModal').style.display='none'; _ajAtivo=null; }
@@ -687,11 +695,18 @@ async function salvarAjuste(){
   const data=document.getElementById('ajData').value;
   const v=parseFloat(document.getElementById('ajValor').value);
   const manual=document.getElementById('ajManual').checked;
+  const compra=document.getElementById('ajCompra').value||null;
   if(!data||isNaN(v)){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
   try{
     await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
-      body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual})});
+      body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual,data_compra:compra})});
     await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:data,valor:v})});
+    if(compra){
+      // limpa pontos anteriores a compra (eram reconstrucao sem lastro) e ancora no custo
+      await fetch(SB+'/rest/v1/posicoes_hist?ativo_id=eq.'+a.id+'&data=lt.'+compra,{method:'DELETE',headers:SBH});
+      await fetch(SB+'/rest/v1/posicoes_hist?ativo_id=eq.'+a.id+'&data=eq.'+compra,{method:'DELETE',headers:SBH});
+      await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:compra,valor:+a.custo_total||0})});
+    }
     toast('✓ Valor atualizado','var(--green)','#0d0f14');
     fecharAjuste(); await carregar();
   }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
