@@ -87,8 +87,8 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .kpi-v{font-family:'DM Serif Display',serif;font-size:22px}
 .cart-hd{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:4px}
 .cart-nome{font-size:14px;font-weight:600}
-.at-row{display:grid;grid-template-columns:1fr 108px 84px 84px 84px 84px;gap:6px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px}
-.at-hd{display:grid;grid-template-columns:1fr 108px 84px 84px 84px 84px;gap:6px;padding:4px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border)}
+.at-row{display:grid;grid-template-columns:1fr 104px 78px 78px 78px 78px 76px;gap:5px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.04);font-size:12.5px}
+.at-hd{display:grid;grid-template-columns:1fr 104px 78px 78px 78px 78px 76px;gap:5px;padding:4px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border)}
 .at-hd div:not(:first-child){text-align:right}
 .at-row:last-child{border-bottom:none}
 .at-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -100,7 +100,8 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .btn{padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12.5px;cursor:pointer}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
 .btn:disabled{opacity:.5;cursor:default}
-@media(max-width:900px){.at-row,.at-hd{grid-template-columns:1fr 100px 80px}.at-row .hide-m,.at-hd .hide-m{display:none}}
+@media(max-width:1100px){.at-row,.at-hd{grid-template-columns:1fr 100px 78px 78px}.at-row .hide-l,.at-hd .hide-l{display:none}}
+@media(max-width:900px){.at-row,.at-hd{grid-template-columns:1fr 100px 78px}.at-row .hide-m,.at-hd .hide-m{display:none}}
 @media(max-width:560px){.at-row,.at-hd{grid-template-columns:1fr 100px}.at-row .hide-s,.at-hd .hide-s{display:none}}
 </style>
 </head>
@@ -214,7 +215,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
   </div>
 
   <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">
-    <span style="opacity:.55">*</span> período parcial (ativo comprado depois do início do período) · 💰 inclui cupons recebidos
+    <span style="opacity:.55">*</span> período parcial (comprado depois do início) · 💰 inclui cupons · <b>% a.a.</b> = retorno no ano projetado para 12 meses
   </div>
   <div id="carteiras"><div style="text-align:center;padding:24px;color:var(--muted)">⟳ Carregando...</div></div>
 </div>
@@ -311,7 +312,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.05-c';
+const APP_VERSION='v2026.09.05-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -409,6 +410,24 @@ function ganhoDesde(a, alvo){
   const abs=(+a.valor_atual||0)-v+cup;
   return {abs:abs, pct:v? abs/v*100 : null, cupom:cup, parcial:parcial, desde:ini};
 }
+
+// Projeta o retorno do periodo para 12 meses (juros compostos)
+function anualizar(g){
+  if(!g || g.pct===null || !g.desde) return null;
+  const dias=Math.round((new Date(TODAY)-new Date(g.desde))/86400000);
+  if(dias<5) return null;                       // periodo curto demais: ruido domina
+  const an=(Math.pow(1+g.pct/100, 365/dias)-1)*100;
+  return isFinite(an)? {pct:an, dias:dias, parcial:g.parcial} : null;
+}
+function celAnual(g){
+  const a=anualizar(g);
+  if(!a) return '<div class="at-num at-sub">—</div>';
+  const c=a.pct>=0?'var(--green)':'var(--red)';
+  const tit=' title="'+a.dias+' dias de histórico'+(a.parcial?' (desde a compra)':'')+'"';
+  return '<div class="at-num" style="color:'+c+(a.parcial?';opacity:.82':'')+'"'+tit+'>'
+    +'<div>'+(a.pct>=0?'+':'')+a.pct.toFixed(1).replace('.',',')+'%'+(a.parcial?'<span style="opacity:.55;font-size:9px;vertical-align:super">*</span>':'')+'</div>'
+    +'<div class="at-sub">a.a.</div></div>';
+}
 function ganhoPeriodo(a, dias){
   const d=new Date(); d.setDate(d.getDate()-dias);
   return ganhoDesde(a, d.toISOString().slice(0,10));
@@ -478,7 +497,7 @@ function render(){
       +'<span class="at-sub" style="margin-left:8px">'+its.length+' ativos · '+(c.instituicao||'')+'</span></div>'
       +'<div style="text-align:right"><div style="font-family:\'DM Serif Display\',serif;font-size:18px">R$ '+fmt(v)+'</div>'
       +'<div class="at-sub" style="color:'+(gg>=0?'var(--green)':'var(--red)')+'">'+(gg>=0?'+':'−')+' R$ '+fmt(Math.abs(gg))+' ('+(cu?(gg/cu*100).toFixed(1).replace('.',','):'0')+'%)</div></div></div>'
-      +'<div class="at-hd"><div>Ativo</div><div>Valor hoje</div><div class="hide-s">1 mês</div><div class="hide-m">3 meses</div><div class="hide-m">No ano</div><div class="hide-m">12 meses</div></div>'
+      +'<div class="at-hd"><div>Ativo</div><div>Valor hoje</div><div class="hide-s">1 mês</div><div class="hide-l">3 meses</div><div class="hide-l">No ano</div><div class="hide-m">12 meses</div><div class="hide-m">% a.a.</div></div>'
       + its.map(a=>{
           const auto=AUTO_TIPOS[a.tipo];
           return '<div class="at-row">'
@@ -492,9 +511,10 @@ function render(){
             +'<span class="tag '+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'man')+'">'+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'manual')+'</span></div></div>'
             +'<div class="at-num"><div>R$ '+fmt(a.valor_atual)+'</div><div class="at-sub">'+(a.quantidade?(+a.quantidade).toLocaleString('pt-BR',{maximumFractionDigits:2}):'')+'</div></div>'
             +'<div class="hide-s">'+celGanho(ganhoPeriodo(a,30))+'</div>'
-            +'<div class="hide-m">'+celGanho(ganhoPeriodo(a,90))+'</div>'
-            +'<div class="hide-m">'+celGanho(ganhoYTD(a))+'</div>'
+            +'<div class="hide-l">'+celGanho(ganhoPeriodo(a,90))+'</div>'
+            +'<div class="hide-l">'+celGanho(ganhoYTD(a))+'</div>'
             +'<div class="hide-m">'+celGanho(ganhoPeriodo(a,365))+'</div>'
+            +'<div class="hide-m">'+celAnual(ganhoYTD(a))+'</div>'
             +'</div>';
         }).join('')
       +'</div>';
