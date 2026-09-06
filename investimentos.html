@@ -213,6 +213,9 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     </div>
   </div>
 
+  <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">
+    <span style="opacity:.55">*</span> período parcial (ativo comprado depois do início do período) · 💰 inclui cupons recebidos
+  </div>
   <div id="carteiras"><div style="text-align:center;padding:24px;color:var(--muted)">⟳ Carregando...</div></div>
 </div>
 
@@ -308,7 +311,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.05-b';
+const APP_VERSION='v2026.09.05-c';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -397,12 +400,14 @@ function cuponsDesde(ativoId, alvo){
 }
 // Retorno total no periodo = variacao da posicao + cupons recebidos
 function ganhoDesde(a, alvo){
-  if(a.data_compra && alvo < a.data_compra) return null;   // ainda nao existia na carteira
-  const v=valorEm(a.id, alvo);
+  // Comprado depois do corte: mede desde a compra e marca como periodo parcial
+  let parcial=false, ini=alvo;
+  if(a.data_compra && alvo < a.data_compra){ ini=a.data_compra; parcial=true; }
+  const v=valorEm(a.id, ini);
   if(v===null) return null;
-  const cup=cuponsDesde(a.id, alvo);
+  const cup=cuponsDesde(a.id, ini);
   const abs=(+a.valor_atual||0)-v+cup;
-  return {abs:abs, pct:v? abs/v*100 : null, cupom:cup};
+  return {abs:abs, pct:v? abs/v*100 : null, cupom:cup, parcial:parcial, desde:ini};
 }
 function ganhoPeriodo(a, dias){
   const d=new Date(); d.setDate(d.getDate()-dias);
@@ -414,8 +419,12 @@ function ganhoYTD(a){
 function celGanho(g){
   if(!g) return '<div class="at-num at-sub">—</div>';
   const c=g.abs>=0?'var(--green)':'var(--red)';
-  const tit=g.cupom? ' title="inclui R$ '+fmt(g.cupom)+' de cupons recebidos"':'';
-  return '<div class="at-num" style="color:'+c+'"'+tit+'><div>'+(g.abs>=0?'+':'−')+fmt(Math.abs(g.abs))+(g.cupom?' <span style="opacity:.6">💰</span>':'')+'</div>'
+  const notas=[];
+  if(g.cupom) notas.push('inclui R$ '+fmt(g.cupom)+' de cupons');
+  if(g.parcial) notas.push('período parcial: desde a compra em '+fmtDate(g.desde));
+  const tit=notas.length?' title="'+notas.join(' · ')+'"':'';
+  const marca=(g.cupom?' <span style="opacity:.6">💰</span>':'')+(g.parcial?'<span style="opacity:.55;font-size:9px;vertical-align:super">*</span>':'');
+  return '<div class="at-num" style="color:'+c+(g.parcial?';opacity:.82':'')+'"'+tit+'><div>'+(g.abs>=0?'+':'−')+fmt(Math.abs(g.abs))+marca+'</div>'
     +(g.pct!==null?'<div class="at-sub" style="color:'+c+'">'+(g.pct>=0?'+':'')+g.pct.toFixed(1).replace('.',',')+'%</div>':'')+'</div>';
 }
 
