@@ -198,6 +198,25 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
           <div><label class="fl2">Ticker <span class="at-sub">(se for ação)</span></label><input type="text" class="fi2" id="apTicker" placeholder="PETR4" style="text-transform:uppercase"></div>
           <div><label class="fl2">Dia do aniversário <span class="at-sub">(poupança)</span></label><input type="number" min="1" max="31" class="fi2" id="apAniv" placeholder="15"></div>
         </div>
+        <div class="fr2">
+          <div style="grid-column:1/-1">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px 0">
+              <input type="checkbox" id="apCupom" style="width:16px;height:16px;accent-color:var(--accent)" onchange="onCupomChk()">
+              <span>Paga juros periódicos (cupom)</span>
+            </label>
+            <div id="apCupomBox" style="display:none;margin-top:6px">
+              <select class="fi2" id="apPeriod">
+                <option value="mensal">Mensal</option>
+                <option value="trimestral">Trimestral</option>
+                <option value="semestral" selected>Semestral</option>
+                <option value="anual">Anual</option>
+                <option value="irregular">Irregular / sob demanda</option>
+              </select>
+              <input type="text" class="fi2" id="apMeses" placeholder="Meses de pagamento, ex: 15/02 e 15/08 (opcional)" style="margin-top:6px">
+              <div class="at-sub" style="margin-top:4px">o valor deste ativo não será estimado — você informa pelo extrato e registra cada cupom</div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="fr2">
         <div><label class="fl2">Valor aplicado R$</label><input type="number" step="0.01" class="fi2" id="apValor" placeholder="0,00"></div>
@@ -293,10 +312,24 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
         <input type="date" class="fi2" id="ajCompra">
         <div class="at-sub" style="margin-top:4px">períodos anteriores a esta data aparecem como “—”, em vez de rendimento inventado</div></div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:14px">
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:10px">
       <input type="checkbox" id="ajManual" style="width:16px;height:16px;accent-color:var(--accent)">
       <span>Não estimar automaticamente este ativo (uso o extrato)</span>
     </label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:10px">
+      <input type="checkbox" id="ajCupom" style="width:16px;height:16px;accent-color:var(--accent)" onchange="onAjCupom()">
+      <span>Paga juros periódicos (cupom)</span>
+    </label>
+    <div id="ajCupomBox" style="display:none;margin-bottom:14px">
+      <select class="fi2" id="ajPeriod">
+        <option value="mensal">Mensal</option>
+        <option value="trimestral">Trimestral</option>
+        <option value="semestral">Semestral</option>
+        <option value="anual">Anual</option>
+        <option value="irregular">Irregular / sob demanda</option>
+      </select>
+      <input type="text" class="fi2" id="ajMeses" placeholder="Meses de pagamento (opcional)" style="margin-top:6px">
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn pri" style="flex:1" onclick="salvarAjuste()">✓ Salvar</button>
       <button class="btn" onclick="fecharAjuste()">Cancelar</button>
@@ -312,7 +345,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.05-d';
+const APP_VERSION='v2026.09.12-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -581,6 +614,9 @@ async function salvarAplicacao(){
         taxa:parseFloat(document.getElementById('apTaxa').value)||null,
         pct_indexador:parseFloat(document.getElementById('apPct').value)||null,
         aniversario:parseInt(document.getElementById('apAniv').value)||null,
+        paga_cupom:document.getElementById('apCupom').checked,
+        periodicidade:document.getElementById('apCupom').checked?
+          (document.getElementById('apPeriod').value + (document.getElementById('apMeses').value.trim()? ' ('+document.getElementById('apMeses').value.trim()+')':'')) : null,
         vencimento:document.getElementById('apVenc').value||null,
         ticker:(document.getElementById('apTicker').value||'').trim().toUpperCase()||null,
         quantidade:qtd, custo_total:valor, valor_atual:valor,
@@ -607,7 +643,7 @@ async function salvarAplicacao(){
     } else {
       toast('✓ Aplicação registrada','var(--green)','#0d0f14');
     }
-    ['apNome','apValor','apQtd','apTaxa','apPct','apTicker','apVenc','apAniv'].forEach(id=>{const e=document.getElementById(id); if(e)e.value='';});
+    ['apNome','apValor','apQtd','apTaxa','apPct','apTicker','apVenc','apAniv','apMeses'].forEach(id=>{const e=document.getElementById(id); if(e)e.value='';});
     toggleForm();
     await carregar();
   }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
@@ -638,6 +674,13 @@ async function serieBCB(codigo){
     const d=await r.json();
     return parseFloat(String(d[0].valor).replace(',','.'));
   }catch(e){ return null; }
+}
+
+function onCupomChk(){
+  document.getElementById('apCupomBox').style.display=document.getElementById('apCupom').checked?'block':'none';
+}
+function onAjCupom(){
+  document.getElementById('ajCupomBox').style.display=document.getElementById('ajCupom').checked?'block':'none';
 }
 
 // ---------- Cupom / juros ----------
@@ -715,6 +758,12 @@ function abrirAjuste(id){
   document.getElementById('ajValor').value=(+_ajAtivo.valor_atual).toFixed(2);
   document.getElementById('ajManual').checked=!!_ajAtivo.preco_manual;
   document.getElementById('ajCompra').value=_ajAtivo.data_compra||'';
+  const per=(_ajAtivo.periodicidade||'');
+  document.getElementById('ajCupom').checked=!!_ajAtivo.paga_cupom;
+  document.getElementById('ajPeriod').value=(per.split(' ')[0]||'semestral');
+  const m=per.match(/\(([^)]*)\)/);
+  document.getElementById('ajMeses').value=m?m[1]:'';
+  onAjCupom();
   document.getElementById('ajusteModal').style.display='flex';
 }
 function fecharAjuste(){ document.getElementById('ajusteModal').style.display='none'; _ajAtivo=null; }
@@ -728,7 +777,10 @@ async function salvarAjuste(){
   if(!data||isNaN(v)){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
   try{
     await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
-      body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual,data_compra:compra})});
+      body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual,data_compra:compra,
+        paga_cupom:document.getElementById('ajCupom').checked,
+        periodicidade:document.getElementById('ajCupom').checked?
+          (document.getElementById('ajPeriod').value + (document.getElementById('ajMeses').value.trim()? ' ('+document.getElementById('ajMeses').value.trim()+')':'')) : null})});
     await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:data,valor:v})});
     if(compra){
       // limpa pontos anteriores a compra (eram reconstrucao sem lastro) e ancora no custo
