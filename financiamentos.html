@@ -226,7 +226,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.12-b';
+const APP_VERSION='v2026.09.21-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -329,7 +329,8 @@ function gerarTabela(cfg){
     linhas.push({numero:k, vencimento:venc.toISOString().slice(0,10),
       juros:+juros.toFixed(2), amortizacao:+amort.toFixed(2), seguro:+(seguro||0), taxa_adm:+(admin||0),
       valor_previsto:+(juros+amort+(seguro||0)+(admin||0)).toFixed(2),
-      saldo_apos:+Math.max(0,saldo).toFixed(2)});
+      saldo_apos:+Math.max(0,saldo).toFixed(2),
+      pago:false, memo:null});   // todas as linhas com os mesmos campos (exigencia do insert em lote)
   }
   return linhas;
 }
