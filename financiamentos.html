@@ -274,7 +274,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.26-b';
+const APP_VERSION='v2026.09.27-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Chamada ao Supabase com erro legivel ----------
@@ -293,6 +293,12 @@ async function sbCall(path, opts){
   }
   const t = await r.text();
   return t ? JSON.parse(t) : null;
+}
+
+// Data em que o controle da conta comeca: antes dela o saldo de partida ja cobre tudo
+function desdeQuando(fin){
+  const c=(CONTAS||[]).find(x=>x.id===fin.conta_id);
+  return (c && c.data_base) ? c.data_base : '2026-05-01';
 }
 
 // ---------- MIP: taxa recuperada das proprias parcelas ----------
@@ -398,7 +404,7 @@ async function carregar(){
   try{
     FINS  = await sbGet('financiamentos','ativo=is.true&order=id.asc');
     PARCS = await sbGet('parcelas','order=numero.asc&limit=5000');
-    if(!CONTAS.length) CONTAS = await sbGet('contas','select=id,nome,tipo&order=ordem.asc');
+    if(!CONTAS.length) CONTAS = await sbGet('contas','select=id,nome,tipo,data_base&order=ordem.asc');
     render();
   }catch(e){ document.getElementById('lista').innerHTML='<div class="card" style="color:var(--red)">Erro: '+e.message+'</div>'; }
 }
@@ -586,7 +592,11 @@ function render(){
           return '<div class="pr-row '+(p.pago?'paga':'')+' '+(venc?'venc':'')+'">'
             +'<div class="num">'+p.numero+'</div>'
             +'<div class="num">'+fmtDate(p.vencimento)+'</div>'
-            +'<div>'+(p.pago?'<span style="color:var(--green)">✓ pago '+fmtDate(p.data_pagamento)+'</span>'
+            +'<div>'+(p.pago?(p.data_pagamento
+                 ? '<span style="color:var(--green)">✓ pago '+fmtDate(p.data_pagamento)+'</span>'
+                 : (p.vencimento>=desdeQuando(f)
+                    ? '<button class="btn" style="padding:4px 8px;font-size:10px" title="cria os lançamentos desta parcela no caixa" onclick="abrirPag('+p.id+',true)">⤓ lançar no caixa</button>'
+                    : '<span class="sub">✓ paga (fora do controle)</span>'))
                             :(venc?'<span style="color:var(--red)">vencida</span>':'<button class="btn g" style="padding:4px 10px;font-size:11px" onclick="abrirPag('+p.id+')">Pagar</button>'))+'</div>'
             +'<div class="num hm">'+fmt(p.juros)+'</div>'
             +'<div class="num hm">'+fmt(p.amortizacao)+'</div>'
@@ -781,17 +791,42 @@ async function salvarEvento(){
 }
 
 // ---------- Pagamento ----------
-let _pgParc=null;
-function abrirPag(id){
+let _pgParc=null, _pgRetro=false;
+function abrirPag(id, retro){
   _pgParc=PARCS.find(p=>String(p.id)===String(id)); if(!_pgParc) return;
+  _pgRetro=!!retro;
   const f=FINS.find(x=>x.id===_pgParc.financiamento_id);
-  document.getElementById('pgInfo').textContent=f.nome+' · parcela '+_pgParc.numero+'/'+f.prazo_meses+' · vence '+fmtDate(_pgParc.vencimento);
-  document.getElementById('pgData').value=TODAY;
-  document.getElementById('pgValor').value=(+_pgParc.valor_previsto).toFixed(2);
+  document.getElementById('pgInfo').textContent=f.nome+' · parcela '+_pgParc.numero+'/'+f.prazo_meses+' · vence '+fmtDate(_pgParc.vencimento)
+    +(_pgRetro? ' · lançamento retroativo':'');
+  // parcela antiga: a data que importa e a do vencimento, nao hoje
+  document.getElementById('pgData').value=_pgRetro? _pgParc.vencimento : TODAY;
+  document.getElementById('pgValor').value=(+(_pgParc.valor_pago||_pgParc.valor_previsto)).toFixed(2);
   calcPag();
   document.getElementById('pagModal').style.display='flex';
 }
-function fecharPag(){ document.getElementById('pagModal').style.display='none'; _pgParc=null; }
+function fecharPag(){ document.getElementById('pagModal').style.display='none'; _pgParc=null; _pgRetro=false; }
+// Reparte o valor realmente pago entre juros/amortizacao/seguro/taxa.
+// Diferenca pequena (indexador) ajusta os juros. Diferenca grande — parcela
+// renegociada, por exemplo — rateia proporcionalmente, senao os juros viram negativos.
+function ratear(p, pago){
+  const prev=+p.valor_previsto||0;
+  const base={juros:+p.juros||0, amortizacao:+p.amortizacao||0, seguro:+p.seguro||0, taxa:+p.taxa_adm||0};
+  const dif=+(pago-prev).toFixed(2);
+  let r;
+  if(prev>0 && (base.juros+dif)>=0 && Math.abs(dif)<=prev*0.3){
+    r={juros:+(base.juros+dif).toFixed(2), amortizacao:base.amortizacao,
+       seguro:base.seguro, taxa:base.taxa, modo:'juros', dif:dif};
+  }else{
+    const k = prev>0 ? pago/prev : 0;
+    r={juros:+(base.juros*k).toFixed(2), amortizacao:+(base.amortizacao*k).toFixed(2),
+       seguro:+(base.seguro*k).toFixed(2), taxa:+(base.taxa*k).toFixed(2), modo:'rateio', dif:dif};
+  }
+  // o resto do arredondamento sobra nos juros: as quatro partes tem de somar o valor pago
+  const soma=+(r.juros+r.amortizacao+r.seguro+r.taxa).toFixed(2);
+  if(soma!==pago) r.juros=+(r.juros+(pago-soma)).toFixed(2);
+  return r;
+}
+
 function calcPag(){
   if(!_pgParc) return;
   const p=_pgParc;
@@ -800,13 +835,16 @@ function calcPag(){
   const dif=pago-prev;
   const f=FINS.find(x=>x.id===p.financiamento_id);
   const conta=(CONTAS.find(c=>c.id===f.conta_id)||{}).nome||'—';
+  const r=ratear(p,pago);
   document.getElementById('pgResumo').innerHTML=
-     'Juros (despesa): <b>R$ '+fmt(p.juros)+'</b><br>'
-    +'Amortização (reduz a dívida): <b>R$ '+fmt(p.amortizacao)+'</b><br>'
-    +(+p.seguro? 'Seguro: <b>R$ '+fmt(p.seguro)+'</b><br>':'')
-    +(+p.taxa_adm? 'Taxa admin.: <b>R$ '+fmt(p.taxa_adm)+'</b><br>':'')
+     'Juros (despesa): <b>R$ '+fmt(r.juros)+'</b><br>'
+    +'Amortização (reduz a dívida): <b>R$ '+fmt(r.amortizacao)+'</b><br>'
+    +(r.seguro? 'Seguro: <b>R$ '+fmt(r.seguro)+'</b><br>':'')
+    +(r.taxa? 'Taxa admin.: <b>R$ '+fmt(r.taxa)+'</b><br>':'')
     +'Debitado de: <b>'+conta+'</b>'
-    +(Math.abs(dif)>0.01? '<br><span style="color:var(--yellow)">Diferença de R$ '+fmt(Math.abs(dif))+' vs. previsto — será lançada como ajuste de juros.</span>':'')
+    +(Math.abs(dif)>0.01? '<br><span style="color:var(--yellow)">Diferença de R$ '+fmt(Math.abs(dif))+' vs. o previsto de R$ '+fmt(prev)+' — '
+       +(r.modo==='juros'? 'lançada como ajuste de juros.' : 'rateada proporcionalmente entre os quatro componentes.')+'</span>':'')
+    +(_pgRetro? '<br><span style="color:var(--yellow)">Retroativo: cria os lançamentos no caixa sem alterar o saldo devedor de hoje.</span>':'')
     +'<br><span class="sub">Saldo após: R$ '+fmt(p.saldo_apos)+'</span>';
 }
 async function salvarPag(){
@@ -815,12 +853,13 @@ async function salvarPag(){
   const data=document.getElementById('pgData').value;
   const pago=parseFloat(document.getElementById('pgValor').value)||0;
   if(!data||!pago){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
-  const dif=+(pago-(+p.valor_previsto)).toFixed(2);
-  const juros=+(+p.juros+dif).toFixed(2);      // diferenca ajusta os juros (correcao do indexador)
+  const rt=ratear(p,pago);
+  const juros=rt.juros;
   try{
-    await fetch(SB+'/rest/v1/parcelas?id=eq.'+p.id,{method:'PATCH',headers:SBH,
+    await sbCall('parcelas?id=eq.'+p.id,{method:'PATCH',headers:SBH,
       body:JSON.stringify({pago:true,data_pagamento:data,valor_pago:pago})});
-    await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,
+    // retroativo: o saldo de hoje ja reflete essa parcela — nao rebobinar
+    if(!_pgRetro) await sbCall('financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,
       body:JSON.stringify({saldo_devedor:+p.saldo_apos})});
     if(f.conta_id){
       const gid=Date.now();
@@ -828,16 +867,16 @@ async function salvarPag(){
       linhas.push({id:gid,type:'expense',amount:juros,date:data,payee:f.nome+' — juros',payee_display:f.nome+' — juros',
         account:f.conta_id,category:'juros',subcategory:'juros_empr_stimos',memo:'Parcela '+p.numero+'/'+f.prazo_meses,
         is_deductible:false,receipt_status:'na',installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:true,split_total:pago});
-      linhas.push({id:gid+1,type:'expense',amount:+p.amortizacao,date:data,payee:f.nome+' — amortização',payee_display:f.nome+' — amortização',
+      linhas.push({id:gid+1,type:'expense',amount:rt.amortizacao,date:data,payee:f.nome+' — amortização',payee_display:f.nome+' — amortização',
         account:f.conta_id,category:'transferencia',subcategory:null,memo:'Amortização parcela '+p.numero,
         is_deductible:false,receipt_status:'na',installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:true,split_total:pago});
-      if(+p.seguro) linhas.push({id:gid+2,type:'expense',amount:+p.seguro,date:data,payee:f.nome+' — seguro',payee_display:f.nome+' — seguro',
+      if(rt.seguro) linhas.push({id:gid+2,type:'expense',amount:rt.seguro,date:data,payee:f.nome+' — seguro',payee_display:f.nome+' — seguro',
         account:f.conta_id,category:'seguros',subcategory:'casa',memo:'Seguro parcela '+p.numero,
         is_deductible:false,receipt_status:'na',installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:true,split_total:pago});
-      if(+p.taxa_adm) linhas.push({id:gid+3,type:'expense',amount:+p.taxa_adm,date:data,payee:f.nome+' — taxa adm.',payee_display:f.nome+' — taxa adm.',
+      if(rt.taxa) linhas.push({id:gid+3,type:'expense',amount:rt.taxa,date:data,payee:f.nome+' — taxa adm.',payee_display:f.nome+' — taxa adm.',
         account:f.conta_id,category:'taxas-bancarias',subcategory:'taxas_banc_rias',memo:'Taxa parcela '+p.numero,
         is_deductible:false,receipt_status:'na',installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:true,split_total:pago});
-      await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify(linhas)});
+      await sbCall('transactions',{method:'POST',headers:SBH,body:JSON.stringify(linhas)});
     }
     toast('✓ Parcela '+p.numero+' registrada','var(--green)','#0d0f14');
     fecharPag(); await carregar();
