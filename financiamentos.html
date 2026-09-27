@@ -166,8 +166,14 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
         <div><label class="fl2">Dia do vencimento</label><input type="number" min="1" max="31" class="fi2" id="fDia" placeholder="10"></div>
       </div>
       <div class="fr2">
-        <div><label class="fl2">Seguro mensal R$ <span class="sub">(MIP/DFI)</span></label><input type="number" step="0.01" class="fi2" id="fSeg" placeholder="0,00"></div>
-        <div><label class="fl2">Taxa admin. mensal R$</label><input type="number" step="0.01" class="fi2" id="fAdm" placeholder="0,00"></div>
+        <div><label class="fl2">MIP — % sobre o saldo devedor <span class="sub">(mensal)</span></label>
+          <input type="number" step="0.000001" class="fi2" id="fMip" placeholder="0,035" oninput="simular()">
+          <div class="sub" style="margin-top:3px">varia todo mês junto com a dívida · deixe vazio se usar valor fixo</div></div>
+        <div><label class="fl2">DFI + seguro fixo R$ <span class="sub">(mensal)</span></label><input type="number" step="0.01" class="fi2" id="fSeg" placeholder="0,00" oninput="simular()"></div>
+      </div>
+      <div class="fr2">
+        <div><label class="fl2">Taxa admin. mensal R$</label><input type="number" step="0.01" class="fi2" id="fAdm" placeholder="25,00"></div>
+        <div></div>
       </div>
       <div class="fr2">
         <div style="grid-column:1/-1"><label class="fl2">Parcela debitada de</label><select class="fi2" id="fConta"></select></div>
@@ -218,6 +224,48 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
   </div>
 </div>
 
+
+<div id="evModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:460px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0" id="evTitulo">Evento</div>
+      <button onclick="fecharEvento()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="evInfo" class="sub" style="margin-bottom:14px"></div>
+
+    <div class="fr2">
+      <div><label class="fl2">Data</label><input type="date" class="fi2" id="evData"></div>
+      <div id="evValorBox"><label class="fl2" id="evValorLbl">Valor R$</label><input type="number" step="0.01" class="fi2" id="evValor" oninput="calcEvento()"></div>
+    </div>
+
+    <div class="fr2" id="evEfeitoBox">
+      <div style="grid-column:1/-1"><label class="fl2">O que a amortização reduz</label>
+        <select class="fi2" id="evEfeito" onchange="calcEvento()">
+          <option value="prazo">Prazo — mantém a parcela, antecipa o fim</option>
+          <option value="parcela">Parcela — mantém o prazo, reduz o valor</option>
+        </select></div>
+    </div>
+
+    <div class="fr2" id="evMesesBox" style="display:none">
+      <div><label class="fl2">Meses de carência</label><input type="number" min="1" max="24" class="fi2" id="evMeses" value="2" oninput="calcEvento()"></div>
+      <div><label class="fl2">Juros no período</label><select class="fi2" id="evJuros" onchange="calcEvento()">
+        <option value="capitaliza">Somados à dívida</option>
+        <option value="pagos">Pagos normalmente</option>
+      </select></div>
+    </div>
+
+    <div class="fr2" id="evContaBox">
+      <div style="grid-column:1/-1"><label class="fl2">Dinheiro saiu de</label><select class="fi2" id="evConta"></select></div>
+    </div>
+
+    <div id="evResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn pri" style="flex:1" onclick="salvarEvento()">✓ Registrar</button>
+      <button class="btn" onclick="fecharEvento()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -226,7 +274,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.21-a';
+const APP_VERSION='v2026.09.23-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -315,7 +363,7 @@ async function carregar(){
 
 // ---------- Tabela de amortizacao ----------
 function gerarTabela(cfg){
-  const {valor,prazo,taxaAnual,sistema,dia,dataContrato,seguro,admin}=cfg;
+  const {valor,prazo,taxaAnual,sistema,dia,dataContrato,seguro,admin,mip}=cfg;
   const i=Math.pow(1+taxaAnual/100,1/12)-1;     // taxa anual efetiva -> mensal
   const linhas=[];
   let saldo=valor;
@@ -325,10 +373,11 @@ function gerarTabela(cfg){
     const juros=saldo*i;
     const amort = sistema==='price' ? (parcelaPrice-juros) : (valor/prazo);
     const venc=new Date(base.getFullYear(), base.getMonth()+k, dia||base.getDate());
+    const seg=+((seguro||0)+(mip? saldo*(mip/100) : 0)).toFixed(2);   // MIP incide sobre o saldo ANTES da amortizacao
     saldo=saldo-amort;
     linhas.push({numero:k, vencimento:venc.toISOString().slice(0,10),
-      juros:+juros.toFixed(2), amortizacao:+amort.toFixed(2), seguro:+(seguro||0), taxa_adm:+(admin||0),
-      valor_previsto:+(juros+amort+(seguro||0)+(admin||0)).toFixed(2),
+      juros:+juros.toFixed(2), amortizacao:+amort.toFixed(2), seguro:seg, taxa_adm:+(admin||0),
+      valor_previsto:+(juros+amort+seg+(admin||0)).toFixed(2),
       saldo_apos:+Math.max(0,saldo).toFixed(2),
       pago:false, memo:null});   // todas as linhas com os mesmos campos (exigencia do insert em lote)
   }
@@ -348,6 +397,7 @@ function lerForm(){
     indexador:document.getElementById('fIdx').value||null,
     dia:parseInt(document.getElementById('fDia').value)||null,
     seguro:parseFloat(document.getElementById('fSeg').value)||0,
+    mip:parseFloat(document.getElementById('fMip').value)||0,
     admin:parseFloat(document.getElementById('fAdm').value)||0,
     conta:document.getElementById('fConta').value||null
   };
@@ -370,9 +420,10 @@ function recalibrar(linhas, pagas, saldoReal, cfg){
     const L=linhas[pagas+k];
     const juros=saldo*i;
     const amort = cfg.sistema==='price' ? (parcPrice-juros) : (saldoReal/rest);
+    const seg=+((cfg.seguro||0)+(cfg.mip? saldo*(cfg.mip/100) : 0)).toFixed(2);
     saldo=saldo-amort;
-    L.juros=+juros.toFixed(2); L.amortizacao=+amort.toFixed(2);
-    L.valor_previsto=+(juros+amort+(cfg.seguro||0)+(cfg.admin||0)).toFixed(2);
+    L.juros=+juros.toFixed(2); L.amortizacao=+amort.toFixed(2); L.seguro=seg;
+    L.valor_previsto=+(juros+amort+seg+(cfg.admin||0)).toFixed(2);
     L.saldo_apos=+Math.max(0,saldo).toFixed(2);
   }
   return linhas;
@@ -415,7 +466,7 @@ async function salvarFin(){
       body:JSON.stringify({nome:c.nome,tipo:c.tipo,instituicao:c.instituicao,valor_financiado:c.valor,
         data_contrato:c.dataContrato,prazo_meses:c.prazo,taxa_anual:c.taxaAnual,sistema:c.sistema,
         indexador:c.indexador,dia_vencimento:c.dia,conta_id:c.conta,seguro_mensal:c.seguro,
-        taxa_admin:c.admin,saldo_devedor:(and&&saldoReal?saldoReal:c.valor),ativo:true})});
+        taxa_admin:c.admin,taxa_mip:c.mip||null,saldo_devedor:(and&&saldoReal?saldoReal:c.valor),ativo:true})});
     const fin=(await r.json())[0];
     // grava as parcelas em lotes
     for(let k=0;k<t.length;k+=200){
@@ -486,12 +537,182 @@ function render(){
             +'<div class="num">'+fmt(p.valor_previsto)+'</div>'
             +'<div class="num hm sub">'+fmt(p.saldo_apos)+'</div></div>';
         }).join('')
+      +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +'<button class="btn" onclick="abrirEvento('+f.id+',\'amortizacao\')">⬇ Amortização extraordinária</button>'
+      +'<button class="btn" onclick="abrirEvento('+f.id+',\'carencia\')">⏸ Carência / pausa</button>'
+      +'<button class="btn" onclick="abrirEvento('+f.id+',\'saldo\')">✎ Ajustar saldo do extrato</button>'
+      +'</div>'
       +'<div style="text-align:center;margin-top:10px"><button class="btn" onclick="toggleTabela('+f.id+')">'
       +(aberto?'▲ Mostrar só as próximas':'▼ Ver tabela completa ('+ps.length+' parcelas)')+'</button></div>'
       +'</div>';
   }).join('');
 }
 function toggleTabela(id){ _abertos[id]=!_abertos[id]; render(); }
+
+
+// ---------- Eventos: amortizacao extraordinaria, carencia, ajuste de saldo ----------
+let _evFin=null, _evTipo=null;
+function abrirEvento(finId, tipo){
+  _evFin=FINS.find(f=>f.id===finId); _evTipo=tipo; if(!_evFin) return;
+  const ps=PARCS.filter(p=>p.financiamento_id===_evFin.id).sort((a,b)=>a.numero-b.numero);
+  const ult=ps.filter(p=>p.pago).sort((a,b)=>b.numero-a.numero)[0];
+  const sd=ult? +ult.saldo_apos : +_evFin.valor_financiado;
+  _evFin._saldo=sd; _evFin._abertas=ps.filter(p=>!p.pago).length;
+  const T={amortizacao:'⬇ Amortização extraordinária', carencia:'⏸ Carência / pausa', saldo:'✎ Ajustar saldo do extrato'};
+  document.getElementById('evTitulo').textContent=T[tipo];
+  document.getElementById('evInfo').textContent=_evFin.nome+' · saldo atual R$ '+fmt(sd)+' · '+_evFin._abertas+' parcelas em aberto';
+  document.getElementById('evData').value=TODAY;
+  document.getElementById('evValor').value = tipo==='saldo' ? sd.toFixed(2) : '';
+  document.getElementById('evValorLbl').textContent = tipo==='saldo' ? 'Saldo devedor do extrato R$' : 'Valor amortizado R$';
+  document.getElementById('evValorBox').style.display = tipo==='carencia' ? 'none' : '';
+  document.getElementById('evEfeitoBox').style.display = tipo==='amortizacao' ? '' : 'none';
+  document.getElementById('evMesesBox').style.display = tipo==='carencia' ? '' : 'none';
+  document.getElementById('evContaBox').style.display = tipo==='amortizacao' ? '' : 'none';
+  const sc=document.getElementById('evConta');
+  sc.innerHTML='<option value="">(não lançar no caixa)</option>'+
+    CONTAS.filter(c=>c.tipo!=='cartao').map(c=>'<option value="'+c.id+'"'+(c.id===_evFin.conta_id?' selected':'')+'>'+c.nome+'</option>').join('');
+  calcEvento();
+  document.getElementById('evModal').style.display='flex';
+}
+function fecharEvento(){ document.getElementById('evModal').style.display='none'; _evFin=null; _evTipo=null; }
+
+// Recalcula as parcelas em aberto a partir de um novo saldo
+function reprojetar(fin, novoSaldo, novoPrazo){
+  const i=Math.pow(1+(+fin.taxa_anual)/100,1/12)-1;
+  const ps=PARCS.filter(p=>p.financiamento_id===fin.id && !p.pago).sort((a,b)=>a.numero-b.numero);
+  const n=novoPrazo||ps.length;
+  const usar=ps.slice(0,n);
+  let saldo=novoSaldo;
+  const parcPrice = fin.sistema==='price' ? saldo*i/(1-Math.pow(1+i,-n)) : null;
+  const out=[];
+  usar.forEach(p=>{
+    const juros=saldo*i;
+    const amort = fin.sistema==='price' ? (parcPrice-juros) : (novoSaldo/n);
+    const seg=+((+fin.seguro_mensal||0)+(fin.taxa_mip? saldo*(+fin.taxa_mip/100) : 0)).toFixed(2);
+    saldo-=amort;
+    out.push({id:p.id, juros:+juros.toFixed(2), amortizacao:+amort.toFixed(2), seguro:seg,
+      valor_previsto:+(juros+amort+seg+(+fin.taxa_admin||0)).toFixed(2), saldo_apos:+Math.max(0,saldo).toFixed(2)});
+  });
+  return {linhas:out, sobrando:ps.slice(n)};
+}
+
+function calcEvento(){
+  if(!_evFin) return;
+  const el=document.getElementById('evResumo');
+  const sd=_evFin._saldo;
+  if(_evTipo==='amortizacao'){
+    const v=parseFloat(document.getElementById('evValor').value)||0;
+    if(!v){ el.innerHTML='<span class="sub">Informe o valor amortizado.</span>'; return; }
+    const novo=Math.max(0,sd-v);
+    const efeito=document.getElementById('evEfeito').value;
+    const r=reprojetar(_evFin,novo, efeito==='prazo'? null : null);
+    const prim=r.linhas[0];
+    if(efeito==='prazo'){
+      // mantem a parcela: descobre quantas ainda cabem
+      const i=Math.pow(1+(+_evFin.taxa_anual)/100,1/12)-1;
+      const ps=PARCS.filter(p=>p.financiamento_id===_evFin.id && !p.pago);
+      const amortAtual=(+ps[0].amortizacao)||1;
+      const novasParc=Math.max(1,Math.ceil(novo/amortAtual));
+      el.innerHTML='Saldo: R$ '+fmt(sd)+' → <b>R$ '+fmt(novo)+'</b><br>'
+        +'Parcela mantida em ~R$ '+fmt(ps[0].valor_previsto)+'<br>'
+        +'Prazo: '+ps.length+' → <b>'+novasParc+' parcelas</b> <span style="color:var(--green)">('+(ps.length-novasParc)+' a menos)</span>';
+    }else{
+      el.innerHTML='Saldo: R$ '+fmt(sd)+' → <b>R$ '+fmt(novo)+'</b><br>'
+        +'Prazo mantido em '+r.linhas.length+' parcelas<br>'
+        +'Próxima parcela: R$ '+fmt(PARCS.filter(p=>p.financiamento_id===_evFin.id&&!p.pago)[0].valor_previsto)+' → <b>R$ '+fmt(prim.valor_previsto)+'</b>';
+    }
+  } else if(_evTipo==='carencia'){
+    const m=parseInt(document.getElementById('evMeses').value)||0;
+    const cap=document.getElementById('evJuros').value==='capitaliza';
+    const i=Math.pow(1+(+_evFin.taxa_anual)/100,1/12)-1;
+    const novo= cap ? sd*Math.pow(1+i,m) : sd;
+    el.innerHTML=m+' meses sem pagar · vencimentos adiados<br>'
+      +(cap? 'Juros somados à dívida: saldo R$ '+fmt(sd)+' → <b>R$ '+fmt(novo)+'</b> <span style="color:var(--yellow)">(+R$ '+fmt(novo-sd)+')</span>'
+           : 'Juros pagos no período: saldo mantido em <b>R$ '+fmt(sd)+'</b>')
+      +'<br><span class="sub">as parcelas em aberto são empurradas '+m+' meses</span>';
+  } else {
+    const v=parseFloat(document.getElementById('evValor').value)||0;
+    const dif=v-sd;
+    el.innerHTML='Saldo calculado: R$ '+fmt(sd)+'<br>Saldo do extrato: <b>R$ '+fmt(v)+'</b><br>'
+      +'Diferença: <b style="color:'+(Math.abs(dif)<1?'var(--green)':'var(--yellow)')+'">'+(dif>=0?'+':'−')+' R$ '+fmt(Math.abs(dif))+'</b>'
+      +'<br><span class="sub">as parcelas em aberto são recalculadas a partir do valor do extrato</span>';
+  }
+}
+
+async function salvarEvento(){
+  if(!_evFin) return;
+  const f=_evFin, sd=f._saldo;
+  const data=document.getElementById('evData').value;
+  const conta=document.getElementById('evConta').value;
+  if(!data){ toast('⚠ Informe a data','#fbbf24','#0d0f14'); return; }
+  try{
+    if(_evTipo==='amortizacao'){
+      const v=parseFloat(document.getElementById('evValor').value)||0;
+      if(!v){ toast('⚠ Informe o valor','#fbbf24','#0d0f14'); return; }
+      const novo=Math.max(0,sd-v);
+      const efeito=document.getElementById('evEfeito').value;
+      const ps=PARCS.filter(p=>p.financiamento_id===f.id && !p.pago).sort((a,b)=>a.numero-b.numero);
+      let manter=ps.length;
+      if(efeito==='prazo'){ const am=(+ps[0].amortizacao)||1; manter=Math.max(1,Math.ceil(novo/am)); }
+      const r=reprojetar(f,novo,manter);
+      for(const L of r.linhas){
+        await fetch(SB+'/rest/v1/parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
+          body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
+      }
+      for(const p of r.sobrando){   // parcelas que deixaram de existir
+        await fetch(SB+'/rest/v1/parcelas?id=eq.'+p.id,{method:'DELETE',headers:SBH});
+      }
+      await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:novo})});
+      if(conta){
+        const gid=Date.now();
+        await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
+          id:gid,type:'expense',amount:v,date:data,payee:f.nome+' — amortização extraordinária',
+          payee_display:f.nome+' — amortização extraordinária',account:conta,category:'transferencia',subcategory:null,
+          memo:'Reduz '+(efeito==='prazo'?'prazo':'parcela'),is_deductible:false,receipt_status:'na',
+          installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:false})});
+      }
+      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
+        financiamento_id:f.id,data:data,tipo:'amortizacao',valor:v,efeito:efeito,conta_id:conta||null,
+        memo:'Saldo '+sd.toFixed(2)+' → '+novo.toFixed(2)})});
+      toast('✓ Amortização registrada','var(--green)','#0d0f14');
+
+    } else if(_evTipo==='carencia'){
+      const m=parseInt(document.getElementById('evMeses').value)||0;
+      const cap=document.getElementById('evJuros').value==='capitaliza';
+      if(!m){ toast('⚠ Informe os meses','#fbbf24','#0d0f14'); return; }
+      const i=Math.pow(1+(+f.taxa_anual)/100,1/12)-1;
+      const novo= cap ? +(sd*Math.pow(1+i,m)).toFixed(2) : sd;
+      const ps=PARCS.filter(p=>p.financiamento_id===f.id && !p.pago).sort((a,b)=>a.numero-b.numero);
+      for(const p of ps){          // empurra os vencimentos
+        const d=new Date(p.vencimento+'T12:00'); d.setMonth(d.getMonth()+m);
+        await fetch(SB+'/rest/v1/parcelas?id=eq.'+p.id,{method:'PATCH',headers:SBH,
+          body:JSON.stringify({vencimento:d.toISOString().slice(0,10)})});
+      }
+      if(cap){
+        const r=reprojetar(f,novo,null);
+        for(const L of r.linhas) await fetch(SB+'/rest/v1/parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
+          body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
+        await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:novo})});
+      }
+      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
+        financiamento_id:f.id,data:data,tipo:'carencia',meses:m,valor:novo-sd,
+        memo:m+' meses · juros '+(cap?'capitalizados':'pagos')})});
+      toast('✓ Carência de '+m+' meses registrada','var(--green)','#0d0f14');
+
+    } else {
+      const v=parseFloat(document.getElementById('evValor').value)||0;
+      if(!v){ toast('⚠ Informe o saldo','#fbbf24','#0d0f14'); return; }
+      const r=reprojetar(f,v,null);
+      for(const L of r.linhas) await fetch(SB+'/rest/v1/parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
+      await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:v})});
+      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
+        financiamento_id:f.id,data:data,tipo:'ajuste_saldo',valor:v,memo:'Calculado '+sd.toFixed(2)+' → extrato '+v.toFixed(2)})});
+      toast('✓ Saldo ajustado','var(--green)','#0d0f14');
+    }
+    fecharEvento(); await carregar();
+  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
+}
 
 // ---------- Pagamento ----------
 let _pgParc=null;
