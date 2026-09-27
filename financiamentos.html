@@ -123,7 +123,6 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 </header>
 
 <div class="main">
-  <div id="schemaAviso" class="card" style="display:none;border:1px solid var(--yellow);font-size:12px;line-height:1.6"></div>
   <div class="kpis">
     <div class="kpi"><div class="kpi-l">Saldo devedor</div><div class="kpi-v" id="kSaldo">—</div></div>
     <div class="kpi"><div class="kpi-l">Já amortizado</div><div class="kpi-v" id="kAmort">—</div></div>
@@ -275,7 +274,7 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.26-a';
+const APP_VERSION='v2026.09.26-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Chamada ao Supabase com erro legivel ----------
@@ -296,73 +295,21 @@ async function sbCall(path, opts){
   return t ? JSON.parse(t) : null;
 }
 
-// ---------- Conferencia do esquema do banco ----------
-// Esta versao usa coisas que podem nao existir no banco ainda.
-const SQL_MIGRACAO = `-- Finanças JR · migração do módulo de financiamentos (v2026.09.26-a)
--- Rode tudo de uma vez. É seguro rodar mais de uma vez.
-
-alter table public.financiamentos add column if not exists taxa_mip numeric;
-
-do $$
-declare tipo_id text;
-begin
-  select format_type(a.atttypid, a.atttypmod) into tipo_id
-    from pg_attribute a
-   where a.attrelid = 'public.financiamentos'::regclass
-     and a.attname  = 'id' and a.attnum > 0;
-  execute format($f$
-    create table if not exists public.fin_eventos (
-      id               bigserial primary key,
-      financiamento_id %s references public.financiamentos(id) on delete cascade,
-      data             date not null,
-      tipo             text not null,
-      valor            numeric,
-      meses            integer,
-      efeito           text,
-      conta_id         text,
-      memo             text,
-      created_at       timestamptz default now()
-    )$f$, tipo_id);
-end $$;
-
-create index if not exists fin_eventos_fin_idx on public.fin_eventos(financiamento_id);
-
-alter table public.fin_eventos enable row level security;
-drop policy if exists fin_eventos_anon on public.fin_eventos;
-create policy fin_eventos_anon on public.fin_eventos
-  for all to anon using (true) with check (true);
-
-grant all on public.fin_eventos to anon;
-grant usage, select on all sequences in schema public to anon;`;
-
-async function verificarEsquema(){
-  const falta=[];
-  try{ const r=await fetch(SB+'/rest/v1/financiamentos?select=taxa_mip&limit=1',{headers:SBH});
-       if(!r.ok) falta.push('a coluna <b>taxa_mip</b> na tabela financiamentos'); }catch(_){}
-  try{ const r=await fetch(SB+'/rest/v1/fin_eventos?select=id&limit=1',{headers:SBH});
-       if(!r.ok) falta.push('a tabela <b>fin_eventos</b>'); }catch(_){}
-  const box=document.getElementById('schemaAviso');
-  if(!box) return !falta.length;
-  if(!falta.length){ box.style.display='none'; return true; }
-  box.style.display='block';
-  box.innerHTML='<div style="font-weight:600;margin-bottom:6px">⚠ O banco está atrás do app</div>'
-    +'Falta '+falta.join(' e ')+'. Sem isso o botão “Criar financiamento” falha e os eventos não são gravados.'
-    +'<div style="margin:8px 0 6px">Abra o Supabase → <b>SQL Editor</b> → <b>New query</b>, cole o bloco abaixo, clique em <b>Run</b> e recarregue esta página.</div>'
-    +'<textarea id="schemaSql" readonly style="width:100%;height:120px;font-family:ui-monospace,monospace;font-size:11px;'
-    +'background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></textarea>'
-    +'<button class="btn" style="margin-top:8px" onclick="copiarSql()">📋 Copiar SQL</button>';
-  document.getElementById('schemaSql').value=SQL_MIGRACAO;
-  return false;
-}
-function copiarSql(){
-  const t=document.getElementById('schemaSql');
-  t.select(); t.setSelectionRange(0,999999);
-  try{ document.execCommand('copy'); }catch(_){}
-  if(navigator.clipboard) navigator.clipboard.writeText(SQL_MIGRACAO).catch(()=>{});
-  toast('✓ SQL copiado','var(--green)','#0d0f14');
+// ---------- MIP: taxa recuperada das proprias parcelas ----------
+// O MIP em % nao precisa de coluna propria: cada parcela ja guarda o seguro
+// do mes (parte fixa + MIP sobre o saldo). Daqui volta-se a taxa.
+function mipDe(fin){
+  if(fin && fin.taxa_mip!=null && +fin.taxa_mip) return +fin.taxa_mip;   // se a coluna existir, usa
+  const ps=PARCS.filter(p=>p.financiamento_id===fin.id).sort((a,b)=>a.numero-b.numero);
+  const fixo=+fin.seguro_mensal||0;
+  for(const p of ps){
+    const saldoAntes=(+p.saldo_apos||0)+(+p.amortizacao||0);
+    const variavel=(+p.seguro||0)-fixo;
+    if(saldoAntes>0 && variavel>0.005) return variavel/saldoAntes*100;
+  }
+  return 0;
 }
 
-// Erro que fica na tela, em vez de sumir com o toast em 3 segundos
 function mostrarErroFin(e){
   const msg=(e && e.message) ? e.message : String(e);
   const el=document.getElementById('fPrev');
@@ -453,7 +400,6 @@ async function carregar(){
     PARCS = await sbGet('parcelas','order=numero.asc&limit=5000');
     if(!CONTAS.length) CONTAS = await sbGet('contas','select=id,nome,tipo&order=ordem.asc');
     render();
-    verificarEsquema();
   }catch(e){ document.getElementById('lista').innerHTML='<div class="card" style="color:var(--red)">Erro: '+e.message+'</div>'; }
 }
 
@@ -563,7 +509,7 @@ async function salvarFin(){
       body:JSON.stringify({nome:c.nome,tipo:c.tipo,instituicao:c.instituicao,valor_financiado:c.valor,
         data_contrato:c.dataContrato,prazo_meses:c.prazo,taxa_anual:c.taxaAnual,sistema:c.sistema,
         indexador:c.indexador,dia_vencimento:c.dia,conta_id:c.conta,seguro_mensal:c.seguro,
-        taxa_admin:c.admin,taxa_mip:c.mip||null,saldo_devedor:(and&&saldoReal?saldoReal:c.valor),ativo:true})});
+        taxa_admin:c.admin,saldo_devedor:(and&&saldoReal?saldoReal:c.valor),ativo:true})});
     const fin=Array.isArray(ins)?ins[0]:ins;
     if(!fin||!fin.id) throw new Error('o banco aceitou o registro mas não devolveu o id');
     finId=fin.id;
@@ -583,7 +529,6 @@ async function salvarFin(){
       }catch(_){}
     }
     mostrarErroFin(e);
-    verificarEsquema();
   }
 }
 
@@ -628,7 +573,9 @@ function render(){
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">'
       +'<div><div style="font-size:15px;font-weight:600">'+f.nome+'</div>'
       +'<div class="sub">'+(f.instituicao||'')+' · '+(f.sistema==='sac'?'SAC':'Price')+' · '+f.taxa_anual+'% a.a.'
-      +(f.indexador?' + '+f.indexador.toUpperCase():'')+' · '+f.prazo_meses+'x</div></div>'
+      +(f.indexador?' + '+f.indexador.toUpperCase():'')+' · '+f.prazo_meses+'x'
+      +(mipDe(f)? ' · MIP '+mipDe(f).toFixed(4).replace('.',',')+'%' : '')
+      +((+f.seguro_mensal)? ' · seguro fixo R$ '+fmt(f.seguro_mensal) : '')+'</div></div>'
       +'<div style="text-align:right"><div class="sub">saldo devedor</div>'
       +'<div style="font-family:\'DM Serif Display\',serif;font-size:20px;color:var(--red)">R$ '+fmt(sd)+'</div></div></div>'
       +'<div class="bar"><i style="width:'+pctPago.toFixed(1)+'%"></i></div>'
@@ -688,6 +635,7 @@ function fecharEvento(){ document.getElementById('evModal').style.display='none'
 // Recalcula as parcelas em aberto a partir de um novo saldo
 function reprojetar(fin, novoSaldo, novoPrazo){
   const i=Math.pow(1+(+fin.taxa_anual)/100,1/12)-1;
+  const mip=mipDe(fin);
   const ps=PARCS.filter(p=>p.financiamento_id===fin.id && !p.pago).sort((a,b)=>a.numero-b.numero);
   const n=novoPrazo||ps.length;
   const usar=ps.slice(0,n);
@@ -697,7 +645,7 @@ function reprojetar(fin, novoSaldo, novoPrazo){
   usar.forEach(p=>{
     const juros=saldo*i;
     const amort = fin.sistema==='price' ? (parcPrice-juros) : (novoSaldo/n);
-    const seg=+((+fin.seguro_mensal||0)+(fin.taxa_mip? saldo*(+fin.taxa_mip/100) : 0)).toFixed(2);
+    const seg=+((+fin.seguro_mensal||0)+(mip? saldo*(mip/100) : 0)).toFixed(2);
     saldo-=amort;
     out.push({id:p.id, juros:+juros.toFixed(2), amortizacao:+amort.toFixed(2), seguro:seg,
       valor_previsto:+(juros+amort+seg+(+fin.taxa_admin||0)).toFixed(2), saldo_apos:+Math.max(0,saldo).toFixed(2)});
@@ -748,18 +696,20 @@ function calcEvento(){
   }
 }
 
+// Registra o historico do evento no memo da parcela afetada (sem tabela nova)
+async function anotarParcela(id, texto){
+  const p=PARCS.find(x=>String(x.id)===String(id));
+  const antes=(p && p.memo) ? p.memo+' · ' : '';
+  await sbCall('parcelas?id=eq.'+id,{method:'PATCH',headers:SBH,
+    body:JSON.stringify({memo:(antes+texto).slice(0,500)})});
+}
+
 async function salvarEvento(){
   if(!_evFin) return;
   const f=_evFin, sd=f._saldo;
   const data=document.getElementById('evData').value;
   const conta=document.getElementById('evConta').value;
   if(!data){ toast('⚠ Informe a data','#fbbf24','#0d0f14'); return; }
-  // um evento mexe em varias parcelas: se o banco nao estiver pronto, nao comeca
-  try{
-    const chk=await fetch(SB+'/rest/v1/fin_eventos?select=id&limit=1',{headers:SBH});
-    if(!chk.ok){ fecharEvento(); await verificarEsquema();
-      toast('⚠ O banco precisa da tabela fin_eventos — veja o aviso no topo','#fbbf24','#0d0f14'); return; }
-  }catch(_){}
   try{
     if(_evTipo==='amortizacao'){
       const v=parseFloat(document.getElementById('evValor').value)||0;
@@ -786,9 +736,10 @@ async function salvarEvento(){
           memo:'Reduz '+(efeito==='prazo'?'prazo':'parcela'),is_deductible:false,receipt_status:'na',
           installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:false})});
       }
-      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
-        financiamento_id:f.id,data:data,tipo:'amortizacao',valor:v,efeito:efeito,conta_id:conta||null,
-        memo:'Saldo '+sd.toFixed(2)+' → '+novo.toFixed(2)})});
+      // o historico do evento fica na propria parcela, visivel na tabela
+      if(r.linhas.length) await anotarParcela(r.linhas[0].id,
+        'Amortização extraordinária de R$ '+fmt(v)+' em '+fmtDate(data)+' — reduziu '
+        +(efeito==='prazo'?'o prazo':'a parcela')+' · saldo R$ '+fmt(sd)+' → R$ '+fmt(novo));
       toast('✓ Amortização registrada','var(--green)','#0d0f14');
 
     } else if(_evTipo==='carencia'){
@@ -809,9 +760,9 @@ async function salvarEvento(){
           body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
         await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:novo})});
       }
-      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
-        financiamento_id:f.id,data:data,tipo:'carencia',meses:m,valor:novo-sd,
-        memo:m+' meses · juros '+(cap?'capitalizados':'pagos')})});
+      if(ps.length) await anotarParcela(ps[0].id,
+        'Carência de '+m+(m>1?' meses':' mês')+' a partir de '+fmtDate(data)+' — juros '
+        +(cap?'capitalizados: saldo R$ '+fmt(sd)+' → R$ '+fmt(novo):'pagos no período'));
       toast('✓ Carência de '+m+' meses registrada','var(--green)','#0d0f14');
 
     } else {
@@ -821,8 +772,8 @@ async function salvarEvento(){
       for(const L of r.linhas) await fetch(SB+'/rest/v1/parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
         body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
       await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:v})});
-      await fetch(SB+'/rest/v1/fin_eventos',{method:'POST',headers:SBH,body:JSON.stringify({
-        financiamento_id:f.id,data:data,tipo:'ajuste_saldo',valor:v,memo:'Calculado '+sd.toFixed(2)+' → extrato '+v.toFixed(2)})});
+      if(r.linhas.length) await anotarParcela(r.linhas[0].id,
+        'Saldo ajustado pelo extrato em '+fmtDate(data)+' — calculado R$ '+fmt(sd)+' → extrato R$ '+fmt(v));
       toast('✓ Saldo ajustado','var(--green)','#0d0f14');
     }
     fecharEvento(); await carregar();
