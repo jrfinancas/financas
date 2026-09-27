@@ -123,6 +123,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 </header>
 
 <div class="main">
+  <div id="schemaAviso" class="card" style="display:none;border:1px solid var(--yellow);font-size:12px;line-height:1.6"></div>
   <div class="kpis">
     <div class="kpi"><div class="kpi-l">Saldo devedor</div><div class="kpi-v" id="kSaldo">—</div></div>
     <div class="kpi"><div class="kpi-l">Já amortizado</div><div class="kpi-v" id="kAmort">—</div></div>
@@ -274,8 +275,102 @@ const SB='https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 const SBH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
 const SALT='jrfinancas_2026';const AUTH='jr_auth_v3';
-const APP_VERSION='v2026.09.23-a';
+const APP_VERSION='v2026.09.26-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
+
+// ---------- Chamada ao Supabase com erro legivel ----------
+// Sem isso, um erro do banco (coluna faltando, por ex.) virava "undefined"
+async function sbCall(path, opts){
+  const r = await fetch(SB+'/rest/v1/'+path, opts);
+  if(!r.ok){
+    let msg = 'HTTP '+r.status;
+    try{
+      const j = await r.json();
+      msg = j.message || msg;
+      if(j.details) msg += ' · ' + j.details;
+      if(j.hint)    msg += ' · ' + j.hint;
+    }catch(_){ try{ const t=await r.text(); if(t) msg += ' · '+t.slice(0,200); }catch(__){} }
+    throw new Error(msg);
+  }
+  const t = await r.text();
+  return t ? JSON.parse(t) : null;
+}
+
+// ---------- Conferencia do esquema do banco ----------
+// Esta versao usa coisas que podem nao existir no banco ainda.
+const SQL_MIGRACAO = `-- Finanças JR · migração do módulo de financiamentos (v2026.09.26-a)
+-- Rode tudo de uma vez. É seguro rodar mais de uma vez.
+
+alter table public.financiamentos add column if not exists taxa_mip numeric;
+
+do $$
+declare tipo_id text;
+begin
+  select format_type(a.atttypid, a.atttypmod) into tipo_id
+    from pg_attribute a
+   where a.attrelid = 'public.financiamentos'::regclass
+     and a.attname  = 'id' and a.attnum > 0;
+  execute format($f$
+    create table if not exists public.fin_eventos (
+      id               bigserial primary key,
+      financiamento_id %s references public.financiamentos(id) on delete cascade,
+      data             date not null,
+      tipo             text not null,
+      valor            numeric,
+      meses            integer,
+      efeito           text,
+      conta_id         text,
+      memo             text,
+      created_at       timestamptz default now()
+    )$f$, tipo_id);
+end $$;
+
+create index if not exists fin_eventos_fin_idx on public.fin_eventos(financiamento_id);
+
+alter table public.fin_eventos enable row level security;
+drop policy if exists fin_eventos_anon on public.fin_eventos;
+create policy fin_eventos_anon on public.fin_eventos
+  for all to anon using (true) with check (true);
+
+grant all on public.fin_eventos to anon;
+grant usage, select on all sequences in schema public to anon;`;
+
+async function verificarEsquema(){
+  const falta=[];
+  try{ const r=await fetch(SB+'/rest/v1/financiamentos?select=taxa_mip&limit=1',{headers:SBH});
+       if(!r.ok) falta.push('a coluna <b>taxa_mip</b> na tabela financiamentos'); }catch(_){}
+  try{ const r=await fetch(SB+'/rest/v1/fin_eventos?select=id&limit=1',{headers:SBH});
+       if(!r.ok) falta.push('a tabela <b>fin_eventos</b>'); }catch(_){}
+  const box=document.getElementById('schemaAviso');
+  if(!box) return !falta.length;
+  if(!falta.length){ box.style.display='none'; return true; }
+  box.style.display='block';
+  box.innerHTML='<div style="font-weight:600;margin-bottom:6px">⚠ O banco está atrás do app</div>'
+    +'Falta '+falta.join(' e ')+'. Sem isso o botão “Criar financiamento” falha e os eventos não são gravados.'
+    +'<div style="margin:8px 0 6px">Abra o Supabase → <b>SQL Editor</b> → <b>New query</b>, cole o bloco abaixo, clique em <b>Run</b> e recarregue esta página.</div>'
+    +'<textarea id="schemaSql" readonly style="width:100%;height:120px;font-family:ui-monospace,monospace;font-size:11px;'
+    +'background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px"></textarea>'
+    +'<button class="btn" style="margin-top:8px" onclick="copiarSql()">📋 Copiar SQL</button>';
+  document.getElementById('schemaSql').value=SQL_MIGRACAO;
+  return false;
+}
+function copiarSql(){
+  const t=document.getElementById('schemaSql');
+  t.select(); t.setSelectionRange(0,999999);
+  try{ document.execCommand('copy'); }catch(_){}
+  if(navigator.clipboard) navigator.clipboard.writeText(SQL_MIGRACAO).catch(()=>{});
+  toast('✓ SQL copiado','var(--green)','#0d0f14');
+}
+
+// Erro que fica na tela, em vez de sumir com o toast em 3 segundos
+function mostrarErroFin(e){
+  const msg=(e && e.message) ? e.message : String(e);
+  const el=document.getElementById('fPrev');
+  if(el) el.innerHTML='<div style="color:var(--red);font-weight:600;margin-bottom:4px">✕ Não salvou</div>'
+    +'<div style="color:var(--red)">'+msg.replace(/</g,'&lt;')+'</div>'
+    +'<div class="sub" style="margin-top:6px">Nada ficou gravado pela metade. Corrija e clique em criar de novo.</div>';
+  toast('✕ Não salvou — veja o detalhe no formulário','var(--red)','white');
+}
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
 const BIOKEY='jr_bio_cred';
@@ -358,6 +453,7 @@ async function carregar(){
     PARCS = await sbGet('parcelas','order=numero.asc&limit=5000');
     if(!CONTAS.length) CONTAS = await sbGet('contas','select=id,nome,tipo&order=ordem.asc');
     render();
+    verificarEsquema();
   }catch(e){ document.getElementById('lista').innerHTML='<div class="card" style="color:var(--red)">Erro: '+e.message+'</div>'; }
 }
 
@@ -461,21 +557,34 @@ async function salvarFin(){
     t=recalibrar(t,pagas,saldoReal,c);
     for(let k=0;k<pagas && k<t.length;k++){ t[k].pago=true; t[k].memo='Paga antes do controle no app'; }
   }
+  let finId=null;
   try{
-    const r=await fetch(SB+'/rest/v1/financiamentos',{method:'POST',headers:{...SBH,'Prefer':'return=representation'},
+    const ins=await sbCall('financiamentos',{method:'POST',headers:{...SBH,'Prefer':'return=representation'},
       body:JSON.stringify({nome:c.nome,tipo:c.tipo,instituicao:c.instituicao,valor_financiado:c.valor,
         data_contrato:c.dataContrato,prazo_meses:c.prazo,taxa_anual:c.taxaAnual,sistema:c.sistema,
         indexador:c.indexador,dia_vencimento:c.dia,conta_id:c.conta,seguro_mensal:c.seguro,
         taxa_admin:c.admin,taxa_mip:c.mip||null,saldo_devedor:(and&&saldoReal?saldoReal:c.valor),ativo:true})});
-    const fin=(await r.json())[0];
+    const fin=Array.isArray(ins)?ins[0]:ins;
+    if(!fin||!fin.id) throw new Error('o banco aceitou o registro mas não devolveu o id');
+    finId=fin.id;
     // grava as parcelas em lotes
     for(let k=0;k<t.length;k+=200){
-      await fetch(SB+'/rest/v1/parcelas',{method:'POST',headers:SBH,
-        body:JSON.stringify(t.slice(k,k+200).map(x=>({...x,financiamento_id:fin.id})))});
+      await sbCall('parcelas',{method:'POST',headers:SBH,
+        body:JSON.stringify(t.slice(k,k+200).map(x=>({...x,financiamento_id:finId})))});
     }
     toast('✓ Financiamento criado com '+t.length+' parcelas','var(--green)','#0d0f14');
     toggleForm(); await carregar();
-  }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
+  }catch(e){
+    // desfaz para nao sobrar financiamento sem parcelas nem duplicata na proxima tentativa
+    if(finId){
+      try{
+        await fetch(SB+'/rest/v1/parcelas?financiamento_id=eq.'+finId,{method:'DELETE',headers:SBH});
+        await fetch(SB+'/rest/v1/financiamentos?id=eq.'+finId,{method:'DELETE',headers:SBH});
+      }catch(_){}
+    }
+    mostrarErroFin(e);
+    verificarEsquema();
+  }
 }
 
 function toggleForm(){
@@ -645,6 +754,12 @@ async function salvarEvento(){
   const data=document.getElementById('evData').value;
   const conta=document.getElementById('evConta').value;
   if(!data){ toast('⚠ Informe a data','#fbbf24','#0d0f14'); return; }
+  // um evento mexe em varias parcelas: se o banco nao estiver pronto, nao comeca
+  try{
+    const chk=await fetch(SB+'/rest/v1/fin_eventos?select=id&limit=1',{headers:SBH});
+    if(!chk.ok){ fecharEvento(); await verificarEsquema();
+      toast('⚠ O banco precisa da tabela fin_eventos — veja o aviso no topo','#fbbf24','#0d0f14'); return; }
+  }catch(_){}
   try{
     if(_evTipo==='amortizacao'){
       const v=parseFloat(document.getElementById('evValor').value)||0;
