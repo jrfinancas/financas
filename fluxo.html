@@ -159,7 +159,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.03-c';
+const APP_VERSION='v2026.10.03-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -278,8 +278,10 @@ async function loginOutraConta(){
 
 async function checkAuth(){
   try{ if(typeof checkReset==='function' && checkReset()){ showLogin(); return; } }catch(e){}
-  try{ if(JRAuth.bioHabilitado() && bioSupported() && bioEnabled()){ showLogin(); return; } }catch(e){}
-  if(await JRAuth.pronto()){ hideLogin(); startApp(); } else showLogin();
+  // Sessão viva (retomada da aba) entra direto. Só pede destrave quando
+  // não há sessão — senão trocar de módulo pediria PIN a cada clique.
+  if(await JRAuth.pronto()){ hideLogin(); startApp(); return; }
+  showLogin();
 }
 
 

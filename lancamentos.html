@@ -1288,7 +1288,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.03-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.03-d';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1447,8 +1447,10 @@ async function loginOutraConta(){
 
 async function checkAuth(){
   try{ if(typeof checkReset==='function' && checkReset()){ showLogin(); return; } }catch(e){}
-  try{ if(JRAuth.bioHabilitado() && bioSupported() && bioEnabled()){ showLogin(); return; } }catch(e){}
-  if(await JRAuth.pronto()){ hideLogin(); startApp(); } else showLogin();
+  // Sessão viva (retomada da aba) entra direto. Só pede destrave quando
+  // não há sessão — senão trocar de módulo pediria PIN a cada clique.
+  if(await JRAuth.pronto()){ hideLogin(); startApp(); return; }
+  showLogin();
 }
 
 

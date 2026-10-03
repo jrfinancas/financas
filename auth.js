@@ -2,7 +2,7 @@
    Finanças JR — auth.js
    Sessão única do Supabase, compartilhada por todas as telas.
 
-   AUTH_VERSION: v2026.10.03-a
+   AUTH_VERSION: v2026.10.03-e
 
    O que isso resolve
    ------------------
@@ -52,6 +52,7 @@ window.JRAuth = (function () {
   const K_BIO  = 'jr_k_bio';    // K embrulhado pela chave do aparelho
   const K_DEV  = 'jr_devkey';   // chave do aparelho (conveniência)
   const K_MAIL = 'jr_mail';     // e-mail, só para preencher o campo
+  const K_SESS = 'jr_sessao';   // sessão viva da ABA (sessionStorage)
   const ITER   = 210000;
 
   let _access  = null;          // access token: só em memória, nunca no disco
@@ -73,6 +74,41 @@ window.JRAuth = (function () {
       if (v === null) { localStorage.removeItem(k); return null; }
       localStorage.setItem(k, v); return v;
     } catch (e) { return null; }      // navegação privada / storage bloqueado
+  }
+
+  /* ---------- sessão viva da aba ----------
+     O app são páginas separadas: trocar de módulo recarrega a página e
+     zeraria a sessão em memória, obrigando a destravar a cada clique.
+     A sessão fica no sessionStorage, que sobrevive à navegação e aos
+     recarregamentos DA ABA e é descartado quando a aba fecha.
+     Compromisso assumido: enquanto a aba está aberta, o refresh token
+     fica legível ali. Fechou a aba ou o navegador, exige PIN ou Face ID
+     de novo. O que fica guardado em disco (localStorage) continua
+     cifrado, como antes.                                              */
+  function ss(k, v) {
+    try {
+      if (v === undefined) return sessionStorage.getItem(k);
+      if (v === null) { sessionStorage.removeItem(k); return null; }
+      sessionStorage.setItem(k, v); return v;
+    } catch (e) { return null; }
+  }
+
+  function salvaSessaoDaAba() {
+    if (!_access) return;
+    ss(K_SESS, JSON.stringify({ a: _access, e: _exp, r: _refresh || null }));
+  }
+
+  function restauraSessaoDaAba() {
+    const raw = ss(K_SESS);
+    if (!raw) return false;
+    try {
+      const o = JSON.parse(raw);
+      if (!o || !o.a) return false;
+      _access = o.a; _exp = o.e || 0; _refresh = o.r || null;
+      // expirado e sem refresh: não serve de nada
+      if (!temSessao() && !_refresh) { ss(K_SESS, null); _access=null; _exp=0; return false; }
+      return true;
+    } catch (e) { ss(K_SESS, null); return false; }
   }
 
   /* ---------- camada de cifragem ---------- */
@@ -146,6 +182,7 @@ window.JRAuth = (function () {
     _access  = j.access_token;
     _refresh = j.refresh_token || _refresh;
     _exp     = Math.floor(Date.now() / 1000) + (j.expires_in || 3600);
+    salvaSessaoDaAba();
     return j;
   }
 
@@ -168,6 +205,22 @@ window.JRAuth = (function () {
   function token()       { return _access; }
   function bioHabilitado() { return !!(ls(K_BIO) && ls(K_DEV) && ls(K_RT)); }
 
+  // O refresh token guardado pode ter sido revogado do outro lado (logout
+  // global, troca de senha, sessão expirada no servidor). Nesse caso não
+  // adianta insistir: o vínculo deste aparelho morreu e é preciso entrar
+  // com e-mail e senha de novo.
+  function ehTokenMorto(e) {
+    const m = String((e && e.message) || e).toLowerCase();
+    return m.includes('refresh token') || m.includes('refresh_token_not_found')
+        || m.includes('invalid grant') || m.includes('session') && m.includes('not found');
+  }
+
+  function limpaVinculo() {
+    _access = null; _refresh = null; _K = null; _exp = 0;
+    ls(K_RT, null); ls(K_PIN, null); ls(K_BIO, null); ls(K_DEV, null);
+    ss(K_SESS, null);
+  }
+
   function renovar() {
     if (_renovando) return _renovando;
     if (!_refresh) return Promise.reject(new Error('sem refresh token'));
@@ -180,7 +233,10 @@ window.JRAuth = (function () {
   // Garante token válido antes de uma chamada ao banco.
   async function pronto() {
     if (temSessao()) return true;
-    if (_refresh) { try { await renovar(); return true; } catch (e) {} }
+    if (_refresh) {
+      try { await renovar(); return true; }
+      catch (e) { if (ehTokenMorto(e)) limpaVinculo(); }
+    }
     return false;
   }
 
@@ -208,7 +264,12 @@ window.JRAuth = (function () {
     try { _K = await desembrulhaK(pin, wk); }
     catch (e) { throw new Error('PIN incorreto'); }
     _refresh = await decifraCom(_K, rt);
-    await renovar();                 // já regrava o jr_rt rotacionado
+    try { await renovar(); }         // já regrava o jr_rt rotacionado
+    catch (e) {
+      if (ehTokenMorto(e)) { limpaVinculo();
+        throw new Error('A sessão deste aparelho expirou. Entre com e-mail e senha de novo.'); }
+      throw e;
+    }
     return true;
   }
 
@@ -226,15 +287,24 @@ window.JRAuth = (function () {
     if (!wk || !dk || !rt) throw new Error('Face ID não está habilitado neste aparelho');
     _K = await desembrulhaK(dk, wk);
     _refresh = await decifraCom(_K, rt);
-    await renovar();
+    try { await renovar(); }
+    catch (e) {
+      if (ehTokenMorto(e)) { limpaVinculo();
+        throw new Error('A sessão deste aparelho expirou. Entre com e-mail e senha de novo.'); }
+      throw e;
+    }
     return true;
   }
 
   function desabilitarBio() { ls(K_BIO, null); ls(K_DEV, null); }
 
   async function sair(apagarAparelho) {
-    try { if (_access) await authPost('logout', {}, true); } catch (e) {}
+    // scope=local encerra SÓ esta sessão. O padrão do Supabase é `global`,
+    // que revoga o refresh token de TODOS os aparelhos — foi o que derrubou
+    // o celular quando o logout foi feito no laptop.
+    try { if (_access) await authPost('logout?scope=local', {}, true); } catch (e) {}
     _access = null; _refresh = null; _K = null; _exp = 0;
+    ss(K_SESS, null);
     if (apagarAparelho) { ls(K_RT, null); ls(K_PIN, null); ls(K_BIO, null); ls(K_DEV, null); }
   }
 
@@ -245,12 +315,16 @@ window.JRAuth = (function () {
     return r.ok ? r.json() : null;
   }
 
+  // Ao carregar a página, tenta retomar a sessão da aba antes de
+  // qualquer coisa: é o que permite trocar de módulo sem destravar.
+  restauraSessaoDaAba();
+
   return {
     SB, KEY, headers, token, pronto, renovar,
     temSessao, temCadastro, emailSalvo,
     entrarComSenha, entrarComPin, definirPin,
     habilitarBio, entrarComBio, bioHabilitado, desabilitarBio,
     sair, quemSou,
-    VERSION: 'v2026.10.03-a'
+    VERSION: 'v2026.10.03-e'
   };
 })();
