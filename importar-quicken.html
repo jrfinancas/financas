@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script src="auth.js"></script>
 <script>
 // Ao ABRIR o app numa nova sessao, comeca sempre pela tela de inicio.
 // Navegacao dentro da mesma sessao continua normal.
@@ -165,7 +166,9 @@ nav a:hover { background:var(--surface2); color:var(--accent); }
 
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const SBH = { 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json', 'Prefer':'return=representation' };
+const SBH = {'apikey':KEY,
+  get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
+  'Content-Type':'application/json','Prefer':'return=representation'};
 
 // ============================================================
 // CATEGORY MAPPING (Quicken → Finanças JR)
@@ -510,6 +513,10 @@ function showResult(ok, title, detail) {
   document.getElementById('resultDetail').textContent=detail;
   box.scrollIntoView({behavior:'smooth'});
 }
+</script>
+<script>
+// Tela sem login próprio: o auth.js injeta o dele e só libera com sessão.
+document.addEventListener('DOMContentLoaded',function(){ JRAuth.protege(function(){}); });
 </script>
 </body>
 </html>

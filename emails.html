@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+<script src="auth.js"></script>
 <script>
 'use strict';
 // ============================================================
@@ -151,8 +152,12 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.03-a';
-document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;try{loadContasCache();}catch(err){}});
+var APP_VERSION='v2026.10.03-f';
+document.addEventListener('DOMContentLoaded',function(){
+  var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
+  // Esta tela não tinha login próprio; o auth.js injeta o dele.
+  JRAuth.protege(function(){ try{loadContasCache();}catch(err){} });
+});
 var WORKER = 'https://financas-jr-emails.agente-x79.workers.dev';
 var SB = 'https://tggtktjblunlbsjbhlls.supabase.co';
 var ANON = [
@@ -160,7 +165,11 @@ var ANON = [
   'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0',
   'POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o'
 ].join('.');
-var SBH = {apikey:ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json'};
+// SBH com getter: as chamadas passam a levar o token da sessão.
+// Sem sessão, cai na chave anon — some quando o anônimo for revogado.
+var SBH = {apikey:ANON,
+  get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||ANON); },
+  'Content-Type':'application/json'};
 var GOOGLE_CLIENT_ID = '218884036084-nl08fa9t7t3tqo7es0m1ao97e6ohc709.apps.googleusercontent.com';
 var REDIRECT = 'https://jrfinancas.github.io/financas/emails.html';
 var TOKEN_KEY = 'jr_gmail_tokens_v1';

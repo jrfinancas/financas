@@ -2,7 +2,7 @@
    Finanças JR — auth.js
    Sessão única do Supabase, compartilhada por todas as telas.
 
-   AUTH_VERSION: v2026.10.03-e
+   AUTH_VERSION: v2026.10.03-f
 
    O que isso resolve
    ------------------
@@ -315,6 +315,142 @@ window.JRAuth = (function () {
     return r.ok ? r.json() : null;
   }
 
+
+  /* ---------- tela de login embutida ----------
+     As telas antigas trazem o próprio overlay no HTML. As que não trazem
+     (index, emails, importar-quicken) usam este, injetado daqui: estilos
+     próprios, sem depender do CSS da página. É o padrão para telas novas. */
+
+  const CSS_LOGIN = `
+#jrLogin{position:fixed;inset:0;z-index:99999;display:none;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px;
+  background:var(--bg,#0d0f14);color:var(--text,#e8eaf0);
+  font-family:'DM Sans',system-ui,sans-serif}
+#jrLogin .jl{font-family:'DM Serif Display',Georgia,serif;font-size:36px;letter-spacing:-1px;margin-bottom:6px}
+#jrLogin .jl span{color:var(--accent,#4f8ef7)}
+#jrLogin .js{font-size:13px;color:var(--muted,#6b7280);margin-bottom:44px}
+#jrLogin .jb{width:100%;max-width:320px}
+#jrLogin label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted,#6b7280);margin-bottom:8px;display:block}
+#jrLogin input{width:100%;background:var(--surface,#13161e);border:1.5px solid var(--border,#252a38);
+  border-radius:14px;padding:14px;color:var(--text,#e8eaf0);font-family:inherit;font-size:22px;
+  outline:none;text-align:center;letter-spacing:6px;margin-bottom:10px;-webkit-appearance:none}
+#jrLogin input.txt{font-size:14px;text-align:left;letter-spacing:0}
+#jrLogin input:focus{border-color:var(--accent,#4f8ef7)}
+#jrLogin input.err{border-color:var(--red,#f87171);animation:jrshake .3s}
+@keyframes jrshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+#jrLogin button{width:100%;padding:14px;background:var(--accent,#4f8ef7);color:#fff;border:none;
+  border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+#jrLogin button.alt{background:rgba(79,142,247,.12);color:var(--accent,#4f8ef7);
+  border:1px solid rgba(79,142,247,.3)}
+#jrLogin .jerr{color:var(--red,#f87171);font-size:12px;text-align:center;min-height:18px;margin-bottom:8px}
+#jrLogin .jhint{font-size:11px;color:var(--muted,#6b7280);text-align:center;line-height:1.5;margin-top:8px}
+#jrLogin a{color:var(--accent,#4f8ef7);text-decoration:none}`;
+
+  const HTML_LOGIN = `
+<div class="jl">Finanças <span>JR</span></div>
+<div class="js">Gestão Financeira Pessoal</div>
+<div class="jb">
+  <div id="jrNovo" style="display:none">
+    <label>E-mail</label>
+    <input type="email" class="txt" id="jrMail" autocomplete="username" placeholder="seu@email.com">
+    <label style="margin-top:10px">Senha</label>
+    <input type="password" class="txt" id="jrPwd" autocomplete="current-password" placeholder="••••••••">
+  </div>
+  <label id="jrPinLbl" style="margin-top:10px">PIN de acesso</label>
+  <input type="password" inputmode="numeric" maxlength="8" id="jrPin" placeholder="••••">
+  <div class="jerr" id="jrErr"></div>
+  <button id="jrEntrar">Entrar</button>
+  <button class="alt" id="jrBio" style="display:none">🔓 Entrar com Face ID / Touch ID</button>
+  <div class="jhint" id="jrHint"></div>
+</div>`;
+
+  let _aoEntrar = null;
+
+  function montaLogin() {
+    if (document.getElementById('jrLogin')) return;
+    const st = document.createElement('style'); st.textContent = CSS_LOGIN;
+    document.head.appendChild(st);
+    const ov = document.createElement('div'); ov.id = 'jrLogin'; ov.innerHTML = HTML_LOGIN;
+    document.body.appendChild(ov);
+    document.getElementById('jrEntrar').onclick = tentaEntrar;
+    document.getElementById('jrBio').onclick = tentaBio;
+    ['jrPin','jrPwd'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.onkeydown = e => { if (e.key === 'Enter') tentaEntrar(); };
+    });
+  }
+
+  function mostraLogin() {
+    montaLogin();
+    const novo = !temCadastro();
+    document.getElementById('jrLogin').style.display = 'flex';
+    document.getElementById('jrNovo').style.display = novo ? 'block' : 'none';
+    document.getElementById('jrPinLbl').textContent = novo ? 'Crie um PIN para este aparelho' : 'PIN de acesso';
+    document.getElementById('jrHint').innerHTML = novo
+      ? 'Na primeira vez em cada aparelho, entre com e-mail e senha e escolha um PIN.'
+      : '<a href="#" id="jrOutra">Entrar com outra conta</a>';
+    document.getElementById('jrBio').style.display = (!novo && bioHabilitado()) ? 'block' : 'none';
+    const m = document.getElementById('jrMail'); if (m && !m.value) m.value = emailSalvo();
+    const outra = document.getElementById('jrOutra');
+    if (outra) outra.onclick = async e => { e.preventDefault(); await sair(true); mostraLogin(); };
+    setTimeout(() => { try { document.getElementById(novo ? 'jrMail' : 'jrPin').focus(); } catch (e) {} }, 100);
+  }
+
+  function escondeLogin() {
+    const ov = document.getElementById('jrLogin');
+    if (ov) ov.style.display = 'none';
+  }
+
+  function entrou() {
+    escondeLogin();
+    const f = _aoEntrar; _aoEntrar = null;
+    if (typeof f === 'function') f();
+  }
+
+  async function tentaEntrar() {
+    const err = document.getElementById('jrErr');
+    const inp = document.getElementById('jrPin');
+    const pin = (inp.value || '').trim();
+    err.textContent = '';
+    try {
+      if (!temCadastro()) {
+        const mail = (document.getElementById('jrMail').value || '').trim();
+        const senha = document.getElementById('jrPwd').value || '';
+        if (!mail || !senha) { err.textContent = 'Informe e-mail e senha.'; return; }
+        if (pin.length < 4) { err.textContent = 'Escolha um PIN de 4 a 8 dígitos.'; return; }
+        err.textContent = 'Entrando...';
+        await entrarComSenha(mail, senha, pin);
+      } else {
+        if (!pin) { err.textContent = 'Digite o PIN'; return; }
+        await entrarComPin(pin);
+      }
+      inp.value = '';
+      const pw = document.getElementById('jrPwd'); if (pw) pw.value = '';
+      entrou();
+    } catch (e) {
+      inp.classList.add('err');
+      err.textContent = e.message || 'Não foi possível entrar.';
+      inp.value = '';
+      setTimeout(() => inp.classList.remove('err'), 400);
+      if (!temCadastro()) mostraLogin();   // vínculo morreu: volta para e-mail e senha
+    }
+  }
+
+  async function tentaBio() {
+    const err = document.getElementById('jrErr');
+    try { await entrarComBio(); entrou(); }
+    catch (e) { err.textContent = e.message || 'Face ID falhou. Use o PIN.'; if (!temCadastro()) mostraLogin(); }
+  }
+
+  // Única chamada que uma tela sem login próprio precisa fazer.
+  async function protege(aoEntrar) {
+    _aoEntrar = aoEntrar;
+    if (await pronto()) { entrou(); return true; }
+    mostraLogin();
+    return false;
+  }
+
   // Ao carregar a página, tenta retomar a sessão da aba antes de
   // qualquer coisa: é o que permite trocar de módulo sem destravar.
   restauraSessaoDaAba();
@@ -325,6 +461,7 @@ window.JRAuth = (function () {
     entrarComSenha, entrarComPin, definirPin,
     habilitarBio, entrarComBio, bioHabilitado, desabilitarBio,
     sair, quemSou,
-    VERSION: 'v2026.10.03-e'
+    protege, mostraLogin, escondeLogin,
+    VERSION: 'v2026.10.03-f'
   };
 })();
