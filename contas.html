@@ -133,6 +133,8 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       O registro vale só para <b>este dispositivo</b> — repita no outro aparelho se quiser usar lá também.
       O PIN continua funcionando como alternativa.
     </div>
+    <div id="sessInfo" style="font-size:12px;line-height:1.5;padding:9px 11px;border-radius:9px;margin-bottom:12px;background:var(--surface2)">
+      <span style="color:var(--muted)">verificando a sessão...</span></div>
     <button class="bsave" id="bioToggle" style="display:none;background:rgba(79,142,247,.12);color:var(--accent);border:1px solid rgba(79,142,247,.3)"></button>
     <div id="bioUnsupported" style="display:none;font-size:12px;color:var(--yellow)">Este navegador/dispositivo não oferece Face ID ou Touch ID.</div>
   </div>
@@ -255,7 +257,7 @@ const SBH={'apikey':KEY,
 // SALT e AUTH saíram: o PIN local foi substituído por sessão real (auth.js).
 // Restos do esquema antigo são limpos uma vez, para não ficar lixo no aparelho.
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.03-b';
+const APP_VERSION='v2026.10.03-c';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -392,8 +394,27 @@ function toast(msg,bg,col){const t=document.getElementById('toast');t.textConten
 
 let contas=[];
 
+// Mostra na tela se as chamadas ao banco estão indo com a SUA sessão ou
+// com a chave anônima. Sem isso só dava para saber pelo console.
+async function mostrarSessao(){
+  const el=document.getElementById('sessInfo'); if(!el) return;
+  try{
+    const u = await JRAuth.quemSou();
+    if(u && u.email){
+      el.innerHTML='<span style="color:var(--green)">●</span> Sessão ativa — <b>'+u.email+'</b>'
+        +'<div style="color:var(--muted);margin-top:3px">As chamadas ao banco vão com o seu token.'
+        +' <a href="#" onclick="loginOutraConta();return false" style="color:var(--accent);text-decoration:none">Sair deste aparelho</a></div>';
+      return;
+    }
+  }catch(e){}
+  el.innerHTML='<span style="color:var(--yellow)">●</span> <b>Sem sessão — usando a chave anônima</b>'
+    +'<div style="color:var(--muted);margin-top:3px">Ainda funciona porque o acesso anônimo não foi revogado. '
+    +'Enquanto estiver assim, os dados seguem abertos.</div>';
+}
+
 function startApp(){
   try{refreshBioUI();}catch(e){}
+  mostrarSessao();
   buildColorGrid();
   loadContas();
 }
