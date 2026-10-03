@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head>
+<script src="auth.js"></script>
 <script>
 // Ao ABRIR o app numa nova sessao, comeca sempre pela tela de inicio.
 // Navegacao dentro da mesma sessao continua normal.
@@ -379,7 +380,13 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
   <div class="ll">Finanças <span>JR</span></div>
   <div class="ls">Gestão Financeira Pessoal</div>
   <div class="lb">
-    <label class="ll2">PIN de acesso</label>
+    <div id="loginNovoBox" style="display:none">
+      <label class="ll2">E-mail</label>
+      <input type="email" autocomplete="username" class="li" id="loginMail" placeholder="seu@email.com" style="text-align:left;letter-spacing:0;font-size:14px">
+      <label class="ll2" style="margin-top:10px">Senha</label>
+      <input type="password" autocomplete="current-password" class="li" id="loginPwd" placeholder="••••••••" style="text-align:left;letter-spacing:0;font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <label class="ll2" id="pinLbl">PIN de acesso</label>
     <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" class="li" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password">
     <div class="lerr" id="pinErr"></div>
     <button class="lbtn" onclick="doLogin()">Entrar</button>
@@ -391,7 +398,10 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <button class="rsendbtn" id="resetBtn" onclick="sendReset()">Enviar link por email</button>
       <div class="rmsg" id="resetMsg"></div>
     </div>
-    <div class="lhint" id="loginHint">Na primeira vez, defina seu PIN digitando-o aqui.</div>
+    <div class="lhint" id="loginHint"></div>
+    <div class="lhint" id="loginReset" style="display:none;margin-top:10px">
+      <a href="#" onclick="loginOutraConta();return false" style="color:var(--accent);text-decoration:none">Entrar com outra conta</a>
+    </div>
   </div>
 </div>
 
@@ -1278,13 +1288,16 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.03-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.03-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
-const SALT  = 'jrfinancas_2026';
-const AUTH  = 'jr_auth_v3';
-
-const SBH = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
+// SBH com getter: todo call site existente (headers:SBH e {...SBH}) passa a
+// mandar o token da sessão. Sem sessão, cai na chave anon — é o que mantém o
+// app de pé durante a migração.
+const SBH={'apikey':KEY,
+  get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
+  'Content-Type':'application/json','Prefer':'return=representation',};
 
 // ============================================================
 // SUPABASE HELPERS
@@ -1305,12 +1318,7 @@ function sync(s) {
 // ============================================================
 // AUTH
 // ============================================================
-async function hashPin(p) {
-  try {
-    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(p + SALT));
-    return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
-  } catch(e) { return p+'_'+SALT; }
-}
+
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
 const BIOKEY='jr_bio_cred';
@@ -1333,6 +1341,7 @@ async function bioRegister(){
     }});
     if(!cred) throw new Error('cancelado');
     localStorage.setItem(BIOKEY, b64u(cred.rawId));
+    await JRAuth.habilitarBio();
     toast('✓ Face ID / Touch ID ativado neste dispositivo','var(--green)','#0d0f14');
     refreshBioUI();
   }catch(e){ toast('Nao foi possivel ativar: '+(e.message||e.name),'#fbbf24','#0d0f14'); }
@@ -1350,7 +1359,7 @@ async function bioLogin(){
       userVerification:'required', timeout: 60000
     }});
     if(!assertion) throw new Error('cancelado');
-    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
+    await JRAuth.entrarComBio();
     hideLogin(); startApp();
   }catch(e){
     if(err) err.textContent='Falhou. Use o PIN.';
@@ -1359,6 +1368,7 @@ async function bioLogin(){
 
 function bioForget(){
   try{ localStorage.removeItem(BIOKEY); }catch(e){}
+  try{ JRAuth.desabilitarBio(); }catch(e){}
   toast('Face ID / Touch ID desativado neste dispositivo','var(--muted)','#0d0f14');
   refreshBioUI();
 }
@@ -1376,46 +1386,73 @@ function refreshBioUI(){
   }
 }
 
-function isAuth() {
-  try {
-    const s = JSON.parse(localStorage.getItem(AUTH)||'null');
-    if(!s) return false;
-    if(Date.now()-s.t > 8*3600*1000) { localStorage.removeItem(AUTH); return false; }
-    return true;
-  } catch(e) { return false; }
-}
 
-async function doLogin() {
-  const inp = document.getElementById('pinInput');
-  const err = document.getElementById('pinErr');
-  const pin = inp.value.trim();
-  if(!pin) { err.textContent='Digite o PIN'; return; }
-  const hash = await hashPin(pin);
-  const stored = localStorage.getItem('jr_pin_hash');
-  if(!stored) {
-    localStorage.setItem('jr_pin_hash', hash);
-    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
+
+// ============================================================
+// LOGIN REAL (sessão Supabase) — ver auth.js
+// ============================================================
+function primeiroAcesso(){ return !JRAuth.temCadastro(); }
+
+async function doLogin(){
+  const err=document.getElementById('pinErr');
+  const inp=document.getElementById('pinInput');
+  const pin=(inp.value||'').trim();
+  err.textContent='';
+  try{
+    if(primeiroAcesso()){
+      const mail=(document.getElementById('loginMail').value||'').trim();
+      const senha=document.getElementById('loginPwd').value||'';
+      if(!mail||!senha){ err.textContent='Informe e-mail e senha.'; return; }
+      if(pin.length<4){ err.textContent='Escolha um PIN de 4 a 8 dígitos.'; return; }
+      err.textContent='Entrando...';
+      await JRAuth.entrarComSenha(mail,senha,pin);
+    }else{
+      if(!pin){ err.textContent='Digite o PIN'; return; }
+      await JRAuth.entrarComPin(pin);
+    }
+    err.textContent=''; inp.value='';
+    const pw=document.getElementById('loginPwd'); if(pw) pw.value='';
     hideLogin(); startApp();
-  } else if(hash===stored) {
-    localStorage.setItem(AUTH, JSON.stringify({t:Date.now()}));
-    hideLogin(); startApp();
-  } else {
-    inp.classList.add('err'); err.textContent='PIN incorreto.'; inp.value='';
-    setTimeout(()=>inp.classList.remove('err'),400);
+  }catch(e){
+    inp.classList.add('err');
+    err.textContent = e.message || 'Não foi possível entrar.';
+    inp.value=''; setTimeout(()=>inp.classList.remove('err'),400);
   }
 }
 
-function showLogin() {
-  const o = document.getElementById('loginOverlay');
-  o.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  refreshBioUI();
-  if(bioSupported() && bioEnabled()){
-    setTimeout(()=>{ bioLogin(); }, 250);   // pede a face/digital direto
-  } else {
-    setTimeout(()=>{ try{ document.getElementById('pinInput').focus(); }catch(e){} },100);
-  }
+function showLogin(){
+  const ov=document.getElementById('loginOverlay');
+  ov.style.display='flex'; document.body.style.overflow='hidden';
+  const novo=primeiroAcesso();
+  const nb=document.getElementById('loginNovoBox'); if(nb) nb.style.display = novo? 'block':'none';
+  const pl=document.getElementById('pinLbl'); if(pl) pl.textContent = novo? 'Crie um PIN para este aparelho' : 'PIN de acesso';
+  const lh=document.getElementById('loginHint');
+  if(lh && !lh.dataset.fixo) lh.textContent = novo
+    ? 'Na primeira vez em cada aparelho, entre com e-mail e senha e escolha um PIN. Depois, só o PIN (ou o Face ID).'
+    : 'Esqueceu o PIN? Use "Entrar com outra conta" abaixo.';
+  const lr=document.getElementById('loginReset'); if(lr) lr.style.display = novo? 'none':'block';
+  const m=document.getElementById('loginMail'); if(m&&!m.value) m.value=JRAuth.emailSalvo();
+  try{ refreshBioUI(); }catch(e){}
+  if(!novo && typeof bioSupported==='function' && bioSupported() && bioEnabled()){ setTimeout(()=>bioLogin(),250); }
+  else setTimeout(()=>{ try{ document.getElementById(novo?'loginMail':'pinInput').focus(); }catch(e){} },100);
 }
+
+// Apaga o vínculo deste aparelho e volta para e-mail + senha.
+async function loginOutraConta(){
+  if(!confirm('Isso apaga o PIN e o Face ID deste aparelho. Você vai precisar do e-mail e da senha para entrar de novo. Continuar?')) return;
+  try{ localStorage.removeItem(BIOKEY); }catch(e){}
+  await JRAuth.sair(true);
+  showLogin();
+}
+
+async function checkAuth(){
+  try{ if(typeof checkReset==='function' && checkReset()){ showLogin(); return; } }catch(e){}
+  try{ if(JRAuth.bioHabilitado() && bioSupported() && bioEnabled()){ showLogin(); return; } }catch(e){}
+  if(await JRAuth.pronto()){ hideLogin(); startApp(); } else showLogin();
+}
+
+
+
 
 function hideLogin() {
   document.getElementById('loginOverlay').style.display = 'none';
@@ -1447,21 +1484,19 @@ async function sendReset() {
 
 function checkReset() {
   const p = new URLSearchParams(window.location.search);
-  if(p.get('rpin')==='1'||location.hash.includes('access_token')) {
-    localStorage.removeItem('jr_pin_hash');
-    localStorage.removeItem(AUTH);
-    document.getElementById('loginHint').textContent='Email confirmado! Digite um novo PIN.';
+  if(p.get('rpin')==='1'){
+    try{ localStorage.removeItem(BIOKEY); }catch(e){}
+    JRAuth.sair(true);
+    const lh=document.getElementById('loginHint');
+    if(lh){ lh.textContent='Vínculo deste aparelho apagado. Entre com e-mail e senha.'; lh.dataset.fixo='1'; }
     window.history.replaceState({},'',location.pathname);
     return true;
   }
   return false;
 }
 
-function checkAuth() {
-  if(checkReset()) { showLogin(); return; }
-  if(!isAuth()) { showLogin(); }
-  else { hideLogin(); startApp(); }
-}
+
+
 
 // ============================================================
 // APP START
