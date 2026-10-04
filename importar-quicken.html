@@ -516,7 +516,11 @@ function showResult(ok, title, detail) {
 </script>
 <script>
 // Tela sem login próprio: o auth.js injeta o dele e só libera com sessão.
-document.addEventListener('DOMContentLoaded',function(){ JRAuth.protege(function(){}); });
+const APP_VERSION='v2026.10.03-g';
+document.addEventListener('DOMContentLoaded',function(){
+  var e=document.getElementById('appVer'); if(e) e.textContent=APP_VERSION;
+  JRAuth.protege(function(){});
+});
 </script>
 </body>
 </html>
