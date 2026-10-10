@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.10-b';
+var APP_VERSION='v2026.10.10-c';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -398,6 +398,17 @@ async function checkEmails() {
   }
 }
 
+// O texto do e-mail e conteudo de terceiro e entrava por innerHTML sem
+// escapar. Num e-mail ENCAMINHADO vem HTML: uma <div> ou <table> aberta
+// engolia o bloco de sugestao para dentro de .email-preview, que tem
+// line-clamp:2 e overflow:hidden — por isso o botao virava uma tira e
+// nada respondia ao clique. Tambem fecha a porta para script injetado.
+function esc(v){
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function renderEmails(emails) {
   var el = document.getElementById('results');
   el.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600">'+emails.length+' EMAIL(S) N\u00c3O LIDO(S)</div>';
@@ -408,9 +419,9 @@ function renderEmails(emails) {
     var pdfTag = email.has_pdf ? ' <span style="font-size:10px;background:rgba(52,211,153,.1);color:var(--green);border-radius:4px;padding:1px 5px">PDF</span>' : '';
     var btnStyle = 'width:100%;padding:10px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);border-radius:10px;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer';
     card.innerHTML =
-      '<div class="email-from">'+email.from+'</div>'
-      +'<div class="email-subject">'+email.subject+pdfTag+'</div>'
-      +'<div class="email-preview">'+email.preview+'</div>'
+      '<div class="email-from">'+esc(email.from)+'</div>'
+      +'<div class="email-subject">'+esc(email.subject)+pdfTag+'</div>'
+      +'<div class="email-preview">'+esc(email.preview)+'</div>'
       +'<div id="sug'+idx+'">'
       +'<div style="text-align:center;padding:10px;color:var(--muted);font-size:12px"><span class="spin">\u27f3</span> Analisando com IA...</div>'
       +'<button style="'+btnStyle+';margin-top:6px" onclick="getSuggestion('+idx+')">\u2728 Sugerir Lan\u00e7amento com IA</button>'
@@ -521,7 +532,7 @@ function renderSuggestion(idx, sug, email) {
     +'<div class="sug-title">\u2728 IA '+confLabel+pdfBadge+'</div>'
     +'<div class="sug-grid">'
     +fxBadge
-    +'<div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p'+idx+'" value="'+(sug.payee||'')+'"></div>'
+    +'<div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p'+idx+'" value="'+esc(sug.payee||'')+'"></div>'
     +'<div class="sug-field"><label>Valor R$</label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'"></div>'
     +'<div class="sug-field"><label>Data</label><input type="date" id="sf_d'+idx+'" value="'+(sug.date||today)+'"></div>'
     +cardNote
@@ -529,7 +540,7 @@ function renderSuggestion(idx, sug, email) {
     +'<div class="sug-field full"><label>Categoria <span id="sf_tag'+idx+'" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:4px"></span></label><select id="sf_c'+idx+'" onchange="fillSubEmail('+idx+')">'+catOpts+'</select></div>'
     +'<div class="sug-field"><label>Parcelas</label><select id="sf_in'+idx+'"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="6">6x</option><option value="12">12x</option></select></div>'
     +'<div class="sug-field"><label>Subcategoria</label><select id="sf_s'+idx+'"><option value="">—</option></select></div>'
-    +'<div class="sug-field full"><label>Observa\u00e7\u00e3o</label><input type="text" id="sf_m'+idx+'" value="'+(sug.memo||'')+'"></div>'
+    +'<div class="sug-field full"><label>Observa\u00e7\u00e3o</label><input type="text" id="sf_m'+idx+'" value="'+esc(sug.memo||'')+'"></div>'
     +'</div>'
     +'<div class="sug-actions">'
     +'<button class="btn-ok" onclick="approve('+idx+',\''+email.message_id+'\')">\u2713 Confirmar</button>'

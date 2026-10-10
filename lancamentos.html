@@ -1296,7 +1296,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.10-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.10-d';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2317,7 +2317,7 @@ async function loadIR() {
       <div class="ircrow"><span style="font-weight:600">IRRF retido na fonte <span style="font-size:10px;color:var(--muted)">(${irrf.length}) · imposto já pago, não é dedução</span></span>
         <span style="font-weight:600;color:var(--yellow)">R$ ${fmt(tIrrf)}</span></div>
       <div style="font-size:11px;color:var(--muted);padding:8px 0 0">Confira contra o informe de rendimentos de cada fonte pagadora.</div>`;
-    document.getElementById('irPend').innerHTML=pend.length?pend.slice(0,20).map(t=>`<div class="irpitem"><div><div style="font-size:13px;font-weight:500">${t.payee}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--red)">-R$ ${fmt(t.amount)}</div><button class="irbtn" onclick="markOK(${t.id})">Marcar OK</button></div></div>`).join(''):'<div class="empty" style="padding:16px"><div class="big">✅</div><div>Nenhum pendente!</div></div>';
+    document.getElementById('irPend').innerHTML=pend.length?pend.slice(0,20).map(t=>`<div class="irpitem"><div><div style="font-size:13px;font-weight:500">${t.payee}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--red)">-R$ ${fmt(t.amount)}</div><button class="irbtn" onclick="markOK(${t.id})">Marcar OK</button> <button class="irbtn" style="background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:var(--red)" onclick="naoDeduzir(${t.id})" title="Sem comprovante: tira da dedução sem mexer na categoria">Não deduzir</button></div></div>`).join(''):'<div class="empty" style="padding:16px"><div class="big">✅</div><div>Nenhum pendente!</div></div>';
     const bc={};de.forEach(t=>{if(!bc[t.category])bc[t.category]=0;bc[t.category]+=parseFloat(t.amount);});
     // By category with expandable detail
     const sortedCats=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
@@ -2342,6 +2342,18 @@ async function loadIR() {
       </div><div style="display:none">${rows}${more}</div>`;
     }).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhum rendimento</div>';
   } catch(e){ console.error('IR:',e); }
+}
+
+// Sem comprovante nao da para deduzir com seguranca. Isto tira o
+// lancamento da deducao SEM mexer na categoria dele — o gasto continua
+// classificado como Psicologo, so nao entra na conta do IR.
+async function naoDeduzir(id) {
+  if(!confirm('Tirar este lançamento da dedução do IR?\n\nA categoria não muda. Use quando não houver comprovante.')) return;
+  try {
+    await sbUpd('transactions',id,{is_deductible:false,receipt_status:'na'});
+    loadIR();
+    toast('Removido da dedução','var(--muted)','#0d0f14');
+  } catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
 }
 
 async function markOK(id) {
