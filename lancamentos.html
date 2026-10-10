@@ -1296,7 +1296,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.10-d';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.10-e';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2808,8 +2808,8 @@ async function saveCambio(){
     {...base,id:gid+1,type:'income',amount:conv,account:dest,payee:'Transferência de '+srcName,payee_display:`Câmbio ${cur} recebido`,category:'transferencia',subcategory:null,
      receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:{originalAmount:fx||null,currency:cur,rate,iof:false,brl:conv}}
   ];
-  if(iof>0)rows.push({...base,id:gid+2,type:'expense',amount:iof,payee:'IOF — Câmbio Wise',payee_display:'IOF — Câmbio Wise',category:'impostos',subcategory:'Outros',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
-  if(fee>0)rows.push({...base,id:gid+3,type:'expense',amount:fee,payee:'Tarifa Wise',payee_display:'Tarifa Wise',category:'taxas-bancarias',subcategory:'Taxas Bancárias',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
+  if(iof>0)rows.push({...base,id:gid+2,type:'expense',amount:iof,payee:'IOF — Câmbio Wise',payee_display:'IOF — Câmbio Wise',category:'impostos',subcategory:'outros',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
+  if(fee>0)rows.push({...base,id:gid+3,type:'expense',amount:fee,payee:'Tarifa Wise',payee_display:'Tarifa Wise',category:'taxas-bancarias',subcategory:'taxas_bancarias',receipt_status:'na',is_split:true,split_total:conv+iof+fee,fx:null});
   try{
     await sbIns('transactions',rows);
     sync('ok');toast(`✓ Câmbio salvo: transferência R$ ${fmt(conv)} + IOF R$ ${fmt(iof)} + taxa R$ ${fmt(fee)}`,'var(--green)','#0d0f14');
