@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.03-f';
+var APP_VERSION='v2026.10.10-b';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -412,11 +412,19 @@ function renderEmails(emails) {
       +'<div class="email-subject">'+email.subject+pdfTag+'</div>'
       +'<div class="email-preview">'+email.preview+'</div>'
       +'<div id="sug'+idx+'">'
-      +'<button style="'+btnStyle+'" onclick="getSuggestion('+idx+')">\u2728 Sugerir Lan\u00e7amento com IA</button>'
+      +'<div style="text-align:center;padding:10px;color:var(--muted);font-size:12px"><span class="spin">\u27f3</span> Analisando com IA...</div>'
+      +'<button style="'+btnStyle+';margin-top:6px" onclick="getSuggestion('+idx+')">\u2728 Sugerir Lan\u00e7amento com IA</button>'
       +'</div>';
     card._email = email;
     el.appendChild(card);
   });
+  // Pede a sugestao sozinho, um e-mail de cada vez. Antes dependia de um
+  // clique no botao, que em alguns navegadores nao respondia.
+  (async function(){
+    for (var i = 0; i < emails.length; i++) {
+      try { await getSuggestion(i); } catch(e){}
+    }
+  })();
 }
 
 // Busca o PDF anexado direto no Gmail (o app ja tem o token)

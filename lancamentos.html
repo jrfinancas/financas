@@ -734,6 +734,14 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <div id="irInc"></div>
       <div id="irIncDetail" style="margin-top:12px"></div>
     </div>
+    <div class="card">
+      <div class="card-title">Retenções na fonte</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">
+        Valores que aparecem no informe de rendimentos das fontes pagadoras.
+        O INSS é dedução e já está somado acima; o IRRF é imposto já pago e entra em outro campo da declaração.
+      </div>
+      <div id="irInformativos"></div>
+    </div>
   </div>
 
   <!-- ======== RECORRENTES ======== -->
@@ -1288,7 +1296,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.10-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.10-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2272,7 +2280,9 @@ async function loadIR() {
   }
   const year=sel.value||THIS_YEAR;
   try {
-    const allTxs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true`);
+    // Busca o ano inteiro: alem das deducoes, o painel precisa mostrar o
+    // IRRF e o INSS retidos, que sao declarados mesmo nao sendo deducao.
+    const allTxs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&limit=5000`);
     // Apply subcategory deductibility rules
     // Mesma regra do lançamento: uma fonte só de verdade.
     // As receitas (salário etc.) entram inteiras; a lista vale para despesas.
@@ -2280,13 +2290,33 @@ async function loadIR() {
       t.type==='expense' ? isDeductible(t.category, t.subcategory||'') : true
     );
     const de=txs.filter(t=>t.type==='expense'), di=txs.filter(t=>t.type==='income');
-    const pend=allTxs.filter(t=>t.receipt_status==='pending');
+    const pend=allTxs.filter(t=>t.receipt_status==='pending' && isDeductible(t.category, t.subcategory||''));
     const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
+
+    // ---- Informados na declaracao, mas NAO sao deducao ----
+    // IRRF retido na fonte entra no campo de imposto ja pago.
+    const SUB_IRRF=new Set(['ir_folha','ir__folha_']);
+    const SUB_INSS=new Set(['inss','inss_folha','inss__folha_']);
+    const irrf=allTxs.filter(t=>t.type==='expense' && t.category==='impostos'
+                                && SUB_IRRF.has(String(t.subcategory||'').toLowerCase()));
+    const inss=allTxs.filter(t=>t.type==='expense' && t.category==='impostos'
+                                && SUB_INSS.has(String(t.subcategory||'').toLowerCase()));
+    const tIrrf=irrf.reduce((s,t)=>s+parseFloat(t.amount),0);
+    const tInss=inss.reduce((s,t)=>s+parseFloat(t.amount),0);
     document.getElementById('irKpis').innerHTML=`
       <div class="irkpi-card"><div class="irkpi-label">Despesas Dedutíveis</div><div class="irkpi-val neg">-R$ ${fmt(te)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${de.length} lançamentos</div></div>
       <div class="irkpi-card"><div class="irkpi-label">Rendimentos</div><div class="irkpi-val pos">+R$ ${fmt(ti)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${di.length} lançamentos</div></div>
       <div class="irkpi-card" style="background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.2)"><div class="irkpi-label" style="color:var(--yellow)">Pendentes</div><div class="irkpi-val" style="color:var(--yellow)">${pend.length}</div></div>
       <div class="irkpi-card" style="background:rgba(52,211,153,.06);border-color:rgba(52,211,153,.2)"><div class="irkpi-label" style="color:var(--green)">Documentados</div><div class="irkpi-val" style="color:var(--green)">${txs.filter(t=>t.receipt_status==='attached').length}</div></div>`;
+
+    // Painel separado: o que vai na declaracao sem ser deducao
+    const elInf=document.getElementById('irInformativos');
+    if(elInf) elInf.innerHTML=`
+      <div class="ircrow"><span style="font-weight:600">INSS retido <span style="font-size:10px;color:var(--muted)">(${inss.length}) · é dedução, já somado acima</span></span>
+        <span style="font-weight:600;color:var(--green)">R$ ${fmt(tInss)}</span></div>
+      <div class="ircrow"><span style="font-weight:600">IRRF retido na fonte <span style="font-size:10px;color:var(--muted)">(${irrf.length}) · imposto já pago, não é dedução</span></span>
+        <span style="font-weight:600;color:var(--yellow)">R$ ${fmt(tIrrf)}</span></div>
+      <div style="font-size:11px;color:var(--muted);padding:8px 0 0">Confira contra o informe de rendimentos de cada fonte pagadora.</div>`;
     document.getElementById('irPend').innerHTML=pend.length?pend.slice(0,20).map(t=>`<div class="irpitem"><div><div style="font-size:13px;font-weight:500">${t.payee}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--red)">-R$ ${fmt(t.amount)}</div><button class="irbtn" onclick="markOK(${t.id})">Marcar OK</button></div></div>`).join(''):'<div class="empty" style="padding:16px"><div class="big">✅</div><div>Nenhum pendente!</div></div>';
     const bc={};de.forEach(t=>{if(!bc[t.category])bc[t.category]=0;bc[t.category]+=parseFloat(t.amount);});
     // By category with expandable detail
