@@ -289,7 +289,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.03-d';
+const APP_VERSION='v2026.10.10-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Chamada ao Supabase com erro legivel ----------
@@ -677,7 +677,9 @@ function render(){
                  : (p.vencimento>=desdeQuando(f)
                     ? '<button class="btn" style="padding:4px 8px;font-size:10px" title="cria os lançamentos desta parcela no caixa" onclick="abrirPag('+p.id+',true)">⤓ lançar no caixa</button>'
                     : '<span class="sub">✓ paga (fora do controle)</span>'))
-                            :(venc?'<span style="color:var(--red)">vencida</span>':'<button class="btn g" style="padding:4px 10px;font-size:11px" onclick="abrirPag('+p.id+')">Pagar</button>'))+'</div>'
+                            :'<button class="btn g" style="padding:4px 10px;font-size:11px'
+                               +(venc?';background:var(--red);color:#fff':'')+'" onclick="abrirPag('+p.id+')">'
+                               +(venc?'Pagar (vencida)':'Pagar')+'</button>')+'</div>'
             +'<div class="num hm">'+fmt(p.juros)+'</div>'
             +'<div class="num hm">'+fmt(p.amortizacao)+'</div>'
             +'<div class="num">'+fmt(p.valor_previsto)+'</div>'
