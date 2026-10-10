@@ -1288,7 +1288,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.03-g';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.10-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1530,7 +1530,37 @@ const TODAY = new Date().toISOString().slice(0,10);
 const THIS_MONTH = TODAY.slice(0,7);
 const THIS_YEAR  = TODAY.slice(0,4);
 
-const DED  = new Set(['saude','educacao','impostos','salario','bonus','dividendos']);
+// ============================================================
+// DEDUTIBILIDADE NO IRPF — regra única
+//
+// A categoria sozinha NAO decide: dentro de 'saude' convivem medico
+// (dedutivel) e medicamentos (nao). Por isso a lista e por categoria +
+// subcategoria, explicita. Inclui as variantes de slug geradas pelo
+// subKeyOf antigo, que trocava acento por underline (medicos -> m_dicos).
+const IR_DEDUTIVEL = {
+  saude: new Set([
+    'medico','medicos','m_dicos',
+    'dentista',
+    'psicologo','psic_logo',
+    'fisioterapeuta','fisicoterapeuta',
+    'fonoaudiologo','fonoaudi_logo',
+    'terapeuta_ocupacional',
+    'hospital','hospitalar','exames','laboratorio',
+    'plano_saude','plano_de_sa_de'
+  ]),
+  // Só ensino formal. Livros e cursos livres não entram.
+  educacao: new Set(['mensalidade']),
+  // Só a contribuição previdenciária. IRRF é imposto retido, não dedução.
+  impostos: new Set(['inss','inss_folha','inss__folha_'])
+};
+function isDeductible(cat, sub){
+  const lista = IR_DEDUTIVEL[cat];
+  if(!lista) return false;
+  return lista.has(String(sub||'').toLowerCase());
+}
+// Categorias que PODEM conter despesa dedutível — usada só para decidir
+// se vale pedir comprovante, nunca para marcar a dedução.
+const DED  = new Set(['saude','educacao','impostos']);
 const INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
 
 const SUBS = {
@@ -1542,7 +1572,7 @@ const SUBS = {
   educacao:['Livros','Mensalidade'], hobbies:['Cinema','Diversão','Eventos','Jogos'],
   impostos:['IR (Folha)','INSS (Folha)','IPTU','IPVA','Outros'],
   juros:['Juros Empréstimos','Juros Pagamentos'], 'outras-despesas':['Cuidados Pessoais','Materiais','Presentes','Taxas'],
-  saude:['Academia','Dentista','Medicamentos','Médicos','Nutricionista/Psicólogo'],
+  saude:['Academia','Dentista','Exames/Laboratório','Fisioterapeuta','Fonoaudiólogo','Hospital','Medicamentos','Médicos','Nutricionista','Plano de Saúde','Psicólogo','Terapeuta Ocupacional'],
   seguros:['Automóvel','Casa','Previdência Privada','Vida'], 'taxas-bancarias':['Taxas Bancárias'],
   utilitarios:['Água','Eletricidade','Gás'], vestuario:['Vestuário'], viagens:['Acomodação','Alimentação','Transporte'],
   salario:['13° Salário','Salário Bruto'], bonus:['Bônus'], dividendos:['Dividendos','JCP'], 'outras-entradas':['Outros Créditos']
@@ -1561,7 +1591,12 @@ const DEDOPTS = ['IR Retido na Fonte','INSS','Plano de Saúde','Vale Transporte'
 const DEDMAP  = {'IR Retido na Fonte':'impostos','INSS':'impostos','Plano de Saúde':'saude','Vale Transporte':'contas','Previdência Privada':'seguros','Outros Descontos':'outras-despesas'};
 const INCMAP  = {'Salário Bruto':'salario','13° Salário':'salario','Bônus':'bonus','Férias':'salario','Outras Entradas':'outras-entradas'};
 // Rótulo do holerite -> subcategoria oficial (mesmas chaves das outras abas)
-function subKeyOf(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+// Antes trocava acento por underline: 'Médicos' virava 'm_dicos'.
+// Agora remove o acento primeiro, entao vira 'medicos'.
+function subKeyOf(s){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+}
 const SUBKEY = {
   'Salário Bruto':'sal_rio_bruto', '13° Salário':'13__sal_rio', 'Bônus':'b_nus', 'Férias':'sal_rio_bruto', 'Outras Entradas':'outros_cr_ditos',
   'IR Retido na Fonte':'ir__folha_', 'INSS':'inss__folha_', 'Plano de Saúde':'m_dicos', 'Vale Transporte':'transporte',
@@ -1777,7 +1812,7 @@ function onCatCh(px) {
   fillSub(px+'Sub', px+'Cat');
   const badge=document.getElementById(px+'DedBadge');
   const subVal=(document.getElementById('nSub')?.value)||'';
-  const isDedutivel=DED.has(cat) && !['medicamentos','academia','outros_impostos'].includes(subVal);
+  const isDedutivel=isDeductible(cat, subVal);
   if(badge) badge.style.display=isDedutivel?'inline-flex':'none';
   if(px==='n' && DED.has(cat) && !INC.has(cat) && !nB64 && nRS==='na') setRS('pending',document.getElementById('rPnd'));
 }
@@ -1872,7 +1907,7 @@ Continuar mesmo assim?`;
         payee,payee_display:inst>1?`${payee} (${i+1}/${inst})`:null,
         account:acct,category:cat,subcategory:document.getElementById('nSub').value||null,
         memo:document.getElementById('nMemo').value||null,
-        receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:DED.has(cat)&&!new Set(['medicamentos','academia','outros_impostos']).has(sub),
+        receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:isDeductible(cat, sub),
         installments:inst,installment_num:i+1,group_id:gid,
         fx:i===0&&pendFX?pendFX:null});
     }
@@ -2239,16 +2274,11 @@ async function loadIR() {
   try {
     const allTxs=await sbGet('transactions',`date=gte.${year}-01-01&date=lte.${year}-12-31&is_deductible=eq.true`);
     // Apply subcategory deductibility rules
-    const NON_DED_CATS_IR=new Set(['seguros','outras-entradas']);
-    const NON_DED_SUBS_IR=new Set(['medicamentos','academia','outros_impostos']);
-    const DED_SUBS_SAUDE_IR=new Set(['medico','dentista','plano_saude','nutricionista','fisicoterapeuta','psicologo','hospitalar','laboratorio','nutricionista_psicologo']);
-    const txs=allTxs.filter(t=>{
-      if(NON_DED_CATS_IR.has(t.category)) return false;
-      if(t.subcategory && NON_DED_SUBS_IR.has(t.subcategory)) return false;
-      // Saúde só dedutível com subcategoria médica válida
-      if(t.category==='saude' && !DED_SUBS_SAUDE_IR.has(t.subcategory||'')) return false;
-      return true;
-    });
+    // Mesma regra do lançamento: uma fonte só de verdade.
+    // As receitas (salário etc.) entram inteiras; a lista vale para despesas.
+    const txs=allTxs.filter(t=>
+      t.type==='expense' ? isDeductible(t.category, t.subcategory||'') : true
+    );
     const de=txs.filter(t=>t.type==='expense'), di=txs.filter(t=>t.type==='income');
     const pend=allTxs.filter(t=>t.receipt_status==='pending');
     const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
@@ -2413,16 +2443,7 @@ function checkTrfFx() {
   if(fxRow) fxRow.style.display = isFx ? '' : 'none';
 }
 
-function isDeductible(cat, sub) {
-  // Seguros nunca dedutível
-  if(cat==='seguros') return false;
-  // outras-entradas nunca dedutível
-  if(cat==='outras-entradas') return false;
-  // Subcategorias não dedutíveis dentro de categorias dedutíveis
-  const NON_DED_SUBS=new Set(['medicamentos','academia','outros_impostos']);
-  if(NON_DED_SUBS.has(sub)) return false;
-  return DED.has(cat);
-}
+// isDeductible agora e definida junto com IR_DEDUTIVEL, la em cima.
 
 function toggleEstimated() {
   const chk=document.getElementById('recEstimated').checked;
@@ -2516,7 +2537,7 @@ async function doLaunchRec(r) {
     const _tot=_lines.reduce((s,l)=>s+(parseFloat(l.amount)||0),0);
     _lines.forEach((l,i)=>rows.push({id:gid+i,group_id:gid,type:r.type,amount:l.amount,date,payee:r.name,payee_display:r.name,account:r.account,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:_tot,from_recorrente:true}));
   } else {
-    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:(r._realMemo!==undefined?(r._realMemo||null):(r.memo||null)),is_deductible:DED.has(r.category||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
+    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:(r._realMemo!==undefined?(r._realMemo||null):(r.memo||null)),is_deductible:isDeductible(r.category||'', r.subcategory||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }
   sync('busy');
   try {
