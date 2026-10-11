@@ -119,6 +119,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <a href="dashboard.html">Dashboard</a>
     <a href="lancamentos.html">Lançamentos</a>
     <a href="#" class="active">Contas</a>
+    <a href="categorias.html">Categorias</a>
     <span id="appVer" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
   </nav>
 </header>
@@ -257,7 +258,7 @@ const SBH={'apikey':KEY,
 // SALT e AUTH saíram: o PIN local foi substituído por sessão real (auth.js).
 // Restos do esquema antigo são limpos uma vez, para não ficar lixo no aparelho.
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.03-d';
+const APP_VERSION='v2026.10.11-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------

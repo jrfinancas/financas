@@ -171,6 +171,14 @@ try{ sessionStorage.setItem('jr_sess','1'); }catch(e){}
     </div>
     <div class="arrow">›</div>
   </a>
+  <a href="categorias.html">
+    <div class="icon" style="background:rgba(79,142,247,.15)">🏷️</div>
+    <div class="label">
+      <strong>Categorias</strong>
+      <span>Categorias · Subcategorias · Dedutível no IR</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
   <a href="importar-quicken.html">
     <div class="icon" style="background:rgba(251,191,36,.15)">📥</div>
     <div class="label">
@@ -202,7 +210,7 @@ try{ sessionStorage.setItem('jr_sess','1'); }catch(e){}
 
 <script>
 // Porta de entrada: destrava aqui e os módulos abrem sem pedir de novo.
-const APP_VERSION='v2026.10.03-f';
+const APP_VERSION='v2026.10.11-a';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer'); if(e) e.textContent=APP_VERSION;
   JRAuth.protege(function(){});

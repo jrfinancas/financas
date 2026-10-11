@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<script src="auth.js"></script>
+<script>
+// Ao ABRIR o app numa nova sessao, comeca sempre pela tela de inicio.
+// Navegacao dentro da mesma sessao continua normal.
+(function(){
+  try{
+    if(!sessionStorage.getItem('jr_sess')){
+      sessionStorage.setItem('jr_sess','1');
+      var p = location.pathname;
+      if(!/(^|\/)(index\.html)?$/.test(p)) { location.replace('index.html'); }
+    }
+  }catch(e){}
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Finanças JR · Categorias</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#0d0f14;--surface:#13161e;--surface2:#1a1e29;--border:#252a38;--text:#e8eaf0;--muted:#6b7280;--accent:#4f8ef7;--green:#34d399;--red:#f87171;--yellow:#fbbf24;--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;padding-top:calc(14px + var(--st));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;background:rgba(13,15,20,.97);backdrop-filter:blur(16px)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;letter-spacing:-.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+nav a{text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:8px;font-size:12px;font-weight:500;transition:all .2s}
+nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
+.main{max-width:860px;margin:0 auto;padding:20px 16px calc(20px + var(--sb))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:14px}
+.nota{font-size:12px;color:var(--muted);line-height:1.6}
+.fl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;display:block}
+.fi,.fs{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;padding:11px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+.fi:focus,.fs:focus{border-color:var(--accent)}
+.fs{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.fs option{background:var(--surface)}
+.fg{margin-bottom:13px}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:13px}
+.bsave{width:100%;padding:13px;background:var(--green);color:#0d0f14;border:none;border-radius:10px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer}
+.bclear{width:100%;padding:11px;background:none;border:1.5px solid var(--border);border-radius:10px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;margin-top:8px}
+/* categoria */
+.cat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.cat.off{opacity:.5}
+.cat-head{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer}
+.cat-nome{font-size:15px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-cnt{font-size:11px;color:var(--muted);flex-shrink:0}
+.cat-body{border-top:1px solid var(--border);padding:4px 13px 12px}
+.badge{font-size:10px;padding:2px 7px;border-radius:8px;font-weight:600;flex-shrink:0}
+.b-exp{background:rgba(248,113,113,.15);color:var(--red)}
+.b-inc{background:rgba(52,211,153,.15);color:var(--green)}
+.b-ir{background:rgba(79,142,247,.15);color:var(--accent)}
+.b-off{background:rgba(107,114,128,.2);color:var(--muted)}
+/* subcategoria */
+.sub-row{display:flex;align-items:center;gap:7px;padding:8px 0;border-bottom:1px solid rgba(37,42,56,.55)}
+.sub-row:last-of-type{border-bottom:none}
+.sub-row.off{opacity:.5}
+.sub-nome{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub-slug{font-size:10px;color:var(--muted);font-family:ui-monospace,Menlo,monospace}
+.ico{background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);min-width:30px;height:30px;cursor:pointer;font-size:11px;font-weight:600;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif}
+.ico:hover{border-color:var(--accent);color:var(--accent)}
+.ico.on{background:rgba(79,142,247,.15);border-color:rgba(79,142,247,.45);color:var(--accent)}
+.ico.del:hover{border-color:var(--red);color:var(--red)}
+.addsub{margin-top:10px;display:flex;gap:7px}
+.addsub .fi{font-size:13px;padding:9px 11px}
+.addsub button{padding:9px 14px;background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.3);border-radius:8px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;flex-shrink:0}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9000;display:none;align-items:center;justify-content:center;padding:20px}
+.modal.on{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;width:100%;max-width:380px}
+.modal-title{font-size:16px;font-weight:600}
+.chk{display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;padding:7px 0}
+.chk input{width:17px;height:17px;accent-color:var(--accent)}
+#toast{position:fixed;bottom:calc(20px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--green);color:#0d0f14;padding:11px 18px;border-radius:12px;font-weight:600;font-size:13px;opacity:0;transition:all .3s;z-index:10000;max-width:90vw;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.empty{text-align:center;color:var(--muted);padding:28px;font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Finanças <span>JR</span></div>
+  <nav>
+    <a href="index.html">← Início</a>
+    <a href="lancamentos.html">Lançamentos</a>
+    <a href="contas.html">Contas</a>
+    <a href="#" class="active">Categorias</a>
+    <span id="appVer" title="Versão carregada" style="font-size:10px;color:var(--muted);opacity:.6;margin-left:auto;align-self:center"></span>
+  </nav>
+</header>
+
+<div class="main">
+
+  <div class="card">
+    <div class="card-title">➕ Nova categoria</div>
+    <div class="fr">
+      <div><label class="fl">Nome</label><input type="text" class="fi" id="nCatNome" placeholder="Ex: Assinaturas" onkeydown="if(event.key==='Enter')criarCategoria()"></div>
+      <div><label class="fl">Tipo</label>
+        <select class="fs" id="nCatTipo">
+          <option value="expense">Despesa</option>
+          <option value="income">Receita</option>
+        </select></div>
+    </div>
+    <button class="bsave" onclick="criarCategoria()">Criar categoria</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Categorias e subcategorias</div>
+      <label class="chk" style="padding:0;flex-shrink:0"><input type="checkbox" id="verInativas" onchange="render()"><span style="color:var(--muted);font-size:11px">ver inativas</span></label>
+    </div>
+    <div class="nota" style="margin-bottom:14px">
+      Toque na categoria para abrir. O selo <span class="badge b-ir">IR</span> marca
+      o que é dedutível no imposto de renda — é essa marca que o módulo de IR usa.<br>
+      <b>Desativar</b> tira da lista de escolha e não mexe no histórico.
+      <b>Apagar</b> só funciona no que nunca foi usado.
+    </div>
+    <div id="lista"><div class="empty">Carregando…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Resumo</div>
+    <div class="nota" id="resumo">—</div>
+  </div>
+
+</div>
+
+<div class="modal" id="edModal">
+  <div class="modal-box">
+    <div class="modal-title" id="edTitulo">Editar</div>
+    <div class="nota" id="edSub" style="margin-bottom:14px"></div>
+    <div class="fg"><label class="fl">Nome que aparece na tela</label><input type="text" class="fi" id="edNome" onkeydown="if(event.key==='Enter')salvarEdicao()"></div>
+    <div class="fg" id="edTipoBox"><label class="fl">Tipo</label>
+      <select class="fs" id="edTipo">
+        <option value="expense">Despesa</option>
+        <option value="income">Receita</option>
+      </select></div>
+    <label class="chk" id="edDedutBox"><input type="checkbox" id="edDedut"><span>Dedutível no imposto de renda</span></label>
+    <label class="chk"><input type="checkbox" id="edAtivo"><span>Ativa — aparece na lista de escolha</span></label>
+    <div class="nota" id="edAviso" style="margin:8px 0 14px"></div>
+    <button class="bsave" onclick="salvarEdicao()">Salvar</button>
+    <button class="bclear" onclick="fecharEd()">Cancelar</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const SB='https://tggtktjblunlbsjbhlls.supabase.co';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
+// Getter: manda o token da sessao quando existe, senao cai na chave anon.
+const SBH={'apikey':KEY,
+  get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
+  'Content-Type':'application/json','Prefer':'return=representation'};
+const APP_VERSION='v2026.10.11-a';
+
+async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbUpd(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbDel(t,id){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:SBH});if(!r.ok)throw new Error(await r.text());}
+
+function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg||'var(--green)';t.style.color=col||'#0d0f14';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// MESMA regra do lancamentos.html: tira o acento ANTES de trocar por
+// underline. 'Vestuário' -> 'vestuario', nao 'vestu_rio'.
+function slugify(s){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+}
+
+let CATS=[], abertas={};
+
+// ---------- carregar e desenhar ----------
+async function carregar(){
+  try{
+    CATS = await sbGet('categorias','order=tipo.desc,ordem.asc,rotulo.asc&limit=2000');
+    render();
+  }catch(e){
+    document.getElementById('lista').innerHTML='<div class="empty" style="color:var(--red)">Erro ao carregar: '+esc(e.message)+'</div>';
+  }
+}
+
+function render(){
+  const verOff=document.getElementById('verInativas').checked;
+  const raiz=CATS.filter(c=>!c.subcategoria);
+  const el=document.getElementById('lista');
+
+  const nSub=CATS.filter(c=>c.subcategoria).length;
+  const nDed=CATS.filter(c=>c.subcategoria&&c.dedutivel).length;
+  const nOff=CATS.filter(c=>!c.ativo).length;
+  document.getElementById('resumo').innerHTML=
+    raiz.length+' categorias · '+nSub+' subcategorias · '+nDed+' marcadas como dedutíveis'
+    +(nOff?' · '+nOff+' inativas':'');
+
+  if(!raiz.length){ el.innerHTML='<div class="empty">Nenhuma categoria cadastrada.</div>'; return; }
+
+  const vis=raiz.filter(c=>verOff||c.ativo);
+  if(!vis.length){ el.innerHTML='<div class="empty">Todas as categorias estão inativas. Marque "ver inativas".</div>'; return; }
+
+  el.innerHTML=vis.map(c=>{
+    const todas=CATS.filter(s=>s.subcategoria&&s.categoria===c.categoria);
+    const subs=todas.filter(s=>verOff||s.ativo);
+    const aberta=!!abertas[c.categoria];
+    const ded=todas.filter(s=>s.dedutivel).length;
+    return '<div class="cat'+(c.ativo?'':' off')+'">'
+      + '<div class="cat-head" onclick="abrir(\''+c.categoria+'\')">'
+      +   '<span style="color:var(--muted);font-size:11px;width:9px">'+(aberta?'▾':'▸')+'</span>'
+      +   '<span class="cat-nome">'+esc(c.rotulo)+'</span>'
+      +   '<span class="badge '+(c.tipo==='income'?'b-inc':'b-exp')+'">'+(c.tipo==='income'?'receita':'despesa')+'</span>'
+      +   (ded?'<span class="badge b-ir">IR '+ded+'</span>':'')
+      +   (c.ativo?'':'<span class="badge b-off">inativa</span>')
+      +   '<span class="cat-cnt">'+todas.length+'</span>'
+      +   '<button class="ico" title="Editar categoria" onclick="event.stopPropagation();editar('+c.id+')">✎</button>'
+      + '</div>'
+      + (aberta
+          ? '<div class="cat-body">'
+            + (subs.length
+                ? subs.map(linhaSub).join('')
+                : '<div class="nota" style="padding:9px 0">Sem subcategoria'+(todas.length?' ativa':'')+'.</div>')
+            + '<div class="addsub">'
+            +   '<input type="text" class="fi" id="ns_'+c.categoria+'" placeholder="Nova subcategoria" onkeydown="if(event.key===\'Enter\')criarSub(\''+c.categoria+'\')">'
+            +   '<button onclick="criarSub(\''+c.categoria+'\')">Adicionar</button>'
+            + '</div>'
+            + '<div style="margin-top:10px;text-align:right">'
+            +   '<button class="ico del" style="width:auto;padding:0 12px" title="Apagar categoria" onclick="apagar('+c.id+')">🗑 apagar categoria</button>'
+            + '</div>'
+          + '</div>'
+          : '')
+      + '</div>';
+  }).join('');
+}
+
+function linhaSub(s){
+  return '<div class="sub-row'+(s.ativo?'':' off')+'">'
+    + '<span class="sub-nome">'+esc(s.rotulo)+' <span class="sub-slug">'+esc(s.subcategoria)+'</span></span>'
+    + (s.ativo?'':'<span class="badge b-off">inativa</span>')
+    + '<button class="ico'+(s.dedutivel?' on':'')+'" title="'
+    +   (s.dedutivel?'Dedutível no IR — toque para tirar':'Não dedutível — toque para marcar')
+    + '" onclick="toggleDedut('+s.id+')">IR</button>'
+    + '<button class="ico" title="Editar" onclick="editar('+s.id+')">✎</button>'
+    + '<button class="ico del" title="Apagar" onclick="apagar('+s.id+')">🗑</button>'
+    + '</div>';
+}
+
+function abrir(cat){ abertas[cat]=!abertas[cat]; render(); }
+
+// ---------- criar ----------
+async function criarCategoria(){
+  const nome=(document.getElementById('nCatNome').value||'').trim();
+  const tipo=document.getElementById('nCatTipo').value;
+  if(!nome){ toast('⚠ Informe o nome','var(--yellow)','#0d0f14'); return; }
+  const slug=slugify(nome);
+  if(!slug){ toast('⚠ Nome inválido','var(--yellow)','#0d0f14'); return; }
+  const ja=CATS.find(c=>!c.subcategoria&&c.categoria===slug);
+  if(ja){ toast('⚠ Já existe: '+ja.rotulo,'var(--yellow)','#0d0f14'); abertas[slug]=true; render(); return; }
+  const ordem=Math.max(0,...CATS.filter(c=>!c.subcategoria).map(c=>+c.ordem||0))+10;
+  try{
+    await sbIns('categorias',{categoria:slug,subcategoria:null,rotulo:nome,tipo:tipo,dedutivel:false,ativo:true,ordem:ordem});
+    document.getElementById('nCatNome').value='';
+    abertas[slug]=true;
+    await carregar();
+    toast('✓ Categoria criada');
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+async function criarSub(cat){
+  const inp=document.getElementById('ns_'+cat);
+  if(!inp) return;
+  const nome=(inp.value||'').trim();
+  if(!nome){ toast('⚠ Informe o nome','var(--yellow)','#0d0f14'); return; }
+  const slug=slugify(nome);
+  if(!slug){ toast('⚠ Nome inválido','var(--yellow)','#0d0f14'); return; }
+  const ja=CATS.find(c=>c.categoria===cat&&c.subcategoria===slug);
+  if(ja){
+    if(!ja.ativo && confirm('"'+ja.rotulo+'" já existe aqui, mas está inativa.\n\nReativar?')){
+      try{ await sbUpd('categorias',ja.id,{ativo:true}); inp.value=''; await carregar(); toast('✓ Reativada'); }
+      catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+    } else { toast('⚠ Já existe nessa categoria','var(--yellow)','#0d0f14'); }
+    return;
+  }
+  const pai=CATS.find(c=>!c.subcategoria&&c.categoria===cat)||{tipo:'expense'};
+  const ordem=Math.max(0,...CATS.filter(c=>c.categoria===cat&&c.subcategoria).map(c=>+c.ordem||0))+10;
+  try{
+    await sbIns('categorias',{categoria:cat,subcategoria:slug,rotulo:nome,tipo:pai.tipo,dedutivel:false,ativo:true,ordem:ordem});
+    inp.value='';
+    await carregar();
+    toast('✓ Subcategoria criada');
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+// ---------- editar ----------
+let _ed=null;
+function editar(id){
+  const c=CATS.find(x=>x.id===id); if(!c) return;
+  _ed=c;
+  const ehSub=!!c.subcategoria;
+  document.getElementById('edTitulo').textContent=ehSub?'Editar subcategoria':'Editar categoria';
+  document.getElementById('edSub').textContent=ehSub
+    ? ('código interno: '+c.categoria+' / '+c.subcategoria)
+    : ('código interno: '+c.categoria);
+  document.getElementById('edNome').value=c.rotulo;
+  document.getElementById('edTipo').value=c.tipo||'expense';
+  document.getElementById('edDedut').checked=!!c.dedutivel;
+  document.getElementById('edAtivo').checked=!!c.ativo;
+  // dedutibilidade so existe na subcategoria; tipo so na categoria
+  document.getElementById('edDedutBox').style.display=ehSub?'flex':'none';
+  document.getElementById('edTipoBox').style.display=ehSub?'none':'block';
+  document.getElementById('edAviso').textContent=
+    'O nome muda só na tela. O código interno continua o mesmo, então os lançamentos já registrados seguem ligados aqui.';
+  document.getElementById('edModal').classList.add('on');
+  setTimeout(()=>{try{document.getElementById('edNome').focus();}catch(e){}},80);
+}
+function fecharEd(){ document.getElementById('edModal').classList.remove('on'); _ed=null; }
+
+async function salvarEdicao(){
+  if(!_ed) return;
+  const nome=(document.getElementById('edNome').value||'').trim();
+  if(!nome){ toast('⚠ Informe o nome','var(--yellow)','#0d0f14'); return; }
+  const ehSub=!!_ed.subcategoria;
+  const d={rotulo:nome, ativo:document.getElementById('edAtivo').checked};
+  if(ehSub) d.dedutivel=document.getElementById('edDedut').checked;
+  else      d.tipo=document.getElementById('edTipo').value;
+  try{
+    await sbUpd('categorias',_ed.id,d);
+    // tipo da categoria desce para as subcategorias, para nao divergir
+    if(!ehSub && d.tipo!==_ed.tipo){
+      const filhas=CATS.filter(c=>c.subcategoria&&c.categoria===_ed.categoria);
+      for(const f of filhas){ try{ await sbUpd('categorias',f.id,{tipo:d.tipo}); }catch(e){} }
+    }
+    fecharEd(); await carregar();
+    toast('✓ Salvo');
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+async function toggleDedut(id){
+  const c=CATS.find(x=>x.id===id); if(!c) return;
+  const novo=!c.dedutivel;
+  try{
+    await sbUpd('categorias',id,{dedutivel:novo});
+    await carregar();
+    toast(novo?'✓ Marcado como dedutível':'Tirado da dedução', novo?'var(--green)':'var(--muted)','#0d0f14');
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+// ---------- apagar ----------
+// So apaga o que nunca foi usado. Com lancamento, oferece desativar: senao
+// o historico passaria a apontar para algo que nao existe mais.
+async function usos(c){
+  let q='select=id&limit=1&category=eq.'+encodeURIComponent(c.categoria);
+  if(c.subcategoria) q+='&subcategory=eq.'+encodeURIComponent(c.subcategoria);
+  const r=await sbGet('transactions',q);
+  return r.length;
+}
+
+async function apagar(id){
+  const c=CATS.find(x=>x.id===id); if(!c) return;
+  const ehSub=!!c.subcategoria;
+
+  if(!ehSub){
+    const filhas=CATS.filter(x=>x.subcategoria&&x.categoria===c.categoria);
+    if(filhas.length){
+      alert('"'+c.rotulo+'" tem '+filhas.length+' subcategoria(s).\n\nApague ou mova as subcategorias primeiro, ou use Editar → desmarcar "Ativa" para esconder a categoria.');
+      return;
+    }
+  }
+
+  let n;
+  try{ n=await usos(c); }
+  catch(e){ toast('✕ Não consegui verificar o uso: '+e.message,'var(--red)','white'); return; }
+
+  if(n){
+    if(confirm('"'+c.rotulo+'" já tem lançamentos — apagar deixaria o histórico órfão.\n\nQuer DESATIVAR? Ela sai da lista de escolha e o histórico fica intacto.')){
+      try{ await sbUpd('categorias',id,{ativo:false}); await carregar(); toast('Desativada','var(--muted)','#0d0f14'); }
+      catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+    }
+    return;
+  }
+  if(!confirm('Apagar "'+c.rotulo+'" de vez?\n\nNunca foi usada em nenhum lançamento.')) return;
+  try{
+    await sbDel('categorias',id);
+    if(!ehSub) delete abertas[c.categoria];
+    await carregar();
+    toast('Apagada','var(--red)','white');
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+// ---------- entrada ----------
+// Tela sem login proprio: o auth.js injeta o dele e so libera com sessao.
+document.addEventListener('DOMContentLoaded',function(){
+  var e=document.getElementById('appVer'); if(e) e.textContent=APP_VERSION;
+  document.getElementById('edModal').addEventListener('click',function(ev){ if(ev.target===this) fecharEd(); });
+  JRAuth.protege(function(){ carregar(); });
+});
+</script>
+</body>
+</html>
