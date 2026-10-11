@@ -1301,7 +1301,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.11-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.11-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1604,8 +1604,12 @@ function dedutivelDespesa(cat, sub){
 function rendimentoDeclaravel(cat, sub){
   if(cat==='transferencia') return false;
   if(CATTAB && CATTAB.algumaReceita){
-    const r = CATTAB.porSub[cat+'|'+String(sub||'')] || CATTAB.porCat[cat];
-    return r ? !!r.dedutivel : false;
+    // OU, não "subcategoria manda". Marcar a categoria 'Dividendos' tem de
+    // valer para Dividendos e JCP; antes a subcategoria desmarcada vencia a
+    // categoria marcada, e o quadro ficava vazio sem explicação.
+    const rc = CATTAB.porCat[cat];
+    const rs = CATTAB.porSub[cat+'|'+String(sub||'')];
+    return !!((rc && rc.dedutivel) || (rs && rs.dedutivel));
   }
   return INC.has(cat);
 }

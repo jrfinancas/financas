@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.11-a';
+var APP_VERSION='v2026.10.11-b';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -239,8 +239,37 @@ async function carregaCatTab(){
       else porCat[x.categoria] = x;
     });
     CATTAB = {porSub:porSub, porCat:porCat, n:rows.length};
+    // A tabela tambem manda nas listas dos menus. Antes DESP_CATS, RECE_CATS
+    // e SUBS eram fixos aqui e tinham ficado atras do lancamentos.html —
+    // 'saude' ainda listava 'Nutricionista/Psicologo' junto.
+    var ativas = rows.filter(function(x){ return x.ativo !== false; });
+    var cats = ativas.filter(function(x){ return !x.subcategoria; });
+    if(cats.length){
+      var desp=[], rece=[], subs={}, inc=[];
+      cats.sort(function(a,b){ return (a.ordem||0)-(b.ordem||0) || String(a.rotulo).localeCompare(String(b.rotulo),'pt-BR'); });
+      cats.forEach(function(c){
+        (c.tipo==='income' ? rece : desp).push([c.categoria, c.rotulo]);
+        if(c.tipo==='income') inc.push(c.categoria);
+        subs[c.categoria] = ativas
+          .filter(function(s){ return s.subcategoria && s.categoria===c.categoria; })
+          .sort(function(a,b){ return (a.ordem||0)-(b.ordem||0) || String(a.rotulo).localeCompare(String(b.rotulo),'pt-BR'); })
+          .map(function(s){ return s.rotulo; });
+      });
+      DESP_CATS = desp; RECE_CATS = rece; SUBS = subs; INC = inc;
+      // O slug e o da TABELA, nao o derivado do rotulo: evita 'Plano de
+      // Saude' virar 'plano_de_saude' quando no banco esta 'plano_saude'.
+      SLUG_ROTULO = {};
+      ativas.forEach(function(s){
+        if(s.subcategoria) SLUG_ROTULO[s.categoria+'|'+s.rotulo] = s.subcategoria;
+      });
+    }
   }catch(e){ console.error('categorias:', e); CATTAB = null; }
   return CATTAB;
+}
+var SLUG_ROTULO = {};
+// Rotulo -> slug: usa o que esta na tabela e, sem par, deriva do texto.
+function slugDaSub(cat, rotulo){
+  return SLUG_ROTULO[cat+'|'+rotulo] || subKey(rotulo);
 }
 // Regra antiga, guardada so para o caso de a tabela nao responder.
 function isDeductibleFixo(cat, sub){
@@ -250,11 +279,14 @@ function isDeductibleFixo(cat, sub){
 }
 function isDeductible(cat, sub){
   if(CATTAB){
-    // Despesa resolve so pela subcategoria; receita cai na categoria.
-    var ehReceita = (INC.indexOf(cat) >= 0);
-    var r = CATTAB.porSub[cat+'|'+String(sub||'')];
-    if(!r && ehReceita) r = CATTAB.porCat[cat];
-    return r ? !!r.dedutivel : false;
+    var rs = CATTAB.porSub[cat+'|'+String(sub||'')];
+    // Receita: categoria OU subcategoria marcada. Despesa: só a subcategoria
+    // (medicamentos e nutricionista moram em 'saude' e não deduzem).
+    if(INC.indexOf(cat) >= 0){
+      var rc = CATTAB.porCat[cat];
+      return !!((rc && rc.dedutivel) || (rs && rs.dedutivel));
+    }
+    return rs ? !!rs.dedutivel : false;
   }
   return isDeductibleFixo(cat, sub);
 }
@@ -265,8 +297,14 @@ function fillSubEmail(idx, sel){
   if(!s) return;
   s.innerHTML='<option value="">—</option>';
   (SUBS[cat]||[]).forEach(function(x){
-    var o=document.createElement('option'); o.value=subKey(x); o.textContent=x;
-    if(sel && (subKey(x)===subKey(sel))) o.selected=true;
+    var slug=slugDaSub(cat,x);
+    var o=document.createElement('option'); o.value=slug; o.textContent=x;
+    // Casa o palpite da IA pelo slug OU pelo texto, para 'Medicamento' no
+    // singular tambem achar 'Medicamentos'.
+    if(sel){
+      var a=subKey(sel), b=subKey(x);
+      if(slug===sel || a===b || a===slug || b.indexOf(a)===0 || a.indexOf(b)===0) o.selected=true;
+    }
     s.appendChild(o);
   });
   var tag=document.getElementById('sf_tag'+idx);
@@ -705,6 +743,8 @@ async function skip(idx, msgId) {
 }
 
 async function init() {
+  // A tabela tem de estar na mao ANTES de montar os menus de categoria.
+  await carregaCatTab();
   var cpf = localStorage.getItem(CPF_KEY);
   if (cpf) {
     document.getElementById('cpfCard').style.borderColor = 'var(--green)';
