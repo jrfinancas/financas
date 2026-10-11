@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.10-c';
+var APP_VERSION='v2026.10.10-d';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -218,7 +218,12 @@ var INC = ['salario','bonus','dividendos','outras-entradas'];
 var DED = ['saude','educacao','impostos','salario','bonus','dividendos'];
 var NON_DED_SUBS = ['medicamentos','academia','outros_impostos'];
 
-function subKey(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,'_'); }
+// Mesma regra do lancamentos: tira o acento ANTES, senao 'Médicos'
+// vira 'm_dicos' e o lancamento nasce orfao da tabela de categorias.
+function subKey(s){
+  return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+}
 function isDeductible(cat, sub){
   if(cat==='seguros'||cat==='outras-entradas') return false;
   if(NON_DED_SUBS.indexOf(sub)>=0) return false;
