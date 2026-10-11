@@ -56,6 +56,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .b-inc{background:rgba(52,211,153,.15);color:var(--green)}
 .b-ir{background:rgba(79,142,247,.15);color:var(--accent)}
 .b-off{background:rgba(107,114,128,.2);color:var(--muted)}
+.b-warn{background:rgba(248,113,113,.15);color:var(--red)}
 /* subcategoria */
 .sub-row{display:flex;align-items:center;gap:7px;padding:8px 0;border-bottom:1px solid rgba(37,42,56,.55)}
 .sub-row:last-of-type{border-bottom:none}
@@ -159,7 +160,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.10.11-b';
+const APP_VERSION='v2026.10.11-c';
 
 async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
@@ -248,6 +249,8 @@ function linhaSub(s){
   return '<div class="sub-row'+(s.ativo?'':' off')+'">'
     + '<span class="sub-nome">'+esc(s.rotulo)+' <span class="sub-slug">'+esc(s.subcategoria)+'</span></span>'
     + (s.ativo?'':'<span class="badge b-off">inativa</span>')
+    + ((s.dedutivel && AVISA_IR[s.categoria+'|'+String(s.subcategoria||'')])
+        ? '<span class="badge b-warn" title="O painel de IR ignora esta marca: IRRF não é dedução">⚠ ignorado</span>' : '')
     + '<button class="ico'+(s.dedutivel?' on':'')+'" title="'
     +   (s.tipo==='income'
           ? (s.dedutivel?'Entra como rendimento declarável — toque para tirar':'Fora dos rendimentos — toque para incluir')
@@ -340,7 +343,10 @@ async function salvarEdicao(){
   if(!nome){ toast('⚠ Informe o nome','var(--yellow)','#0d0f14'); return; }
   const ehSub=!!_ed.subcategoria;
   const d={rotulo:nome, ativo:document.getElementById('edAtivo').checked};
-  if(ehSub){ d.dedutivel=document.getElementById('edDedut').checked; }
+  if(ehSub){
+    d.dedutivel=document.getElementById('edDedut').checked;
+    if(d.dedutivel && !_ed.dedutivel && !avisoDedut(_ed)) return;
+  }
   else{
     d.tipo=document.getElementById('edTipo').value;
     // receita tem marca na categoria; despesa nao (vive na subcategoria)
@@ -358,9 +364,28 @@ async function salvarEdicao(){
   }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
 }
 
+// IRRF é imposto já retido, não dedução. Marcar isto como dedutível infla a
+// dedução na declaração. Não bloqueio — o app é seu — mas aviso antes.
+const AVISA_IR = {
+  'impostos|ir_folha':'IRRF retido na folha',
+  'impostos|ir__folha_':'IRRF retido na folha',
+  'impostos|irrf':'IRRF'
+};
+function avisoDedut(c){
+  const nome = AVISA_IR[c.categoria+'|'+String(c.subcategoria||'')];
+  if(!nome) return true;
+  return confirm('⚠ ' + nome + ' não é dedução.\n\n'
+    + 'É imposto que você já pagou — entra em outro campo da declaração, não '
+    + 'como dedução. Marcar aqui soma R$ 21 mil indevidos na sua dedução.\n\n'
+    + 'O painel de IR já mostra o IRRF no quadro "Retenções na fonte", que é '
+    + 'onde ele serve para conferência, e vai ignorar esta marca.\n\n'
+    + 'Marcar mesmo assim?');
+}
+
 async function toggleDedut(id){
   const c=CATS.find(x=>x.id===id); if(!c) return;
   const novo=!c.dedutivel;
+  if(novo && !avisoDedut(c)) return;
   try{
     await sbUpd('categorias',id,{dedutivel:novo});
     await carregar();

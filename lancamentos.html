@@ -720,6 +720,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       </div>
       <div class="irkpi" id="irKpis"></div>
       <div id="irFonte" style="font-size:10px;color:var(--muted);opacity:.7;margin-top:10px"></div>
+      <div id="irAviso"></div>
     </div>
     <div class="card"><div class="card-title" style="color:var(--yellow)">⏳ Pendentes de comprovante</div><div id="irPend"></div></div>
     <div class="card">
@@ -1301,7 +1302,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.11-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.11-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1590,14 +1591,33 @@ async function carregaCatTab(){
   }catch(e){ console.error('categorias:',e); CATTAB = null; }
   return CATTAB;
 }
+// IRRF é imposto JÁ PAGO, não dedução. Isso é regra da Receita, não
+// preferência, e errar aqui infla a dedução numa declaração de verdade.
+// Então nem a tabela pode torná-lo dedutível. Ele continua visível no
+// quadro 'Retenções na fonte', que é onde serve para conferência.
+const NAO_DEDUZ_NUNCA = new Set(['impostos|ir_folha','impostos|ir__folha_',
+                                 'impostos|irrf','impostos|ir_retido']);
 // DESPESA: resolve só pela subcategoria. Medicamentos e nutricionista moram
 // em 'saude' e não são dedutíveis, então a categoria não serve de atalho.
 function dedutivelDespesa(cat, sub){
+  const chave = cat+'|'+String(sub||'');
+  if(NAO_DEDUZ_NUNCA.has(chave)) return false;
   if(CATTAB){
-    const r = CATTAB.porSub[cat+'|'+String(sub||'')];
+    const r = CATTAB.porSub[chave];
     return r ? !!r.dedutivel : false;
   }
   return isDeductible(cat, sub);
+}
+// Marcas da tabela que estou ignorando de propósito — para avisar na tela
+// em vez de corrigir por baixo do pano.
+function marcasIgnoradas(){
+  if(!CATTAB) return [];
+  const fora = [];
+  NAO_DEDUZ_NUNCA.forEach(function(k){
+    const r = CATTAB.porSub[k];
+    if(r && r.dedutivel) fora.push(k.replace('|',' / '));
+  });
+  return fora;
 }
 // RECEITA: resolve pela subcategoria e, sem par, cai na categoria.
 // 'transferencia' nunca é rendimento: é dinheiro dele andando de conta.
@@ -2417,6 +2437,26 @@ async function loadIR() {
           </div><div style="display:none">${rows}${more}</div>`;
         }).join('')
         : '<div style="color:var(--muted);font-size:13px;padding:10px 0">Nada fora. Todas as entradas do ano são rendimento declarável.</div>';
+
+      // Receita de verdade que caiu aqui so porque a CATEGORIA nao esta
+      // marcada. E o caso dos lancamentos antigos do Quicken, que vieram
+      // sem subcategoria: sem marca na categoria, nao ha o que consultar.
+      const semMarca = sortedNao.filter(function(p){
+        const r = CATTAB && CATTAB.porCat[p[0]];
+        return r && r.tipo==='income' && !r.dedutivel;
+      });
+      if(semMarca.length){
+        const tSem = semMarca.reduce((s,p)=>s+p[1],0);
+        elNao.insertAdjacentHTML('afterbegin', `
+          <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--yellow);line-height:1.5;margin-bottom:12px">
+            <b>⚠ R$ ${fmt(tSem)}</b> aqui é receita de verdade:
+            ${semMarca.map(p=>(CLABEL[p[0]]||p[0])+' (R$ '+fmt(p[1])+')').join(', ')}.
+            A categoria não está marcada como rendimento declarável.
+            Marque o selo IR na linha da categoria em
+            <a href="categorias.html" style="color:var(--yellow);text-decoration:underline">Categorias</a>
+            e isto passa para o quadro de cima.
+          </div>`);
+      }
     }
     // De onde saiu a regra, para nao ter de adivinhar
     const elFonte=document.getElementById('irFonte');
@@ -2424,6 +2464,20 @@ async function loadIR() {
       ? ('Regra vinda da tabela Categorias (' + CATTAB.n + ' linhas)'
          + (CATTAB.algumaReceita ? '' : ' · nenhuma receita marcada ainda, usando a lista antiga nesse lado'))
       : 'Tabela Categorias não respondeu — usando a lista fixa do código';
+    // Aviso em vez de correcao silenciosa
+    const elAviso=document.getElementById('irAviso');
+    if(elAviso){
+      const fora=marcasIgnoradas();
+      elAviso.innerHTML = fora.length ? `
+        <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--red);line-height:1.5;margin-top:10px">
+          <b>⚠ ${fora.join(', ')}</b> está marcado como dedutível na tabela e eu
+          <b>não</b> estou somando. IRRF é imposto já retido, não dedução — entraria
+          como dedução indevida na declaração. Ele aparece em <b>Retenções na fonte</b>,
+          que é onde serve para conferência.
+          Para tirar o aviso, desmarque o selo IR dele em
+          <a href="categorias.html" style="color:var(--red);text-decoration:underline">Categorias</a>.
+        </div>` : '';
+    }
   } catch(e){ console.error('IR:',e); }
 }
 
