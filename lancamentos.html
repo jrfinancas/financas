@@ -732,6 +732,15 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <div id="irDedDetail" style="margin-top:12px"></div>
     </div>
     <div class="card">
+      <div class="card-title">Conferência por subcategoria</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px">
+        Tudo o que você gastou no ano em Saúde, Educação e Impostos, com o que
+        cada subcategoria está somando na dedução. É aqui que se vê de onde vem
+        uma diferença no total, sem precisar consultar o banco.
+      </div>
+      <div id="irRecon"></div>
+    </div>
+    <div class="card">
       <div class="card-title">Rendimentos declaráveis</div>
       <div id="irInc"></div>
       <div id="irIncDetail" style="margin-top:12px"></div>
@@ -1302,7 +1311,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.11-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.11-d';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2361,7 +2370,11 @@ async function loadIR() {
     const di=allTxs.filter(t=>t.type==='income'  && rendimentoDeclaravel(t.category,t.subcategory||''));
     const dnao=allTxs.filter(t=>t.type==='income' && !rendimentoDeclaravel(t.category,t.subcategory||''));
     const txs=de.concat(di);
-    const pend=allTxs.filter(t=>t.receipt_status==='pending' && dedutivelDespesa(t.category, t.subcategory||''));
+    // Só DESPESA pede comprovante de dedução. Faltava este t.type: a marca
+    // de 'salario/salario_bruto' é "rendimento declarável", e sem o filtro o
+    // holerite da Kaizen caía aqui desenhado como despesa, com sinal negativo.
+    const pend=allTxs.filter(t=>t.type==='expense' && t.receipt_status==='pending'
+                                && dedutivelDespesa(t.category, t.subcategory||''));
     const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
 
     // ---- Informados na declaracao, mas NAO sao deducao ----
@@ -2412,6 +2425,49 @@ async function loadIR() {
         <span style="font-weight:600;color:var(--green)">+R$ ${fmt(amt)}</span>
       </div><div style="display:none">${rows}${more}</div>`;
     }).join('')||'<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhum rendimento</div>';
+
+    // ---- Conferencia por subcategoria ----
+    // DED = saude, educacao, impostos: as categorias que PODEM conter
+    // deducao. Mostra cada subcategoria com movimento no ano e se ela esta
+    // somando, para a diferenca no total se explicar sozinha.
+    const elRec=document.getElementById('irRecon');
+    if(elRec){
+      const mapa={};
+      allTxs.filter(t=>t.type==='expense' && DED.has(t.category)).forEach(function(t){
+        const sub=String(t.subcategory||''), k=t.category+'|'+sub;
+        if(!mapa[k]) mapa[k]={cat:t.category,sub:sub,n:0,v:0,
+                              deduz:dedutivelDespesa(t.category,sub),
+                              ignorada:NAO_DEDUZ_NUNCA.has(k)};
+        mapa[k].n++; mapa[k].v+=parseFloat(t.amount)||0;
+      });
+      const linhas=Object.values(mapa).sort((a,b)=>b.v-a.v);
+      const soma=a=>a.reduce((s,l)=>s+l.v,0);
+      const dentro=linhas.filter(l=>l.deduz), fora=linhas.filter(l=>!l.deduz);
+      const bloco=(titulo,arr,cor)=>arr.length?(
+        '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:'+cor+';margin:14px 0 6px">'
+        + titulo + ' · R$ ' + fmt(soma(arr)) + '</div>'
+        + arr.map(l=>'<div class="ircrow" style="font-size:12px">'
+            + '<span>' + (CLABEL[l.cat]||l.cat) + ' / <b>' + (l.sub||'(sem subcategoria)') + '</b>'
+            + ' <span style="font-size:10px;color:var(--muted)">(' + l.n + ')</span>'
+            + (l.ignorada?' <span style="font-size:10px;color:var(--red)">⚠ não é dedução</span>':'')
+            + '</span><span style="color:'+cor+'">R$ ' + fmt(l.v) + '</span></div>').join('')
+      ):'';
+      elRec.innerHTML = linhas.length
+        ? bloco('Somando na dedução', dentro, 'var(--green)')
+          + bloco('Fora da dedução', fora, 'var(--muted)')
+          + '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;display:flex;justify-content:space-between;font-size:13px;font-weight:600">'
+          + '<span>Soma do que está deduzindo</span><span style="color:var(--green)">R$ ' + fmt(soma(dentro)) + '</span></div>'
+          + (Math.abs(soma(dentro)-te) > 0.005
+              ? '<div style="font-size:11px;color:var(--yellow);margin-top:8px;line-height:1.5">'
+                + '⚠ O total do painel é R$ ' + fmt(te) + ', e esta soma dá R$ ' + fmt(soma(dentro))
+                + '. A diferença de R$ ' + fmt(Math.abs(te-soma(dentro)))
+                + ' é dedução fora de Saúde, Educação e Impostos — me avise, porque não deveria existir.</div>'
+              : '')
+          + '<div style="font-size:11px;color:var(--muted);margin-top:6px">'
+          + 'Para mudar qualquer linha, use o selo IR em '
+          + '<a href="categorias.html" style="color:var(--accent)">Categorias</a>.</div>'
+        : '<div style="color:var(--muted);font-size:13px;padding:10px 0">Nenhum gasto nessas categorias em ' + year + '.</div>';
+    }
 
     // ---- Entradas que NAO sao rendimento declaravel ----
     // Nada fica escondido: se algo legitimo caiu aqui, e porque a
