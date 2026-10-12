@@ -1311,7 +1311,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.11-d';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.12-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1530,6 +1530,20 @@ function startApp() {
   sync('ok');
   loadPayees();
   loadRecs();
+  // A tabela 'categorias' manda nas listas e na regra do IR. Busca aqui,
+  // uma vez por sessao da aba, e remonta os selects com o que vier.
+  carregaCatTab().then(function(){
+    try{
+      montaSelectsCategoria();
+      ['nCat','eCat','recCat'].forEach(function(id){
+        const el=document.getElementById(id);
+        if(el && el.value){
+          const sub={nCat:'nSub',eCat:'eSub',recCat:'recSub'}[id];
+          if(document.getElementById(sub)) fillSub(sub,id);
+        }
+      });
+    }catch(e){ console.error('menus:',e); }
+  });
 }
 
 // ============================================================
@@ -1587,7 +1601,12 @@ function isDeductible(cat, sub){
 let CATTAB = null;
 async function carregaCatTab(){
   try{
-    const rows = await sbGet('categorias','select=categoria,subcategoria,tipo,dedutivel&limit=2000');
+    const rows = await sbGet('categorias','select=categoria,subcategoria,rotulo,tipo,dedutivel,ativo,ordem&limit=2000');
+    // Tabela VAZIA não é tabela. O PostgREST devolve zero linhas sem erro
+    // quando a política de RLS não cobre o papel da sessão — foi o que
+    // esvaziou as contas em 3/out. Se caísse aqui, nada seria dedutível e a
+    // dedução iria a zero sem nenhum aviso.
+    if(!rows.length) throw new Error('tabela categorias voltou vazia');
     const porSub = {}, porCat = {};
     rows.forEach(function(r){
       if(r.subcategoria) porSub[r.categoria+'|'+r.subcategoria] = r;
@@ -1596,9 +1615,69 @@ async function carregaCatTab(){
     // Se nenhuma receita foi marcada ainda, a tabela nao manda no lado das
     // receitas — senao o painel zerava sem aviso.
     const algumaReceita = rows.some(function(r){ return r.tipo==='income' && r.dedutivel; });
-    CATTAB = {porSub, porCat, n:rows.length, algumaReceita};
+
+    // ---- A tabela tambem manda nas LISTAS dos formularios ----
+    // Antes CLABEL, SUBS, INC e DED eram fixos no codigo, e era por isso que
+    // criar uma subcategoria na tela de Categorias nao fazia ela aparecer na
+    // hora de lancar.
+    const ativas = rows.filter(r=>r.ativo!==false);
+    const raiz = ativas.filter(r=>!r.subcategoria)
+      .sort((a,b)=>(a.ordem||0)-(b.ordem||0) || String(a.rotulo).localeCompare(String(b.rotulo),'pt-BR'));
+    const desp=[], rece=[], subs={}, clab={}, inc=new Set(), ded=new Set(), slug={};
+    raiz.forEach(function(c){
+      clab[c.categoria] = c.rotulo;
+      (c.tipo==='income' ? rece : desp).push([c.categoria, c.rotulo]);
+      if(c.tipo==='income') inc.add(c.categoria);
+      const filhas = ativas.filter(s=>s.subcategoria && s.categoria===c.categoria)
+        .sort((a,b)=>(a.ordem||0)-(b.ordem||0) || String(a.rotulo).localeCompare(String(b.rotulo),'pt-BR'));
+      subs[c.categoria] = filhas.map(s=>s.rotulo);
+      // DED = categoria que PODE conter deducao, para decidir se pede
+      // comprovante. Sai da tabela em vez das tres fixas.
+      if(c.tipo!=='income' && filhas.some(s=>s.dedutivel)) ded.add(c.categoria);
+    });
+    // Rotulo -> slug DA TABELA, nunca derivado do texto: 'Plano de Saúde'
+    // no banco e 'plano_saude', e nao 'plano_de_saude'.
+    ativas.forEach(function(s){
+      if(s.subcategoria) slug[s.categoria+'|'+s.rotulo] = s.subcategoria;
+    });
+    if(raiz.length){
+      CLABEL = clab; SUBS = subs; INC = inc;
+      if(ded.size) DED = ded;
+      SLUG_ROTULO = slug;
+    }
+    CATTAB = {porSub, porCat, n:rows.length, algumaReceita, desp, rece};
   }catch(e){ console.error('categorias:',e); CATTAB = null; }
   return CATTAB;
+}
+let SLUG_ROTULO = {};
+function slugDaSub(cat, rotulo){
+  return SLUG_ROTULO[cat+'|'+rotulo] || subKeyOf(rotulo);
+}
+// Reescreve as opcoes dos selects de categoria a partir da tabela,
+// preservando o que estava escolhido e a primeira opcao vazia do HTML.
+function optsCategoria(sel){
+  if(!CATTAB || !CATTAB.desp || !CATTAB.desp.length) return null;
+  const esc=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const grp=(rot,arr)=>arr.length
+    ? '<optgroup label="'+rot+'">'+arr.map(c=>'<option value="'+esc(c[0])+'"'
+        +(c[0]===sel?' selected':'')+'>'+esc(c[1])+'</option>').join('')+'</optgroup>'
+    : '';
+  return grp('Despesas',CATTAB.desp)+grp('Receitas',CATTAB.rece);
+}
+function montaSelectsCategoria(){
+  const ids = ['nCat','eCat','recCat','histCat'];
+  // as linhas das abas Dividido e Recorrentes nascem antes da tabela chegar
+  document.querySelectorAll('select[id^="slc"],select[id^="rslc"]')
+    .forEach(function(el){ ids.push(el.id); });
+  ids.forEach(function(id){
+    const el=document.getElementById(id); if(!el) return;
+    const atual=el.value;
+    const html=optsCategoria(atual);
+    if(!html) return;                       // sem tabela, fica o HTML fixo
+    const vazia=el.querySelector('option[value=""]');
+    el.innerHTML=(vazia?vazia.outerHTML:'')+html;
+    if(atual) el.value=atual;
+  });
 }
 // IRRF é imposto JÁ PAGO, não dedução. Isso é regra da Receita, não
 // preferência, e errar aqui infla a dedução numa declaração de verdade.
@@ -1616,6 +1695,13 @@ function dedutivelDespesa(cat, sub){
     return r ? !!r.dedutivel : false;
   }
   return isDeductible(cat, sub);
+}
+// O que vai no campo is_deductible do banco. Uma funcao, os dois lados:
+// despesa -> deduz?   receita -> e rendimento declaravel?
+// Antes cada formulario chamava a lista fixa e o campo divergia da tela.
+function marcaIR(tipo, cat, sub){
+  return tipo==='income' ? rendimentoDeclaravel(cat, sub||'')
+                         : dedutivelDespesa(cat, sub||'');
 }
 // Marcas da tabela que estou ignorando de propósito — para avisar na tela
 // em vez de corrigir por baixo do pano.
@@ -1645,10 +1731,10 @@ function rendimentoDeclaravel(cat, sub){
 
 // Categorias que PODEM conter despesa dedutível — usada só para decidir
 // se vale pedir comprovante, nunca para marcar a dedução.
-const DED  = new Set(['saude','educacao','impostos']);
-const INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
+let DED  = new Set(['saude','educacao','impostos']);
+let INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
 
-const SUBS = {
+let SUBS = {
   aluguel:['Condomínio','Mensalidade'], animais:['Veterinário','Ração e Petshop','Outros'],
   arranjos:['Cuidados Domésticos','Manutenção','Móveis e Utensílios'],
   automovel:['Combustível','Estacionamento','Manutenção','Multas','Seguro'],
@@ -1663,7 +1749,7 @@ const SUBS = {
   salario:['13° Salário','Salário Bruto'], bonus:['Bônus'], dividendos:['Dividendos','JCP'], 'outras-entradas':['Outros Créditos']
 };
 
-const CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações'};
+let CLABEL = {aluguel:'Aluguel',animais:'Animais',arranjos:'Arranjos Dom.',automovel:'Automóvel',contas:'Contas',saude:'Saúde',viagens:'Viagens',impostos:'Impostos',hobbies:'Hobbies',vestuario:'Vestuário',seguros:'Seguros',educacao:'Educação',salario:'Salário',bonus:'Bônus',dividendos:'Dividendos','outras-despesas':'Outras Desp.','outras-entradas':'Outras Entr.',utilitarios:'Utilitários',juros:'Juros','despesas-trabalho':'Trab.','taxas-bancarias':'Taxas',doacoes:'Doações'};
 // Mapa: 4 últimos dígitos do cartão -> conta. Editar aqui quando renovar/trocar cartão.
 const CARDMAP = {
   '7346': 'santander-unique-visa',   // Visa Santander Unique
@@ -1682,10 +1768,16 @@ function subKeyOf(s){
   return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
 }
+// Estes eram os slugs QUEBRADOS da versão antiga ('sal_rio_bruto',
+// 'inss__folha_', 'm_dicos' para Plano de Saúde). Os lançamentos antigos já
+// foram renomeados no banco, mas cada holerite novo nascia errado de novo.
+// Agora batem com a tabela 'categorias'.
 const SUBKEY = {
-  'Salário Bruto':'sal_rio_bruto', '13° Salário':'13__sal_rio', 'Bônus':'b_nus', 'Férias':'sal_rio_bruto', 'Outras Entradas':'outros_cr_ditos',
-  'IR Retido na Fonte':'ir__folha_', 'INSS':'inss__folha_', 'Plano de Saúde':'m_dicos', 'Vale Transporte':'transporte',
-  'Previdência Privada':'previd_ncia_privada', 'Outros Descontos':'taxas'
+  'Salário Bruto':'salario_bruto', '13° Salário':'13_salario', 'Bônus':'bonus',
+  'Férias':'salario_bruto', 'Outras Entradas':'outros_creditos',
+  'IR Retido na Fonte':'ir_folha', 'INSS':'inss_folha',
+  'Plano de Saúde':'plano_saude', 'Vale Transporte':'transporte',
+  'Previdência Privada':'previdencia_privada', 'Outros Descontos':'taxas'
 };
 
 // ============================================================
@@ -1856,7 +1948,9 @@ function fillSub(subId, catId) {
   const cat=document.getElementById(catId).value;
   const sel=document.getElementById(subId);
   sel.innerHTML='<option value="">—</option>';
-  (SUBS[cat]||[]).forEach(s=>{const o=document.createElement('option');o.value=subKeyOf(s);o.textContent=s;sel.appendChild(o);});
+  // slugDaSub: o valor sai da tabela. Derivar do rótulo criava divergência
+  // ('Plano de Saúde' -> plano_de_saude, quando no banco é plano_saude).
+  (SUBS[cat]||[]).forEach(s=>{const o=document.createElement('option');o.value=slugDaSub(cat,s);o.textContent=s;sel.appendChild(o);});
 }
 
 function setType(px, t, btn) {
@@ -1897,7 +1991,7 @@ function onCatCh(px) {
   fillSub(px+'Sub', px+'Cat');
   const badge=document.getElementById(px+'DedBadge');
   const subVal=(document.getElementById('nSub')?.value)||'';
-  const isDedutivel=isDeductible(cat, subVal);
+  const isDedutivel=dedutivelDespesa(cat, subVal);
   if(badge) badge.style.display=isDedutivel?'inline-flex':'none';
   if(px==='n' && DED.has(cat) && !INC.has(cat) && !nB64 && nRS==='na') setRS('pending',document.getElementById('rPnd'));
 }
@@ -1992,7 +2086,7 @@ Continuar mesmo assim?`;
         payee,payee_display:inst>1?`${payee} (${i+1}/${inst})`:null,
         account:acct,category:cat,subcategory:document.getElementById('nSub').value||null,
         memo:document.getElementById('nMemo').value||null,
-        receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:isDeductible(cat, sub),
+        receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:marcaIR((nType==='exp'||nType==='trf')?'expense':'income', cat, sub),
         installments:inst,installment_num:i+1,group_id:gid,
         fx:i===0&&pendFX?pendFX:null});
     }
@@ -2058,8 +2152,11 @@ function addSLine(pre) {
   const DESP=[['aluguel','Aluguel'],['animais','Animais de Estimação'],['arranjos','Arranjos Domésticos'],['automovel','Automóvel'],['contas','Contas'],['despesas-trabalho','Desp. Trabalho'],['doacoes','Doações'],['educacao','Educação'],['hobbies','Hobbies e Lazer'],['impostos','Impostos'],['juros','Juros'],['outras-despesas','Outras Despesas'],['saude','Saúde e Fitness'],['seguros','Seguros'],['taxas-bancarias','Taxas Bancárias'],['utilitarios','Utilitários'],['vestuario','Vestuário'],['viagens','Viagens']];
   const RECE=[['salario','Salários'],['bonus','Bônus'],['dividendos','Dividendos'],['outras-entradas','Outras Entradas']];
   const opt=(a)=>a.map(([v,l])=>`<option value="${v}"${pre?.category===v?' selected':''}>${l}</option>`).join('');
+  // Da tabela quando ela respondeu; as duas listas acima ficam de reserva.
+  const grupos = optsCategoria(pre?.category)
+    || ('<optgroup label="Despesas">'+opt(DESP)+'</optgroup><optgroup label="Receitas">'+opt(RECE)+'</optgroup>');
   div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n} <span id="sltag${n}" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:6px"></span></span><button class="rmvbtn" onclick="document.getElementById('sl${n}').remove();chkSplit()">×</button></div>
-  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="onSplitCat(${n})" style="font-size:13px"><option value="">Selecionar...</option><optgroup label="Despesas">${opt(DESP)}</optgroup><optgroup label="Receitas">${opt(RECE)}</optgroup></select></div>
+  <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="slc${n}" onchange="onSplitCat(${n})" style="font-size:13px"><option value="">Selecionar...</option>${grupos}</select></div>
   <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="slsub${n}" style="font-size:13px"><option value="">—</option></select></div>
   <div><label class="fl" style="font-size:10px">Valor R$</label><input type="text" inputmode="decimal" class="fi" id="sla${n}" placeholder="0,00" value="${pre?.amount?fmt(Math.abs(pre.amount)):''}" oninput="chkSplit()"></div></div>
   <div><label class="fl" style="font-size:10px">Descrição</label><input type="text" class="fi" id="sld${n}" placeholder="Opcional" value="${pre?.desc||''}" style="font-size:13px"></div>`;
@@ -2122,7 +2219,7 @@ async function saveSplit() {
   sync('busy');
   try {
     const gid=Date.now();
-    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,group_id:gid,type:l.type,amount:l.amount,date,payee,payee_display:payee,account:acct,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:l.type==='expense'?isDeductible(l.category, l.subcategory||''):false,receipt_status:sB64?'attached':'na',is_split:true,split_total:tot,installments:1,installment_num:1,from_recorrente:false})));
+    await sbIns('transactions',lines.map((l,i)=>({id:gid+i,group_id:gid,type:l.type,amount:l.amount,date,payee,payee_display:payee,account:acct,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:marcaIR(l.type, l.category, l.subcategory||''),receipt_status:sB64?'attached':'na',is_split:true,split_total:tot,installments:1,installment_num:1,from_recorrente:false})));
     await upsertPayee(payee,null,null);
     sync('ok'); toast(`✓ ${lines.length} linhas salvas!`,'var(--green)','#0d0f14'); clearSplit();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
@@ -2189,12 +2286,12 @@ async function savePayslip() {
   document.querySelectorAll('#pIncLines .psrow').forEach(row=>{
     const lbl=row.querySelector('select').value;
     const amt=psNum(row.querySelector('input').value);
-    if(amt>0) rows.push({id:gid+(idx++),type:'income',amount:amt,date,payee:label,account:ac,category:INCMAP[lbl]||'salario',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:isDeductible(INCMAP[lbl]||'salario',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
+    if(amt>0) rows.push({id:gid+(idx++),type:'income',amount:amt,date,payee:label,account:ac,category:INCMAP[lbl]||'salario',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:marcaIR('income',INCMAP[lbl]||'salario',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
   });
   document.querySelectorAll('#pDedLines .psrow').forEach(row=>{
     const lbl=row.querySelector('select').value;
     const amt=psNum(row.querySelector('input').value);
-    if(amt>0) rows.push({id:gid+(idx++),type:'expense',amount:amt,date,payee:label,account:ac,category:DEDMAP[lbl]||'outras-despesas',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:isDeductible(DEDMAP[lbl]||'outras-despesas',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
+    if(amt>0) rows.push({id:gid+(idx++),type:'expense',amount:amt,date,payee:label,account:ac,category:DEDMAP[lbl]||'outras-despesas',subcategory:SUBKEY[lbl]||subKeyOf(lbl),memo:label,is_deductible:marcaIR('expense',DEDMAP[lbl]||'outras-despesas',SUBKEY[lbl]||subKeyOf(lbl)),receipt_status:pB64?'attached':'pending',is_payslip:true,payslip_month:mo});
   });
   if(!rows.length){toast('⚠ Preencha pelo menos um valor','#fbbf24','#0d0f14');return;}
   sync('busy');
@@ -2246,7 +2343,7 @@ async function saveEdit() {
       category:eCat,subcategory:eSub,
       memo:document.getElementById('eMemo').value||null,
       receipt_status:eReceiptStatus,
-      is_deductible:isDeductible(eCat,eSub||'')});
+      is_deductible:marcaIR(INC.has(eCat)?'income':'expense',eCat,eSub||'')});
     sync('ok'); closeEdit(); toast('✓ Atualizado!','var(--green)','#0d0f14'); loadHist();
   } catch(e){ sync('err'); toast('✕ Erro: '+e.message,'var(--red)','white'); }
   btn.disabled=false;btn.textContent='✓ Salvar';
@@ -2600,7 +2697,10 @@ function toggleRecSplit() {
 function addRecSLine(pre) {
   recSN++;const n=recSN;
   const div=document.createElement('div');div.className='sline';div.id='rsl'+n;
-  const cats=['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${pre?.category===c?' selected':''}>${CLABEL[c]||c}</option>`).join('');
+  // Sai da tabela, igual aos outros selects. Esta linha tinha a lista de
+  // categorias escrita a mao, e so com despesas.
+  const cats = optsCategoria(pre?.category)
+    || ['aluguel','animais','arranjos','automovel','contas','despesas-trabalho','doacoes','educacao','hobbies','impostos','juros','outras-despesas','saude','seguros','taxas-bancarias','utilitarios','vestuario','viagens'].map(c=>`<option value="${c}"${pre?.category===c?' selected':''}>${CLABEL[c]||c}</option>`).join('');
   div.innerHTML=`<div class="slhd"><span class="slnum">Linha ${n}</span><button class="rmvbtn" onclick="document.getElementById('rsl${n}').remove()">×</button></div>
   <div class="slflds"><div><label class="fl" style="font-size:10px">Categoria</label><select class="fs" id="rslc${n}" onchange="fillSub('rslsub${n}','rslc${n}')" style="font-size:13px"><option value="">...</option>${cats}</select></div>
   <div><label class="fl" style="font-size:10px">Subcategoria</label><select class="fs" id="rslsub${n}" style="font-size:13px"><option value="">—</option></select></div>
@@ -2769,9 +2869,9 @@ async function doLaunchRec(r) {
   if(r.launch_type==='split'&&r.split_lines){
     const _lines=r._realLines||r.split_lines;
     const _tot=_lines.reduce((s,l)=>s+(parseFloat(l.amount)||0),0);
-    _lines.forEach((l,i)=>rows.push({id:gid+i,group_id:gid,type:r.type,amount:l.amount,date,payee:r.name,payee_display:r.name,account:r.account,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:isDeductible(l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:_tot,from_recorrente:true}));
+    _lines.forEach((l,i)=>rows.push({id:gid+i,group_id:gid,type:r.type,amount:l.amount,date,payee:r.name,payee_display:r.name,account:r.account,category:l.category,subcategory:l.subcategory||null,memo:l.desc||null,is_deductible:marcaIR(r.type, l.category, l.subcategory||''),receipt_status:'na',is_split:true,split_total:_tot,from_recorrente:true}));
   } else {
-    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:(r._realMemo!==undefined?(r._realMemo||null):(r.memo||null)),is_deductible:isDeductible(r.category||'', r.subcategory||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
+    rows.push({id:gid,type:r.type,amount:r._realAmt||r.amount,date,payee:r.name,account:r.account,category:r.category,subcategory:r.subcategory||null,memo:(r._realMemo!==undefined?(r._realMemo||null):(r.memo||null)),is_deductible:marcaIR(r.type, r.category||'', r.subcategory||''),receipt_status:DED.has(r.category||'')?'pending':'na',from_recorrente:true});
   }
   sync('busy');
   try {

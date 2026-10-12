@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.11-b';
+var APP_VERSION='v2026.10.12-a';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -233,6 +233,9 @@ async function carregaCatTab(){
     var r = await fetch(SB+'/rest/v1/categorias?select=categoria,subcategoria,tipo,dedutivel&limit=2000',{headers:SBH});
     if(!r.ok) throw new Error(await r.text());
     var rows = await r.json();
+    // Tabela vazia nao e tabela: o PostgREST devolve zero linhas sem erro
+    // quando a RLS nao cobre o papel da sessao. Sem isto, nada deduziria.
+    if(!rows.length) throw new Error('tabela categorias voltou vazia');
     var porSub = {}, porCat = {};
     rows.forEach(function(x){
       if(x.subcategoria) porSub[x.categoria+'|'+x.subcategoria] = x;
