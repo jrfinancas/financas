@@ -1311,7 +1311,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.12-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.12-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1736,6 +1736,19 @@ let DED  = new Set(['saude','educacao','impostos']);
 // conferência do IR, que tem de mostrar a categoria mesmo quando ela perdeu
 // a última marca — senão a conferência esconde o que se quer achar.
 const DED_CANDIDATAS = new Set(['saude','educacao','impostos']);
+
+// REFERÊNCIA, NÃO REGRA. O que decide a dedução é sempre a tabela
+// 'categorias' — esta lista só serve para a Conferência avisar quando uma
+// subcategoria que costuma deduzir no IRPF está sem o selo, que é como se
+// pega marca caída por engano. Não mexer nela muda nada no cálculo.
+// (É a lista que o Roberto confirmou em 10/out/2026.)
+const REF_IRPF = new Set([
+  'saude|medicos','saude|dentista','saude|psicologo','saude|fisioterapeuta',
+  'saude|fonoaudiologo','saude|terapeuta_ocupacional','saude|hospital',
+  'saude|exames_laboratorio','saude|plano_saude',
+  'educacao|mensalidade',
+  'impostos|inss_folha'
+]);
 let INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
 
 let SUBS = {
@@ -2552,23 +2565,48 @@ async function loadIR() {
         const sub=String(t.subcategory||''), k=t.category+'|'+sub;
         if(!mapa[k]) mapa[k]={cat:t.category,sub:sub,n:0,v:0,
                               deduz:dedutivelDespesa(t.category,sub),
-                              ignorada:NAO_DEDUZ_NUNCA.has(k)};
+                              ignorada:NAO_DEDUZ_NUNCA.has(k),
+                              naLista:REF_IRPF.has(k),
+                              semPar:!!(CATTAB && sub && !CATTAB.porSub[k])};
         mapa[k].n++; mapa[k].v+=parseFloat(t.amount)||0;
       });
       const linhas=Object.values(mapa).sort((a,b)=>b.v-a.v);
       const soma=a=>a.reduce((s,l)=>s+l.v,0);
       const dentro=linhas.filter(l=>l.deduz), fora=linhas.filter(l=>!l.deduz);
+      // Marca caída: está na referência do IRPF e não está marcada.
+      // É o alerta que importa; o resto de 'Fora da dedução' é permanente.
+      const caidas=fora.filter(l=>l.naLista);
+      const orfas=fora.filter(l=>l.semPar && !l.naLista);
       const bloco=(titulo,arr,cor)=>arr.length?(
         '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:'+cor+';margin:14px 0 6px">'
         + titulo + ' · R$ ' + fmt(soma(arr)) + '</div>'
-        + arr.map(l=>'<div class="ircrow" style="font-size:12px">'
+        + arr.map(l=>'<div class="ircrow" style="font-size:12px'+(l.naLista?';background:rgba(251,191,36,.07)':'')+'">'
             + '<span>' + (CLABEL[l.cat]||l.cat) + ' / <b>' + (l.sub||'(sem subcategoria)') + '</b>'
             + ' <span style="font-size:10px;color:var(--muted)">(' + l.n + ')</span>'
             + (l.ignorada?' <span style="font-size:10px;color:var(--red)">⚠ não é dedução</span>':'')
-            + '</span><span style="color:'+cor+'">R$ ' + fmt(l.v) + '</span></div>').join('')
+            + (l.naLista?' <span style="font-size:10px;color:var(--yellow)">⚠ está na lista do IRPF</span>':'')
+            + (l.semPar?' <span style="font-size:10px;color:var(--red)">⚠ sem par na tabela</span>':'')
+            + '</span><span style="color:'+(l.naLista?'var(--yellow)':cor)+'">R$ ' + fmt(l.v) + '</span></div>').join('')
       ):'';
+      const alerta = caidas.length ? `
+        <div style="background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--yellow);line-height:1.5;margin:14px 0 4px">
+          <b>⚠ R$ ${fmt(soma(caidas))}</b> em ${caidas.length} subcategoria(s) que costumam deduzir no IRPF
+          e estão <b>sem o selo IR</b>: ${caidas.map(l=>(l.sub||'(sem sub)')).join(', ')}.
+          Se a marca caiu sem você querer, remarque em
+          <a href="categorias.html" style="color:var(--yellow);text-decoration:underline">Categorias</a>.
+          Se foi de propósito — sem comprovante, por exemplo — está certo assim.
+        </div>` : '';
+      const aviso_orfas = orfas.length ? `
+        <div style="background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--red);line-height:1.5;margin:10px 0 4px">
+          <b>⚠ ${orfas.length} subcategoria(s) sem par na tabela:</b>
+          ${orfas.map(l=>l.cat+' / '+l.sub).join(', ')}.
+          Lançamento apontando para subcategoria que não existe mais não pode deduzir.
+          Crie em <a href="categorias.html" style="color:var(--red);text-decoration:underline">Categorias</a>
+          ou reclassifique os lançamentos.
+        </div>` : '';
       elRec.innerHTML = linhas.length
-        ? bloco('Somando na dedução', dentro, 'var(--green)')
+        ? alerta + aviso_orfas
+          + bloco('Somando na dedução', dentro, 'var(--green)')
           + bloco('Fora da dedução', fora, 'var(--muted)')
           + '<div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;display:flex;justify-content:space-between;font-size:13px;font-weight:600">'
           + '<span>Soma do que está deduzindo</span><span style="color:var(--green)">R$ ' + fmt(soma(dentro)) + '</span></div>'
