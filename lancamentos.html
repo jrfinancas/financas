@@ -551,7 +551,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
             <optgroup label="Receitas"><option value="salario">Salários</option><option value="bonus">Bônus</option><option value="dividendos">Dividendos</option><option value="outras-entradas">Outras Entradas</option></optgroup>
           </select>
         </div>
-        <div id="nSubRow"><label class="fl">Subcategoria</label><select class="fs" id="nSub"><option value="">—</option></select></div>
+        <div id="nSubRow"><label class="fl">Subcategoria</label><select class="fs" id="nSub" onchange="atualizaDedBadge('n')"><option value="">—</option></select></div>
       </div>
       <div id="nDedBadge" class="dedbadge" style="display:none">⭐ Dedutível no IR</div>
       <label class="fl">Status do Comprovante</label>
@@ -1311,7 +1311,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.12-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.12-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1732,6 +1732,10 @@ function rendimentoDeclaravel(cat, sub){
 // Categorias que PODEM conter despesa dedutível — usada só para decidir
 // se vale pedir comprovante, nunca para marcar a dedução.
 let DED  = new Set(['saude','educacao','impostos']);
+// As que podem conter dedução por lei. Fixa de propósito: é o alcance da
+// conferência do IR, que tem de mostrar a categoria mesmo quando ela perdeu
+// a última marca — senão a conferência esconde o que se quer achar.
+const DED_CANDIDATAS = new Set(['saude','educacao','impostos']);
 let INC  = new Set(['salario','bonus','dividendos','outras-entradas']);
 
 let SUBS = {
@@ -1986,13 +1990,20 @@ function setType(px, t, btn) {
   if(amtEl) amtEl.className='fi '+(t==='inc'?'pos':'neg');
 }
 
+// O selo "⭐ Dedutível no IR" depende da SUBCATEGORIA, então tem de ser
+// recalculado quando ela muda. Antes só rodava no onchange da categoria —
+// e logo depois do fillSub, que acabava de limpar a subcategoria. Resultado:
+// subVal era sempre '' e o selo nunca aparecia.
+function atualizaDedBadge(px){
+  const cat=(document.getElementById(px+'Cat')||{}).value||'';
+  const sub=(document.getElementById(px+'Sub')||{}).value||'';
+  const badge=document.getElementById(px+'DedBadge');
+  if(badge) badge.style.display=dedutivelDespesa(cat,sub)?'inline-flex':'none';
+}
 function onCatCh(px) {
   const cat=document.getElementById(px+'Cat').value;
   fillSub(px+'Sub', px+'Cat');
-  const badge=document.getElementById(px+'DedBadge');
-  const subVal=(document.getElementById('nSub')?.value)||'';
-  const isDedutivel=dedutivelDespesa(cat, subVal);
-  if(badge) badge.style.display=isDedutivel?'inline-flex':'none';
+  atualizaDedBadge(px);
   if(px==='n' && DED.has(cat) && !INC.has(cat) && !nB64 && nRS==='na') setRS('pending',document.getElementById('rPnd'));
 }
 
@@ -2530,7 +2541,14 @@ async function loadIR() {
     const elRec=document.getElementById('irRecon');
     if(elRec){
       const mapa={};
-      allTxs.filter(t=>t.type==='expense' && DED.has(t.category)).forEach(function(t){
+      // DED vem da tabela: categoria com ao menos uma subcategoria marcada.
+      // Só que se a última marca de 'educacao' cair, 'educacao' sai do DED e
+      // a conferência deixaria de mostrar justamente a categoria que perdeu a
+      // marca — escondendo a resposta exatamente quando ela importa.
+      // Por isso o filtro é a UNIÃO: as três que podem conter dedução por lei,
+      // mais o que a tabela marcou.
+      allTxs.filter(t=>t.type==='expense'
+                       && (DED_CANDIDATAS.has(t.category) || DED.has(t.category))).forEach(function(t){
         const sub=String(t.subcategory||''), k=t.category+'|'+sub;
         if(!mapa[k]) mapa[k]={cat:t.category,sub:sub,n:0,v:0,
                               deduz:dedutivelDespesa(t.category,sub),
