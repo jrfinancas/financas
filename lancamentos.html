@@ -1310,7 +1310,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.17-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.17-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1324,7 +1324,29 @@ const SBH={'apikey':KEY,
 // ============================================================
 // SUPABASE HELPERS
 // ============================================================
-async function sbGet(t, q='')  { const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+async function sbGet(t, q='') {
+  // A API devolve no MAXIMO 1000 linhas por chamada e ignora o limit=5000
+  // que pediamos. Sem paginar, 2026 (1476 lancamentos) chegava cortado e a
+  // aba IR somava 25 dos 55 dedutiveis: R$ 16.475,05 em vez de R$ 35.193,38.
+  // Descoberto em 17/out/2026 reproduzindo o corte pela ordem fisica (ctid).
+  const PAG = 1000;
+  // Paginar sem ordem estavel pode repetir ou pular linha entre as paginas.
+  // Todas as 13 tabelas tem 'id', entao ele serve de criterio de desempate.
+  let base = q.replace(/(^|&)limit=\d+/g, '').replace(/^&+/, '');
+  const m = base.match(/(^|&)order=([^&]*)/);
+  if (!m) base = base ? base + '&order=id.asc' : 'order=id.asc';
+  else if (!/\bid\b/.test(m[2]))
+    base = base.replace(/((^|&)order=)([^&]*)/, '$1$3,id.asc');
+  let off = 0, tudo = [];
+  for (;;) {
+    const r = await fetch(`${SB}/rest/v1/${t}?${base}&limit=${PAG}&offset=${off}`, {headers: SBH});
+    if (!r.ok) throw new Error(await r.text());
+    const lote = await r.json();
+    tudo = tudo.concat(lote);
+    if (lote.length < PAG) return tudo;
+    off += PAG;
+  }
+}
 async function sbIns(t, d)     { const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 async function sbUpd(t, id, d) { const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:SBH,body:JSON.stringify(d)}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
 async function sbDel(t, id)    { const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:SBH}); if(!r.ok) throw new Error(await r.text()); }

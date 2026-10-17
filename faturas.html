@@ -381,7 +381,29 @@ async function checkAuth(){
 function hideLogin(){document.getElementById('loginOverlay').style.display='none';document.body.style.overflow='';}
 
 
-async function sbGet(t,q=''){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{headers:SBH});if(!r.ok)throw new Error(await r.text());return r.json();}
+async function sbGet(t, q='') {
+  // A API devolve no MAXIMO 1000 linhas por chamada e ignora o limit=5000
+  // que pediamos. Sem paginar, 2026 (1476 lancamentos) chegava cortado e a
+  // aba IR somava 25 dos 55 dedutiveis: R$ 16.475,05 em vez de R$ 35.193,38.
+  // Descoberto em 17/out/2026 reproduzindo o corte pela ordem fisica (ctid).
+  const PAG = 1000;
+  // Paginar sem ordem estavel pode repetir ou pular linha entre as paginas.
+  // Todas as 13 tabelas tem 'id', entao ele serve de criterio de desempate.
+  let base = q.replace(/(^|&)limit=\d+/g, '').replace(/^&+/, '');
+  const m = base.match(/(^|&)order=([^&]*)/);
+  if (!m) base = base ? base + '&order=id.asc' : 'order=id.asc';
+  else if (!/\bid\b/.test(m[2]))
+    base = base.replace(/((^|&)order=)([^&]*)/, '$1$3,id.asc');
+  let off = 0, tudo = [];
+  for (;;) {
+    const r = await fetch(`${SB}/rest/v1/${t}?${base}&limit=${PAG}&offset=${off}`, {headers: SBH});
+    if (!r.ok) throw new Error(await r.text());
+    const lote = await r.json();
+    tudo = tudo.concat(lote);
+    if (lote.length < PAG) return tudo;
+    off += PAG;
+  }
+}
 async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbUpd(t,q,d){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{method:'PATCH',headers:{...SBH,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());}
 
@@ -389,7 +411,7 @@ function addDaysStr(dateStr, n){
   const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);
   return d.toISOString().slice(0,10);
 }
-const APP_VERSION='v2026.10.03-d';
+const APP_VERSION='v2026.10.17-b';
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2});}
 function fatVal(t){const a=parseFloat(t.amount||0);return t.type==='income'?-a:a;}
