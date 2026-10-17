@@ -539,8 +539,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
       <div class="fg">
         <label class="fl">Fornecedor <span class="aibadge" id="nPayBadge" style="display:none">IA</span></label>
         <div class="acwrap">
-          <input type="text" class="fi" id="nPay" placeholder="Nome do estabelecimento" oninput="acSearch(this.value)" onblur="setTimeout(acHide,200)" autocomplete="off">
-          <div class="aclist" id="acList"></div>
+          <input type="text" class="fi" id="nPay" placeholder="Nome do estabelecimento" autocomplete="off">
         </div>
       </div>
       <div class="fr">
@@ -1311,7 +1310,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.12-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.17-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -1532,6 +1531,7 @@ function startApp() {
   loadRecs();
   // A tabela 'categorias' manda nas listas e na regra do IR. Busca aqui,
   // uma vez por sessao da aba, e remonta os selects com o que vier.
+  try{ acLigaTudo(); }catch(e){ console.error('autocomplete:',e); }
   carregaCatTab().then(function(){
     try{
       montaSelectsCategoria();
@@ -1935,23 +1935,145 @@ async function loadPayees() {
   try { payees=await sbGet('payees','order=use_count.desc&limit=200'); } catch(e){}
 }
 
-function acSearch(q) {
-  const l=document.getElementById('acList');
-  if(!q||q.length<2){l.classList.remove('open');return;}
-  const m=payees.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())).slice(0,6);
-  if(!m.length){l.classList.remove('open');return;}
-  l.innerHTML=m.map(p=>`<div class="acitem" onclick="acPick('${p.name.replace(/'/g,"\\'")}','${p.category||''}','${p.subcategory||''}')"><span>${p.name}</span><span class="accat">${CLABEL[p.category]||''}</span></div>`).join('');
-  l.classList.add('open');
+// ============================================================
+// FORNECEDORES — autocomplete e aviso de nome parecido
+//
+// Antes a lista só existia no campo da aba Normal, presa a um
+// <div id="acList"> fixo no HTML. Era por isso que Dividido, Recorrentes
+// e a edição aceitavam qualquer texto digitado, e era assim que nasciam
+// os duplicados. Agora uma caixa flutuante serve qualquer campo.
+// ============================================================
+
+// Normaliza para COMPARAR: sem acento, sem caixa, sem pontuação.
+// 'Raia Drogasil S.A.' e 'raia drogasil sa' viram a mesma coisa.
+function normNome(s){
+  return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+// Chave sem espaço: 'Raia Drogasil S.A.' e 'Raia Drogasil SA' viram a mesma
+// coisa. Sem isto o ponto virava espaço num e não no outro, e o aviso
+// deixava passar justamente o duplicado mais comum.
+function chaveNome(s){ return normNome(s).replace(/ /g,''); }
+function escH(v){
+  return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-function acPick(name,cat,sub) {
-  document.getElementById('nPay').value=name;
+let _acEl=null, _acAlvo=null, _acCb=null;
+function acCaixa(){
+  if(!_acEl){
+    _acEl=document.createElement('div');
+    _acEl.className='aclist';
+    _acEl.style.cssText='position:absolute;display:none;z-index:9500';
+    document.body.appendChild(_acEl);
+  }
+  return _acEl;
+}
+function acHide(){
+  const c=acCaixa();
+  c.classList.remove('open'); c.style.display='none';
+  _acAlvo=null; _acCb=null;
+}
+function acShow(el, cb){
+  const q=(el.value||'').trim(), c=acCaixa();
+  if(q.length<2){ acHide(); return; }
+  const n=normNome(q);
+  const k=chaveNome(q);
+  const m=payees.filter(p=>chaveNome(p.name).indexOf(k)>=0).slice(0,6);
+  if(!m.length){ acHide(); return; }
+  _acAlvo=el; _acCb=cb||null;
+  c.innerHTML=m.map(p=>'<div class="acitem"><span>'+escH(p.name)
+    +'</span><span class="accat">'+escH(CLABEL[p.category]||'')+'</span></div>').join('');
+  // mousedown, não click: o blur do input dispara antes do click e
+  // fecharia a lista antes de a escolha acontecer.
+  const itens=c.querySelectorAll('.acitem');
+  for(let i=0;i<itens.length;i++){
+    (function(p){ itens[i].addEventListener('mousedown', function(ev){
+      ev.preventDefault(); acEscolhe(p);
+    }); })(m[i]);
+  }
+  const r=el.getBoundingClientRect();
+  c.style.left=(r.left+window.scrollX)+'px';
+  c.style.top=(r.bottom+window.scrollY+2)+'px';
+  c.style.width=r.width+'px';
+  c.style.display='block';
+  c.classList.add('open');
+}
+function acEscolhe(p){
+  const el=_acAlvo, cb=_acCb;
+  if(el) el.value=p.name;
   acHide();
-  if(cat){document.getElementById('nCat').value=cat;onCatCh('n');}
-  if(sub) setTimeout(()=>{document.getElementById('nSub').value=sub;},50);
+  if(cb) cb(p);
+}
+function acAttach(id, cb){
+  const el=document.getElementById(id);
+  if(!el || el._acOn) return;
+  el._acOn=true;
+  el.setAttribute('autocomplete','off');
+  el.addEventListener('input', function(){ acShow(el, cb); });
+  el.addEventListener('focus', function(){ acShow(el, cb); });
+  el.addEventListener('blur',  function(){ setTimeout(acHide, 180); });
+}
+// Liga os quatro campos. Cada um preenche o que a tela dele tem.
+function acLigaTudo(){
+  acAttach('nPay', function(p){
+    if(p.category){ document.getElementById('nCat').value=p.category; onCatCh('n'); }
+    if(p.subcategory) setTimeout(function(){
+      document.getElementById('nSub').value=p.subcategory; atualizaDedBadge('n');
+    },50);
+  });
+  acAttach('ePay', function(p){
+    if(p.category){ document.getElementById('eCat').value=p.category; fillSub('eSub','eCat'); }
+    if(p.subcategory) setTimeout(function(){ document.getElementById('eSub').value=p.subcategory; },50);
+  });
+  acAttach('recName', function(p){
+    if(p.category){ document.getElementById('recCat').value=p.category; fillSub('recSub','recCat'); }
+    if(p.subcategory) setTimeout(function(){ document.getElementById('recSub').value=p.subcategory; },50);
+  });
+  acAttach('sPay');   // o Dividido tem categoria por linha
 }
 
-function acHide() { document.getElementById('acList').classList.remove('open'); }
+// ---- aviso de nome parecido ----
+// Distância de edição, só para decidir se vale perguntar.
+function distNome(a,b){
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  let ant=new Array(n+1), at=new Array(n+1);
+  for(let j=0;j<=n;j++) ant[j]=j;
+  for(let i=1;i<=m;i++){
+    at[0]=i;
+    for(let j=1;j<=n;j++){
+      at[j]=Math.min(ant[j]+1, at[j-1]+1, ant[j-1]+(a[i-1]===b[j-1]?0:1));
+    }
+    const t=ant; ant=at; at=t;
+  }
+  return ant[n];
+}
+function parecidos(nome){
+  const n=normNome(nome), k=chaveNome(nome);
+  if(k.length<3) return [];
+  return payees.filter(function(p){
+    if(p.name===nome) return false;                               // exatamente o mesmo texto
+    const m=normNome(p.name), mk=chaveNome(p.name);
+    if(!mk) return false;
+    if(mk===k) return true;                                       // 'S.A.' x 'SA', só a grafia muda
+    if(mk.indexOf(k)===0 || k.indexOf(mk)===0) return true;       // um começa com o outro
+    if((' '+m+' ').indexOf(' '+n+' ')>=0) return true;            // contido como palavra
+    const lim=Math.max(1, Math.floor(Math.min(mk.length,k.length)/6));
+    const d=distNome(mk,k);
+    return d>0 && d<=lim;                                         // erro de digitação
+  }).sort((a,b)=>(b.use_count||0)-(a.use_count||0)).slice(0,3);
+}
+// Pergunta uma vez, antes de gravar. Quem decide é o Roberto.
+function avisaParecido(nome){
+  const p=parecidos(nome);
+  if(!p.length) return nome;
+  const outros = p.length>1 ? '\n\n(também parecidos: '+p.slice(1).map(x=>x.name).join(', ')+')' : '';
+  const msg='"'+nome+'" parece com um fornecedor que você já usa:\n\n    '
+    + p[0].name + (p[0].use_count?'  ('+p[0].use_count+' lançamentos)':'') + outros
+    + '\n\nUsar o nome que já existe?\n\nOK = usa "'+p[0].name+'"\nCancelar = mantém "'+nome+'"';
+  return confirm(msg) ? p[0].name : nome;
+}
 
 async function upsertPayee(name,cat,sub) {
   if(!name) return;
@@ -2073,13 +2195,18 @@ function calcInst() {
 async function saveNormal() {
   const amt=vNum(document.getElementById('nAmt').value);
   const date=document.getElementById('nDate').value;
-  const payee=document.getElementById('nPay').value.trim();
+  let payee=document.getElementById('nPay').value.trim();
   const acct=document.getElementById('nAcct').value;
   const cat=document.getElementById('nCat').value;
   const sub=document.getElementById('nSub').value||null;
   const inst=getInstCount();
   const fm=document.getElementById('nFirst').value||THIS_MONTH;
   if(!amt||!date||!payee||!acct||(nType!=='trf'&&!cat)){toast('⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
+  // Nome parecido com fornecedor existente? Pergunta antes de criar outro.
+  if(nType!=='trf'){
+    const escolhido=avisaParecido(payee);
+    if(escolhido!==payee){ payee=escolhido; document.getElementById('nPay').value=payee; }
+  }
   // Duplicate check
   try {
     const dupes=await sbGet('transactions',`date=eq.${date}&payee=ilike.*${encodeURIComponent(payee)}*&amount=eq.${amt}&limit=3`);
@@ -2233,13 +2360,15 @@ function chkSplit() {
 async function saveSplit() {
   const tot=vNum(document.getElementById('sTot').value);
   const date=document.getElementById('sDate').value;
-  const payee=document.getElementById('sPay').value.trim();
+  let payee=document.getElementById('sPay').value.trim();
   const acct=document.getElementById('sAcct').value;
   const lines=getSLines();
   const falta=[!tot&&'valor líquido',!date&&'data',!payee&&'fornecedor',!acct&&'conta',!lines.length&&'linhas'].filter(Boolean);
   if(falta.length){toast('⚠ Faltando: '+falta.join(', '),'#fbbf24','#0d0f14');return;}
   const _net=lines.reduce((s,l)=>s+(l.type==='income'?l.amount:-l.amount),0);
   if(Math.abs(tot-Math.abs(_net))>0.05){toast(`⚠ Líquido das linhas (R$ ${fmt(Math.abs(_net))}) ≠ total informado (R$ ${fmt(tot)})`,'#fbbf24','#0d0f14');return;}
+  { const escolhido=avisaParecido(payee);
+    if(escolhido!==payee){ payee=escolhido; document.getElementById('sPay').value=payee; } }
   sync('busy');
   try {
     const gid=Date.now();
@@ -2786,7 +2915,7 @@ function updRecDate() {
 }
 
 async function saveRec() {
-  const name=document.getElementById('recName').value.trim();
+  let name=document.getElementById('recName').value.trim();
   const freq=document.getElementById('recFreq').value;
   const nd=document.getElementById('recNextDate').value;
   const ad=parseInt(document.getElementById('recAlertDays').value);
@@ -2796,6 +2925,8 @@ async function saveRec() {
   const eid=document.getElementById('recEditId').value;
   if(!name||!nd){toast('⚠ Preencha descrição e vencimento','#fbbf24','#0d0f14');return;}
   if(endDate&&endDate<nd){toast('⚠ Data final deve ser após o vencimento','#fbbf24','#0d0f14');return;}
+  if(!eid){ const escolhido=avisaParecido(name);
+    if(escolhido!==name){ name=escolhido; document.getElementById('recName').value=name; } }
   let rec={name,type:recType==='exp'?'expense':'income',frequency:freq,next_date:nd,alert_days:ad,end_date:endDate,is_estimated:estimated,memo:document.getElementById('recMemo').value||null,launch_type:lt};
   if(lt==='split'){
     const tot=vNum(document.getElementById('recSTot').value);
