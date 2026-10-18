@@ -159,7 +159,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.17-c';
+const APP_VERSION='v2026.10.17-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -352,10 +352,24 @@ async function loadSaldos(){
         {id:'wise',nome:'Wise',tipo:'internacional',saldo_inicial:0},
       ];
     }
-    // Get transactions per account
-    const txs=await sbGet('transactions','select=account,type,amount');
+    // Saldo = saldo_inicial na data_base + o que veio DEPOIS dela, ate hoje.
+    // Antes isto somava a tabela inteira (12.551 lancamentos desde 2012) e
+    // dava R$ 2,5 milhoes na Santander. So nao aparecia porque a API cortava
+    // a resposta em 1000 linhas; com a paginacao, o erro ficou visivel.
+    // A regra agora e a mesma do contas.html. 17/out/2026.
+    const baseDe={};
+    contas.forEach(c=>{ baseDe[c.id]=c.data_base||'2026-05-01'; });
+    const txs=await sbGet('transactions',
+      `select=account,type,amount,date&date=lte.${TODAY}`);
     const saldoMap={};
-    txs.forEach(t=>{const v=parseFloat(t.amount)||0;if(!saldoMap[t.account])saldoMap[t.account]=0;saldoMap[t.account]+=(t.type==='income'?v:-v);});
+    txs.forEach(t=>{
+      const base=baseDe[t.account];
+      if(!base) return;              // conta que nao esta na lista
+      if(t.date < base) return;      // anterior a data-base: ja esta no saldo_inicial
+      const v=parseFloat(t.amount)||0;
+      if(!saldoMap[t.account])saldoMap[t.account]=0;
+      saldoMap[t.account]+=(t.type==='income'?v:-v);
+    });
     // Only show operational accounts (not cartao/investimento)
     const opContas=contas.filter(c=>!['cartao','investimento'].includes(c.tipo));
     let totalSaldo=0;

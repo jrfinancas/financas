@@ -249,7 +249,7 @@ nav a.active, nav a:hover { background:var(--surface2); color:var(--accent); }
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.17-c';
+const APP_VERSION='v2026.10.17-d';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -492,7 +492,12 @@ async function sbGet(t, q='') {
 
 async function getTxs() {
   const q=`date=gte.${dateFrom}&date=lte.${dateTo}&order=date.asc`;
-  return sbGet('transactions',q);
+  const r=await sbGet('transactions',q);
+  // Transferencia e cambio movem dinheiro entre contas do proprio Roberto:
+  // criam uma saida numa conta e uma entrada na outra. Somadas aqui,
+  // inflavam OS DOIS lados do painel (R$ 167k de receita em 3 meses para
+  // quem recebe R$ 30k/mes). A aba IR ja as excluia. 17/out/2026.
+  return r.filter(t=>t.category!=='transferencia');
 }
 
 // ============================================================
