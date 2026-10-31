@@ -144,16 +144,31 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
   <div class="modal-box">
     <div class="modal-title">Lançar no app</div>
     <div class="nota" id="lcSub" style="margin-bottom:14px"></div>
-    <div class="fg"><label class="fl">Descrição</label><input type="text" class="fi" id="lcDesc"></div>
+    <div class="fg"><label class="fl">Fornecedor</label>
+      <input type="text" class="fi" id="lcDesc" list="lcPayees" autocomplete="off" oninput="lcDica()">
+      <datalist id="lcPayees"></datalist>
+      <div class="nota" id="lcPayHint" style="margin-top:5px"></div>
+    </div>
     <div class="fr">
       <div><label class="fl">Data</label><input type="date" class="fi" id="lcData"></div>
       <div><label class="fl">Valor</label><input type="text" class="fi" id="lcValor" readonly></div>
     </div>
     <div class="fg"><label class="fl">Categoria</label><select class="fs" id="lcCat" onchange="lcFillSub()"></select></div>
-    <div class="fg"><label class="fl">Subcategoria</label><select class="fs" id="lcSub2"></select></div>
+    <div class="fg" id="lcSubBox"><label class="fl">Subcategoria</label><select class="fs" id="lcSub2"></select></div>
+    <div class="fg" id="lcDestBox" style="display:none"><label class="fl" id="lcDestLb">Conta de destino</label>
+      <select class="fs" id="lcDest"></select></div>
     <div class="aviso" id="lcAviso" style="display:none"></div>
     <button class="bsave" onclick="lancarConfirma()">Lançar</button>
     <button class="bclear" onclick="fecharLancar()">Cancelar</button>
+  </div>
+</div>
+
+<div class="modal" id="mdCasar">
+  <div class="modal-box">
+    <div class="modal-title">Casar à mão</div>
+    <div class="nota" id="csSub" style="margin-bottom:14px"></div>
+    <div id="csLista"></div>
+    <button class="bclear" onclick="fecharCasar()">Cancelar</button>
   </div>
 </div>
 
@@ -182,7 +197,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.10.31-b';
+const APP_VERSION='v2026.10.31-c';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -349,16 +364,20 @@ function casar(banco, cand, TOL, JAN){
   const livres = () => cand.filter((c,i) => !usados.has(i));
   const idx = c => cand.indexOf(c);
 
-  function fecha(bl, lista, nota){
-    lista.forEach(c => usados.add(idx(c)));
-    pares.push({ banco: bl, app: lista, nota });
+  // Um casamento tem N linhas de cada lado. Comecou com uma do banco
+  // contra varias do app, mas o inverso existe: em 03/ago o extrato traz
+  // IOF em duas linhas (-1,46 e -0,08) e o app tem uma so de -1,54.
+  function fecha(bls, cs, nota){
+    bls.forEach(b => { b._ok = 1; });
+    cs.forEach(c => usados.add(idx(c)));
+    pares.push({ bancos: bls, apps: cs, nota });
   }
 
   // PASSE 1 — data e valor batendo na mosca
   banco.forEach(bl => {
     if (bl._ok) return;
     const c = livres().find(c => c.data === bl.data && Math.abs(c.valor - bl.valor) < 0.005);
-    if (c) { bl._ok = 1; fecha(bl, [c], 'exato'); }
+    if (c) fecha([bl], [c], 'exato');
   });
 
   // PASSE 2 — valor dentro da tolerancia, data dentro da janela.
@@ -383,8 +402,7 @@ function casar(banco, cand, TOL, JAN){
   arestas.forEach(e => {
     const bl = banco[e.bi];
     if (bl._ok || usados.has(e.ci)) return;
-    bl._ok = 2;
-    fecha(bl, [cand[e.ci]],
+    fecha([bl], [cand[e.ci]],
       e.dv >= 0.005 ? ('difere R$ ' + fmt(e.dv)) : (e.dd ? ('data ' + e.dd + 'd') : 'exato'));
   });
 
@@ -414,22 +432,52 @@ function casar(banco, cand, TOL, JAN){
       .sort((a, b) => dias(a.data, bl.data) - dias(b.data, bl.data));
     if (pool.length < 2) return;
     const achado = somaQueFecha(pool, bl.valor, 4);
-    if (achado) { bl._ok = 3; fecha(bl, achado, 'somou ' + achado.length); }
+    if (achado) fecha([bl], achado, 'somou ' + achado.length + ' do app');
+  });
+
+  // PASSE 4 — o inverso: varias linhas do BANCO contra uma do app.
+  // Em 03/ago o extrato traz o IOF separado (-1,46 adicional e -0,08
+  // imposto) e no app ha um unico lancamento de -1,54. O passe 3 so
+  // somava do lado do app, entao esse caso ficava nos dois quadros.
+  cand.forEach((c, ci) => {
+    if (usados.has(ci)) return;
+    const pool = banco
+      .filter(b => !b._ok && dias(b.data, c.data) <= JAN && Math.sign(b.valor) === Math.sign(c.valor))
+      .sort((a, b) => dias(a.data, c.data) - dias(b.data, c.data));
+    if (pool.length < 2) return;
+    const achado = somaQueFecha(pool, c.valor, 4);
+    if (achado) fecha(achado, [c], 'somou ' + achado.length + ' do extrato');
   });
 
   const porData = (a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0;
-  return {
-    pares,
-    soBanco: banco.filter(b => !b._ok).sort(porData),
-    soApp: livres().sort(porData)
-  };
+  const soBanco = banco.filter(b => !b._ok).sort(porData);
+  const soApp = livres().sort(porData);
+
+  // Para cada sobra, o candidato mais proximo do outro lado. Nao casa
+  // nada — so mostra a distancia, para a tela poder sugerir. Foi o que
+  // faltou no financiamento: a parcela de setembro esta no app com data
+  // de 10/out e R$ 0,21 de diferenca, longe demais para casar sozinha,
+  // mas obvia para quem olha.
+  function maisProximo(x, outros){
+    let melhor = null;
+    outros.forEach(o => {
+      const dv = Math.abs(o.valor - x.valor), dd = dias(o.data, x.data);
+      const peso = dv * 100 + dd;      // centavo pesa como um dia
+      if (!melhor || peso < melhor.peso) melhor = { o, dv, dd, peso };
+    });
+    return melhor;
+  }
+  soBanco.forEach(b => { b._perto = maisProximo(b, soApp); });
+  soApp.forEach(a => { a._perto = maisProximo(a, soBanco); });
+
+  return { pares, soBanco, soApp };
 }
 
 // ============================================================
 // ESTADO E TELA
 // ============================================================
 
-let CONTAS = [], CATS = [], EXTRATO = [], TXS = [], RES = null, CONTA = null;
+let CONTAS = [], CATS = [], PAYEES = [], EXTRATO = [], TXS = [], RES = null, CONTA = null;
 let TOL = 0.05, JAN = 5;
 
 async function carregar(){
@@ -440,7 +488,8 @@ async function carregar(){
     sel.innerHTML = uteis.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('');
     const cc = uteis.find(c => c.tipo === 'corrente');
     if (cc) sel.value = cc.id;
-    CATS = await sbGet('categorias','select=categoria,subcategoria,rotulo,tipo,ativo&limit=2000');
+    CATS = await sbGet('categorias','select=categoria,subcategoria,rotulo,tipo,ativo,dedutivel&limit=2000');
+    PAYEES = await sbGet('payees','select=name,category,subcategory&order=use_count.desc');
   }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
 }
 
@@ -516,18 +565,38 @@ function desenhar(de, ate){
   // o botao marca LANCAMENTOS, nao casamentos: um casamento pode levar
   // varias linhas do app (holerite, conta desdobrada). Os dois numeros
   // discordavam na tela — 98 casamentos, 118 lancamentos.
-  const nLanc = P.reduce((s,p) => s + p.app.reduce((t,a) => t + a.ids.length, 0), 0);
+  const nLanc = P.reduce((s,p) => s + p.apps.reduce((t,a) => t + a.ids.length, 0), 0);
 
+  // A sugestao do vizinho mais proximo do outro lado. Nao casa nada
+  // sozinha: so mostra a distancia, para o olho decidir. A parcela do
+  // financiamento de setembro esta no app com data de 10/out e R$ 0,21
+  // de diferenca — longe demais para casar, obvia para quem olha.
+  const dica = x => {
+    const p = x._perto;
+    if (!p || (p.dv > 5 && p.dd > 45)) return '';
+    const partes = [];
+    if (p.dv >= 0.005) partes.push('R$ ' + fmt(p.dv) + ' de diferença');
+    if (p.dd) partes.push(p.dd + (p.dd === 1 ? ' dia' : ' dias') + ' de distância');
+    return `<div class="sub2" style="color:var(--yellow)">↔ parecido: ${esc(p.o.desc||'—')} ${fmt(p.o.valor)} em ${fmtD(p.o.data)}` +
+           (partes.length ? ' · ' + partes.join(', ') : '') + '</div>';
+  };
   // passa o indice, nao o objeto: descricao com aspas quebraria o atributo
-  const linB = (x,i) => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span><span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span><button class="ico" onclick="abrirLancar(${i})">Lançar</button></div>`;
-  const linA = x => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span>` +
+  const linB = (x,i) => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span><span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span><button class="ico" onclick="abrirLancar(${i})">Lançar</button></div>` + dica(x);
+  const linA = (x,i) => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span>` +
       (x.conciliado ? '<span class="badge b-info">já conciliado</span>' : '') +
       `<span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span>` +
-      (x.conciliado ? '' : `<button class="ico" onclick="conciliarUm('${x.ids.join(',')}')">Conciliar</button>`) + `</div>`;
-  const linP = p => `<div class="lin"><span class="lin-d">${fmtD(p.banco.data)}</span><span class="lin-t">${esc(p.banco.desc||'—')}</span>` +
+      `<button class="ico" onclick="abrirCasar(${i})" title="Casar à mão com uma linha do extrato">Casar…</button></div>` + dica(x);
+  const linP = p => {
+    const b0 = p.bancos[0];
+    const total = p.bancos.reduce((s,x)=>s+x.valor,0);
+    return `<div class="lin"><span class="lin-d">${fmtD(b0.data)}</span>` +
+      `<span class="lin-t">${esc(b0.desc||'—')}${p.bancos.length>1?' + '+(p.bancos.length-1)+' no extrato':''}</span>` +
       `<span class="badge ${p.nota==='exato'?'b-ok':'b-warn'}">${esc(p.nota)}</span>` +
-      `<span class="lin-v ${p.banco.valor<0?'neg':'pos'}">${fmt(p.banco.valor)}</span></div>` +
-      (p.nota==='exato' ? '' : `<div class="sub2">app: ${p.app.map(a=>esc(a.desc)+' '+fmt(a.valor)).join(' + ')}</div>`);
+      `<span class="lin-v ${total<0?'neg':'pos'}">${fmt(total)}</span></div>` +
+      (p.nota==='exato' ? ''
+        : `<div class="sub2">app: ${p.apps.map(a=>esc(a.desc)+' '+fmt(a.valor)).join(' + ')}</div>` +
+          (p.bancos.length>1 ? `<div class="sub2">extrato: ${p.bancos.map(b=>esc(b.desc)+' '+fmt(b.valor)).join(' + ')}</div>` : ''));
+  };
 
   function bloco(id, titulo, badge, cor, itens, render, rodape){
     return `<div class="grp"><div class="grp-head" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
@@ -565,19 +634,60 @@ function reRodar(){
 
 async function conciliarCasados(){
   const ids = [];
-  RES.pares.forEach(p => p.app.forEach(a => a.ids.forEach(i => ids.push(i))));
+  RES.pares.forEach(p => p.apps.forEach(a => a.ids.forEach(i => ids.push(i))));
   if (!ids.length) return;
   if (!confirm('Marcar ' + ids.length + ' lançamentos como conciliados?\n\nIsso não muda valor nem categoria — só registra que bateram com o extrato.')) return;
   let ok = 0;
   for (const id of ids) { try { await sbUpd('transactions', id, {reconciled:true}); ok++; } catch(e){} }
   toast('✓ ' + ok + ' conciliados');
-  RES.pares.forEach(p => p.app.forEach(a => a.conciliado = true));
+  RES.pares.forEach(p => p.apps.forEach(a => a.conciliado = true));
 }
 
-async function conciliarUm(idsStr){
-  const ids = idsStr.split(',').filter(Boolean);
-  for (const id of ids) { try { await sbUpd('transactions', id, {reconciled:true}); } catch(e){} }
-  toast('✓ conciliado');
+// ---------- casamento a mao ----------
+// O botao antigo so marcava reconciled e sumia com a linha — ou seja,
+// gravava no banco que ela bateu com o extrato quando ela nao bateu.
+// Agora ele faz o que o nome diz: voce escolhe com qual linha do
+// extrato aquele lancamento casa.
+let CS = null;
+function abrirCasar(i){
+  CS = RES.soApp[i];
+  if (!CS) return;
+  document.getElementById('csSub').innerHTML =
+    'Lançamento do app: <b>' + esc(CS.desc||'—') + '</b> · ' + fmt(CS.valor) + ' em ' + fmtD(CS.data) +
+    '<br>Escolha a linha do extrato que corresponde a ele.';
+  const opc = RES.soBanco
+    .map((b, j) => ({ b, j, dv: Math.abs(b.valor - CS.valor), dd: dias(b.data, CS.data) }))
+    .sort((x, y) => (x.dv * 100 + x.dd) - (y.dv * 100 + y.dd))
+    .slice(0, 12);
+  document.getElementById('csLista').innerHTML = opc.length
+    ? opc.map(o => `<div class="lin"><span class="lin-d">${fmtD(o.b.data)}</span>` +
+        `<span class="lin-t">${esc(o.b.desc||'—')}</span>` +
+        `<span class="lin-v ${o.b.valor<0?'neg':'pos'}">${fmt(o.b.valor)}</span>` +
+        `<button class="ico" onclick="casarCom(${o.j})">Casar</button></div>` +
+        (o.dv >= 0.005 || o.dd
+          ? `<div class="sub2">${o.dv>=0.005?'R$ '+fmt(o.dv)+' de diferença':''}${o.dv>=0.005&&o.dd?' · ':''}${o.dd?o.dd+'d de distância':''}</div>`
+          : '')).join('')
+    : '<div class="empty">Não há linha do extrato sobrando para casar.</div>';
+  document.getElementById('mdCasar').classList.add('on');
+}
+function fecharCasar(){ document.getElementById('mdCasar').classList.remove('on'); CS = null; }
+
+async function casarCom(j){
+  const bl = RES.soBanco[j], alvo = CS;
+  if (!bl || !alvo) return;
+  const dv = Math.abs(bl.valor - alvo.valor);
+  if (dv >= 0.005 && !confirm('Os valores diferem em R$ ' + fmt(dv) +
+      '.\n\nCasar assim registra que bateram, mas a diferença continua no saldo. Confirma?')) return;
+  for (const id of alvo.ids) { try { await sbUpd('transactions', id, {reconciled:true}); } catch(e){} }
+  RES.soApp = RES.soApp.filter(a => a !== alvo);
+  RES.soBanco = RES.soBanco.filter(b => b !== bl);
+  RES.pares.push({ bancos:[bl], apps:[alvo], nota: dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
+  alvo.conciliado = true;
+  fecharCasar();
+  toast('✓ casado à mão');
+  const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
+  const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data);
+  desenhar(de, ate);
 }
 
 let LC = null;
@@ -587,7 +697,13 @@ function abrirLancar(i){
   LC = bl;
   document.getElementById('lcSub').innerHTML =
     'Linha do extrato de <b>' + fmtD(bl.data) + '</b> que não existe no app.';
-  document.getElementById('lcDesc').value = bl.desc || '';
+  // A descricao do banco ("Pix enviado Marildete vale santos men") nao
+  // pode virar fornecedor novo: suja a base e quebra o autocomplete das
+  // outras telas. Procura o fornecedor que ja existe e propoe esse.
+  const sugerido = achaPayee(bl.desc || '');
+  document.getElementById('lcDesc').value = sugerido || bl.desc || '';
+  document.getElementById('lcPayees').innerHTML =
+    PAYEES.slice(0, 400).map(p => `<option value="${esc(p.name)}">`).join('');
   document.getElementById('lcData').value = bl.data;
   document.getElementById('lcValor').value = 'R$ ' + fmt(bl.valor);
   const tipo = bl.valor >= 0 ? 'income' : 'expense';
@@ -604,9 +720,64 @@ function abrirLancar(i){
     lista.map(c => `<option value="${esc(c.categoria)}">${esc(c.rotulo||c.categoria)}</option>`).join('');
   document.getElementById('lcCat').value = '';
   lcFillSub();
-  document.getElementById('lcAviso').style.display = 'none';
+  lcDica();
   document.getElementById('mdLancar').classList.add('on');
 }
+
+// Casa a descricao do extrato com um fornecedor que ja existe.
+// Mesma normalizacao do autocomplete do lancamentos.html: sem acento,
+// sem pontuacao, minusculo — assim "MARILDETE VALE SANTOS MEN" acha
+// "Marildete Vale Santos".
+function normNome(s){
+  // ̀-ͯ sao os acentos que o NFD separa da letra. Escapado de
+  // proposito: escrito com os caracteres crus fica invisivel no codigo.
+  return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+// Mesma regra do marcaIR() do lancamentos.html: a marca vem da tabela de
+// categorias, nao de um false fixo — senao uma despesa de Saude lancada
+// daqui ficaria fora da deducao do IR sem ninguem notar.
+function marcaDed(cat, sub){
+  if (!cat || cat === 'transferencia') return false;
+  const r = CATS.find(c => c.categoria === cat && String(c.subcategoria||'') === String(sub||''))
+         || CATS.find(c => c.categoria === cat && !c.subcategoria);
+  return !!(r && r.dedutivel);
+}
+function achaPayee(descBanco){
+  const d = normNome(descBanco);
+  if (!d) return '';
+  // tira os prefixos que o banco carimba e nao fazem parte do nome
+  const limpo = d.replace(/^(pix (enviado|recebido)|ted (recebida|enviada|conta salario)|debito (aut|autom|automatico|visa electron brasil)?\.?|pagamento de boleto( outros bancos)?|saque dinheiro( banco 24h| atm inter ag)?|debito aut fat cartao|operacoes credito imobiliario)\s*/,'').trim();
+  const alvo = limpo || d;
+  let melhor = null;
+  PAYEES.forEach(p => {
+    const n = normNome(p.name);
+    if (!n) return;
+    let pontos = 0;
+    if (n === alvo) pontos = 100;
+    else if (alvo.indexOf(n) === 0 || n.indexOf(alvo) === 0) pontos = 80;
+    else if (alvo.indexOf(n) >= 0 || n.indexOf(alvo) >= 0) pontos = 60;
+    else {
+      // palavras em comum, ignorando as de uma ou duas letras
+      const pa = alvo.split(' ').filter(w => w.length > 2);
+      const pn = n.split(' ').filter(w => w.length > 2);
+      const com = pa.filter(w => pn.indexOf(w) >= 0).length;
+      if (com >= 2 || (com === 1 && pn.length === 1)) pontos = 30 + com * 10;
+    }
+    if (pontos && (!melhor || pontos > melhor.pontos)) melhor = { nome: p.name, pontos };
+  });
+  return melhor && melhor.pontos >= 40 ? melhor.nome : '';
+}
+function lcDica(){
+  const v = document.getElementById('lcDesc').value.trim();
+  const el = document.getElementById('lcPayHint');
+  if (!v) { el.textContent = ''; return; }
+  const existe = PAYEES.some(p => normNome(p.name) === normNome(v));
+  el.innerHTML = existe
+    ? '<span style="color:var(--green)">✓ fornecedor já cadastrado</span>'
+    : '<span style="color:var(--yellow)">fornecedor novo — será criado na base</span>';
+}
+
 function lcFillSub(){
   const cat = document.getElementById('lcCat').value;
   const subs = CATS.filter(c => c.categoria === cat && c.subcategoria && c.ativo !== false);
@@ -614,10 +785,24 @@ function lcFillSub(){
     '<option value="">— sem subcategoria —</option>' +
     subs.map(s => `<option value="${esc(s.subcategoria)}">${esc(s.rotulo||s.subcategoria)}</option>`).join('');
   const av = document.getElementById('lcAviso');
-  if (cat === 'transferencia') {
-    av.innerHTML = 'Transferência lançada aqui fica <b>só nesta conta</b>, sem a perna do outro lado. ' +
-                   'É o certo quando a contrapartida já existe em outro módulo — por exemplo uma aplicação que o módulo de Investimentos já registra. ' +
-                   'Se as duas pernas faltarem, use a aba Transferência em Lançamentos.';
+  const ehTrf = cat === 'transferencia';
+  // Transferencia cria AS DUAS PERNAS, igual a aba Transferencia do
+  // modulo de lancamentos: saida nesta conta e entrada na de destino.
+  // A versao anterior criava so uma, o que deixa o outro lado torto.
+  document.getElementById('lcDestBox').style.display = ehTrf ? '' : 'none';
+  document.getElementById('lcSubBox').style.display  = ehTrf ? 'none' : '';
+  if (ehTrf) {
+    document.getElementById('lcDestLb').textContent =
+      (LC && LC.valor < 0) ? 'Conta de destino' : 'Conta de origem';
+    const outras = CONTAS.filter(c => c.id !== CONTA.id && c.ativo !== false && !c.data_encerramento);
+    document.getElementById('lcDest').innerHTML =
+      '<option value="">— escolha a conta —</option>' +
+      outras.map(c => `<option value="${esc(c.id)}">${esc(c.nome||c.id)}</option>`).join('');
+    const deb = LC && LC.valor < 0;
+    av.innerHTML = 'Vai criar <b>as duas pernas</b>, igual à aba Transferência em Lançamentos: ' +
+      (deb ? 'a <b>saída</b> nesta conta e a <b>entrada</b> na conta escolhida.'
+           : 'a linha do extrato é um crédito, então a <b>entrada</b> fica nesta conta e a ' +
+             '<b>saída</b> na conta escolhida, que é de onde o dinheiro veio.');
     av.style.display = '';
   } else av.style.display = 'none';
 }
@@ -632,15 +817,66 @@ async function lancarConfirma(){
   const data = document.getElementById('lcData').value;
   const v = Math.abs(LC.valor);
   const tipo = LC.valor >= 0 ? 'income' : 'expense';
+  const dest = document.getElementById('lcDest').value;
+  if (cat === 'transferencia' && !dest) { toast('✕ Escolha a conta de destino','var(--red)','white'); return; }
   try{
-    await sbIns('transactions', [{
-      id: Date.now(), type: tipo, amount: v, date: data,
-      payee: desc, payee_display: desc, account: CONTA.id,
-      category: cat, subcategory: sub,
-      memo: 'Conciliação bancária · lançado a partir do extrato',
-      is_deductible: false, receipt_status: 'na', reconciled: true
-    }]);
-    toast('✓ Lançado');
+    const gid = Date.now();
+    let linhas;
+    if (cat === 'transferencia') {
+      // Mesmo molde da aba Transferencia do lancamentos.html: a perna de
+      // ORIGEM leva o texto digitado e a de DESTINO leva 'Transferencia de
+      // <origem>'. Quem e origem depende do sinal da linha do extrato:
+      // debito  -> esta conta e a origem;
+      // credito -> esta conta e o DESTINO (o dinheiro veio da outra).
+      // A versao anterior nomeava sempre a outra perna como vinda desta
+      // conta, o que inverte o credito.
+      const nomeAqui = CONTA.nome || CONTA.id;
+      const nomeLa   = (CONTAS.find(c => c.id === dest) || {}).nome || dest;
+      const debito   = LC.valor < 0;
+      const origemId = debito ? CONTA.id : dest;
+      const destinoId= debito ? dest : CONTA.id;
+      const nomeOrig = debito ? nomeAqui : nomeLa;
+      const base = { amount: v, date: data, category: 'transferencia', subcategory: null,
+                     is_deductible: false, receipt_status: 'na',
+                     installments: 1, installment_num: 1, from_recorrente: false };
+      // id+99999 e o mesmo afastamento do lancamentos.html — gid+1
+      // colidiria com o Date.now() do milissegundo seguinte.
+      const idSai = gid, idEnt = gid + 99999;
+      linhas = [
+        Object.assign({}, base, {
+          id: idSai, group_id: idSai, type: 'expense', account: origemId,
+          payee: debito ? desc : ('Transferência para ' + nomeAqui),
+          payee_display: debito ? desc : ('Transf. para ' + nomeAqui),
+          memo: 'Conciliação bancária · saída da transferência',
+          reconciled: debito
+        }),
+        Object.assign({}, base, {
+          id: idEnt, group_id: idEnt, type: 'income', account: destinoId,
+          payee: 'Transferência de ' + nomeOrig,
+          payee_display: 'Transf. de ' + nomeOrig,
+          memo: 'Conciliação bancária · entrada da transferência',
+          reconciled: !debito
+        })
+      ];
+    } else {
+      linhas = [{
+        id: gid, group_id: gid, type: tipo, amount: v, date: data,
+        payee: desc, payee_display: desc, account: CONTA.id,
+        category: cat, subcategory: sub,
+        memo: 'Conciliação bancária · lançado a partir do extrato',
+        is_deductible: marcaDed(cat, sub), receipt_status: 'na', reconciled: true,
+        installments: 1, installment_num: 1, from_recorrente: false
+      }];
+    }
+    await sbIns('transactions', linhas);
+    // fornecedor novo entra na base, para o autocomplete das outras telas
+    if (cat !== 'transferencia' && desc && !PAYEES.some(p => normNome(p.name) === normNome(desc))) {
+      try{
+        await sbIns('payees', [{ name: desc, category: cat, subcategory: sub, use_count: 1, last_used: data }]);
+        PAYEES.push({ name: desc });
+      }catch(e){ /* fornecedor duplicado nao impede o lancamento */ }
+    }
+    toast(cat === 'transferencia' ? '✓ Lançado nas duas contas' : '✓ Lançado');
     fecharLancar();
     const de = EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data);
     const ate = EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data);
@@ -652,6 +888,7 @@ async function lancarConfirma(){
 document.addEventListener('DOMContentLoaded', function(){
   var e = document.getElementById('appVer'); if (e) e.textContent = APP_VERSION;
   document.getElementById('mdLancar').addEventListener('click', function(ev){ if (ev.target === this) fecharLancar(); });
+  document.getElementById('mdCasar').addEventListener('click', function(ev){ if (ev.target === this) fecharCasar(); });
   document.getElementById('cSaldoFim').addEventListener('change', function(){
     if (RES) { const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
                const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data); desenhar(de, ate); }
