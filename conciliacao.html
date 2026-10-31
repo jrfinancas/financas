@@ -197,7 +197,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.10.31-c';
+const APP_VERSION='v2026.10.31-d';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -354,11 +354,17 @@ function montaCandidatos(txs){
                          conciliado: !!t.reconciled });
   });
   const todos = soltos.concat(Object.values(grupos));
-  todos.forEach(c => { if (c.grupo) c.desc = c.desc + ' (' + c.n + ' linhas)'; });
+  // o lancamentos.html grava group_id em TODO lancamento, inclusive nos de
+  // uma linha — entao sem o n>1 quase tudo saia como "(1 linhas)"
+  todos.forEach(c => { if (c.grupo && c.n > 1) c.desc = c.desc + ' (' + c.n + ' linhas)'; });
   return todos;
 }
 
-function casar(banco, cand, TOL, JAN){
+function casar(banco, cand, TOL, JAN, MAO){
+  // A marca de "ja casou" fica na propria linha do extrato. Limpar isso
+  // era tarefa de quem chamava — e uma segunda chamada sem a limpeza
+  // devolvia um resultado errado, sem erro nenhum. Agora e aqui.
+  banco.forEach(b => { delete b._ok; });
   const usados = new Set();
   const pares = [];
   const livres = () => cand.filter((c,i) => !usados.has(i));
@@ -372,6 +378,24 @@ function casar(banco, cand, TOL, JAN){
     cs.forEach(c => usados.add(idx(c)));
     pares.push({ bancos: bls, apps: cs, nota });
   }
+
+  // PASSE 0 — os casamentos que voce ja fez a mao, em qualquer rodada.
+  //
+  // Vem antes de tudo: foi decisao sua, nao chute do motor. Sem este
+  // passe, toda nova rodada refazia o casamento do zero e o par se
+  // desfazia — a ponta do app voltava com o selo "ja conciliado" e a do
+  // extrato voltava como "falta lancar", convidando a lancar duplicado.
+  const M = MAO || {};
+  banco.forEach(bl => {
+    if (bl._ok) return;
+    const reg = M[fpBanco(bl)];
+    const ids = reg && reg.ids;
+    if (!ids || !ids.length) return;
+    const cs = cand.filter((c, i) => !usados.has(i) && c.ids.some(id => ids.indexOf(id) >= 0));
+    if (!cs.length) return;                    // o lancamento foi apagado depois
+    const dv = Math.abs(bl.valor - cs.reduce((s, c) => s + c.valor, 0));
+    fecha([bl], cs, dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão');
+  });
 
   // PASSE 1 — data e valor batendo na mosca
   banco.forEach(bl => {
@@ -528,7 +552,7 @@ async function rodar(de, ate){
     CONTA = CONTAS.find(c => c.id === document.getElementById('cConta').value);
     TXS = await sbGet('transactions', `account=eq.${encodeURIComponent(CONTA.id)}&date=gte.${de}&date=lte.${ate}&order=date.asc`);
     EXTRATO.forEach(b => delete b._ok);
-    RES = casar(EXTRATO, montaCandidatos(TXS), TOL, JAN);
+    RES = casar(EXTRATO, montaCandidatos(TXS), TOL, JAN, maoDaConta());
     desenhar(de, ate);
     document.getElementById('resultado').style.display = '';
     document.getElementById('arqInfo').textContent = '';
@@ -586,13 +610,16 @@ function desenhar(de, ate){
       (x.conciliado ? '<span class="badge b-info">já conciliado</span>' : '') +
       `<span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span>` +
       `<button class="ico" onclick="abrirCasar(${i})" title="Casar à mão com uma linha do extrato">Casar…</button></div>` + dica(x);
-  const linP = p => {
+  const linP = (p,i) => {
     const b0 = p.bancos[0];
     const total = p.bancos.reduce((s,x)=>s+x.valor,0);
+    const mao = String(p.nota).indexOf('à mão') === 0;
     return `<div class="lin"><span class="lin-d">${fmtD(b0.data)}</span>` +
       `<span class="lin-t">${esc(b0.desc||'—')}${p.bancos.length>1?' + '+(p.bancos.length-1)+' no extrato':''}</span>` +
       `<span class="badge ${p.nota==='exato'?'b-ok':'b-warn'}">${esc(p.nota)}</span>` +
-      `<span class="lin-v ${total<0?'neg':'pos'}">${fmt(total)}</span></div>` +
+      `<span class="lin-v ${total<0?'neg':'pos'}">${fmt(total)}</span>` +
+      (mao ? `<button class="ico" onclick="desfazerMao(${i})" title="Desfazer este casamento">Desfazer</button>` : '') +
+      `</div>` +
       (p.nota==='exato' ? ''
         : `<div class="sub2">app: ${p.apps.map(a=>esc(a.desc)+' '+fmt(a.valor)).join(' + ')}</div>` +
           (p.bancos.length>1 ? `<div class="sub2">extrato: ${p.bancos.map(b=>esc(b.desc)+' '+fmt(b.valor)).join(' + ')}</div>` : ''));
@@ -643,6 +670,40 @@ async function conciliarCasados(){
   RES.pares.forEach(p => p.apps.forEach(a => a.conciliado = true));
 }
 
+// ---------- onde mora um casamento feito a mao ----------
+// A tabela transactions so tem o 'reconciled', que diz "bateu" mas nao diz
+// COM O QUE. Entao o vinculo linha-do-extrato <-> lancamento nao tem onde
+// morar na base, e eu nao vou pedir mudanca de schema por causa disso.
+// Fica aqui, no proprio navegador, por conta. E por navegador: um
+// casamento feito no computador nao aparece no celular.
+const MKEY = 'jr_conc_mao';
+function mapaMao(){
+  try { return JSON.parse(localStorage.getItem(MKEY) || '{}') || {}; } catch(e){ return {}; }
+}
+function gravaMao(m){ try { localStorage.setItem(MKEY, JSON.stringify(m)); } catch(e){} }
+// Impressao digital da linha do extrato: o que nao muda entre dois
+// downloads do mesmo periodo. Descricao normalizada e cortada, para o
+// banco nao poder quebrar o vinculo mudando espaco ou acento.
+function fpBanco(b){
+  return b.data + '|' + Number(b.valor).toFixed(2) + '|' + normNome(b.desc).slice(0, 40);
+}
+function maoDaConta(){ const m = mapaMao(); return (CONTA && m[CONTA.id]) || {}; }
+function salvaMao(bl, ids, antes){
+  if (!CONTA) return;
+  const m = mapaMao();
+  const c = m[CONTA.id] || (m[CONTA.id] = {});
+  c[fpBanco(bl)] = { ids: ids.slice(), antes: antes.slice() };
+  gravaMao(m);
+}
+function apagaMao(bl){
+  if (!CONTA) return null;
+  const m = mapaMao(), c = m[CONTA.id];
+  if (!c) return null;
+  const fp = fpBanco(bl), reg = c[fp] || null;
+  delete c[fp]; gravaMao(m);
+  return reg;
+}
+
 // ---------- casamento a mao ----------
 // O botao antigo so marcava reconciled e sumia com a linha — ou seja,
 // gravava no banco que ela bateu com o extrato quando ela nao bateu.
@@ -672,13 +733,40 @@ function abrirCasar(i){
 }
 function fecharCasar(){ document.getElementById('mdCasar').classList.remove('on'); CS = null; }
 
+// Um casamento a mao errado tem de ter volta, senao o erro fica gravado.
+async function desfazerMao(i){
+  const p = RES.pares[i];
+  if (!p || String(p.nota).indexOf('à mão') !== 0) return;
+  if (!confirm('Desfazer este casamento?\n\nAs duas pontas voltam para as listas. Os lançamentos que já estavam conciliados antes deste casamento continuam conciliados.')) return;
+  const reg = apagaMao(p.bancos[0]);
+  // volta cada id ao estado anterior; quem ja era conciliado antes, fica
+  for (const a of p.apps) {
+    for (const id of a.ids) {
+      const k = reg && reg.ids ? reg.ids.indexOf(id) : -1;
+      const eraAntes = k >= 0 && reg.antes ? !!reg.antes[k] : false;
+      if (!eraAntes) { try { await sbUpd('transactions', id, {reconciled:false}); } catch(e){} }
+    }
+  }
+  toast('✓ casamento desfeito');
+  const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
+  const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data);
+  await rodar(de, ate);
+}
+
 async function casarCom(j){
   const bl = RES.soBanco[j], alvo = CS;
   if (!bl || !alvo) return;
   const dv = Math.abs(bl.valor - alvo.valor);
   if (dv >= 0.005 && !confirm('Os valores diferem em R$ ' + fmt(dv) +
       '.\n\nCasar assim registra que bateram, mas a diferença continua no saldo. Confirma?')) return;
+  // guardo como cada id estava ANTES, para o desfazer nao apagar um
+  // reconciled que ja vinha de outra rodada
+  const antes = alvo.ids.map(id => {
+    const t = TXS.find(x => x.id === id);
+    return !!(t && t.reconciled);
+  });
   for (const id of alvo.ids) { try { await sbUpd('transactions', id, {reconciled:true}); } catch(e){} }
+  salvaMao(bl, alvo.ids, antes);
   RES.soApp = RES.soApp.filter(a => a !== alvo);
   RES.soBanco = RES.soBanco.filter(b => b !== bl);
   RES.pares.push({ bancos:[bl], apps:[alvo], nota: dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
