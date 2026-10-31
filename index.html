@@ -171,6 +171,14 @@ try{ sessionStorage.setItem('jr_sess','1'); }catch(e){}
     </div>
     <div class="arrow">›</div>
   </a>
+  <a href="conciliacao.html">
+    <div class="icon" style="background:rgba(79,142,247,.15)">⚖️</div>
+    <div class="label">
+      <strong>Conciliação</strong>
+      <span>Extrato do banco × lançamentos do app</span>
+    </div>
+    <div class="arrow">›</div>
+  </a>
   <a href="categorias.html">
     <div class="icon" style="background:rgba(79,142,247,.15)">🏷️</div>
     <div class="label">
@@ -210,7 +218,7 @@ try{ sessionStorage.setItem('jr_sess','1'); }catch(e){}
 
 <script>
 // Porta de entrada: destrava aqui e os módulos abrem sem pedir de novo.
-const APP_VERSION='v2026.10.11-a';
+const APP_VERSION='v2026.10.31-a';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer'); if(e) e.textContent=APP_VERSION;
   JRAuth.protege(function(){});
