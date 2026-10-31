@@ -1310,7 +1310,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.10.17-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.10.31-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2891,7 +2891,44 @@ async function exportIR() {
 // ============================================================
 // Guarda as contas para consultar regras (ex.: isencao de IOF)
 async function loadContasCache(){
-  try{ window.contasCache = await sbGet('contas','select=id,nome,sem_iof'); if(typeof checkWise==='function') checkWise(); }catch(e){ window.contasCache=[]; }
+  try{ window.contasCache = await sbGet('contas','select=id,nome,tipo,sem_iof,ativo,data_encerramento&order=ordem.asc');
+       if(typeof checkWise==='function') checkWise();
+       try{ montaSelectsConta(); }catch(e){ console.error('selects de conta:',e); }
+  }catch(e){ window.contasCache=[]; }
+}
+
+// Os selects de conta eram cinco listas de <option> escritas a mao, cada
+// uma com um subconjunto diferente. O de EDICAO nao tinha Carteira nem
+// Caixa, entao um lancamento registrado em Banco nao podia ser movido
+// para dinheiro — foi o caso da Terezinha em 04/set/26. Mesmo erro de
+// regra copiada que ja custou caro na aba IR: agora todos saem da tabela.
+function montaSelectsConta(){
+  const cs = window.contasCache || [];
+  if (!cs.length) return;                       // sem tabela, fica o HTML fixo
+  const esc2 = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const viva = c => c.ativo !== false && !c.data_encerramento;
+  const grupo = (rot, arr) => arr.length
+    ? '<optgroup label="'+rot+'">' + arr.map(c =>
+        '<option value="'+esc2(c.id)+'">'+esc2(c.nome||c.id)+'</option>').join('') + '</optgroup>'
+    : '';
+  const cartoes = cs.filter(c => viva(c) && c.tipo === 'cartao');
+  const demais  = cs.filter(c => viva(c) && c.tipo !== 'cartao');
+  ['nAcct','eAcct','sAcct','recAcct','pAcct'].forEach(function(id){
+    const el = document.getElementById(id); if (!el) return;
+    const atual = el.value;
+    const vazia = el.querySelector('option[value=""]');
+    el.innerHTML = (vazia ? vazia.outerHTML : '') + grupo('Contas', demais) + grupo('Cartões', cartoes);
+    // conta encerrada nao entra na lista, mas se o lancamento aberto for
+    // de uma delas, devolve a opcao para nao trocar a conta sem querer
+    if (atual) {
+      if (!el.querySelector('option[value="'+atual.replace(/"/g,'')+'"]')) {
+        const velha = cs.find(c => c.id === atual);
+        el.insertAdjacentHTML('beforeend',
+          '<option value="'+esc2(atual)+'">'+esc2((velha&&velha.nome)||atual)+' (encerrada)</option>');
+      }
+      el.value = atual;
+    }
+  });
 }
 
 async function loadRecs() {

@@ -182,7 +182,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.10.31-a';
+const APP_VERSION='v2026.10.31-b';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -226,7 +226,7 @@ function hoje(){ return new Date().toISOString().slice(0,10); }
 // tratar as aspas — que e o que o importar-quicken.html faz — quebra o
 // arquivo. Este tokenizador percorre caractere a caractere.
 function lerCSV(texto, sep){
-  texto = texto.replace(/^﻿/, '');          // BOM do UTF-8
+  texto = texto.replace(/^\uFEFF/, '');          // BOM do UTF-8
   texto = texto.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const linhas = []; let campos = [], campo = '', aspas = false;
   for (let i = 0; i < texto.length; i++) {
@@ -307,23 +307,36 @@ function parseExtrato(texto){
 
 function dias(a, b){ return Math.abs((new Date(a+'T00:00:00') - new Date(b+'T00:00:00')) / 86400000); }
 
-// Monta os candidatos do lado do app. Lancamentos que compartilham
-// group_id (holerite, lancamento dividido) viram UM candidato com a
-// soma liquida — e assim que o banco os enxerga.
+// Monta os candidatos do lado do app. O que o banco mostra como UMA
+// linha vira UM candidato, com a soma liquida.
+//
+// Sao DOIS agrupamentos, nao um:
+//   - group_id, que o lancamento dividido grava;
+//   - is_payslip + payslip_month, que e como o HOLERITE se identifica.
+//     A aba Holerite nao grava group_id (lancamentos.html ~2475): as
+//     linhas so compartilham is_payslip e payslip_month. Agrupar apenas
+//     por group_id deixava o salario solto e o TED nunca casava.
+//     Conferido em set/26: 18.000 − 1,00 − 35,00 − 988,07 − 7.069,55
+//     = 9.906,38, exatamente o TED do extrato de 30/09.
 function montaCandidatos(txs){
   const soltos = [], grupos = {};
+  function chaveGrupo(t){
+    if (t.group_id) return 'g' + t.group_id;
+    if (t.is_payslip && t.payslip_month) return 'h' + t.payslip_month + '|' + (t.account || '');
+    return null;
+  }
   txs.forEach(t => {
     const v = (t.type === 'income' ? 1 : -1) * parseFloat(t.amount || 0);
-    const item = { ids:[t.id], data:t.date, valor:v,
-                   desc:(t.payee_display || t.payee || ''), n:1,
-                   conciliado: !!t.reconciled };
-    if (t.group_id) {
-      const g = grupos[t.group_id] || (grupos[t.group_id] = {ids:[], data:t.date, valor:0, desc:'', n:0, conciliado:true, grupo:true});
+    const k = chaveGrupo(t);
+    if (k) {
+      const g = grupos[k] || (grupos[k] = {ids:[], data:t.date, valor:0, desc:'', n:0, conciliado:true, grupo:true});
       g.ids.push(t.id); g.valor += v; g.n++;
       if (t.date < g.data) g.data = t.date;
       if (!g.desc) g.desc = (t.payee_display || t.payee || '');
       if (!t.reconciled) g.conciliado = false;
-    } else soltos.push(item);
+    } else soltos.push({ ids:[t.id], data:t.date, valor:v,
+                         desc:(t.payee_display || t.payee || ''), n:1,
+                         conciliado: !!t.reconciled });
   });
   const todos = soltos.concat(Object.values(grupos));
   todos.forEach(c => { if (c.grupo) c.desc = c.desc + ' (' + c.n + ' linhas)'; });
@@ -349,40 +362,67 @@ function casar(banco, cand, TOL, JAN){
   });
 
   // PASSE 2 — valor dentro da tolerancia, data dentro da janela.
-  // Pega a fatura de 2 centavos e o lancamento com data trocada.
-  banco.forEach(bl => {
+  //
+  // O melhor par do CONJUNTO primeiro, nao linha a linha. A versao
+  // anterior resolvia banco por banco, e com nove PIX de R$ 146,63 no
+  // mesmo periodo a primeira linha levava o candidato que uma linha
+  // posterior precisava mais — sobrava uma no extrato e outra no app,
+  // ambas certas. Agora todas as duplas viaveis sao ordenadas por
+  // diferenca de valor e depois por distancia de data, e consumidas
+  // nessa ordem.
+  const arestas = [];
+  banco.forEach((bl, bi) => {
     if (bl._ok) return;
-    const cs = livres().filter(c => Math.abs(c.valor - bl.valor) <= TOL && dias(c.data, bl.data) <= JAN);
-    if (!cs.length) return;
-    cs.sort((a,b) => (Math.abs(a.valor-bl.valor) - Math.abs(b.valor-bl.valor)) || (dias(a.data,bl.data) - dias(b.data,bl.data)));
+    cand.forEach((c, ci) => {
+      if (usados.has(ci)) return;
+      const dv = Math.abs(c.valor - bl.valor), dd = dias(c.data, bl.data);
+      if (dv <= TOL && dd <= JAN) arestas.push({ bi, ci, dv, dd });
+    });
+  });
+  arestas.sort((a, b) => (a.dv - b.dv) || (a.dd - b.dd));
+  arestas.forEach(e => {
+    const bl = banco[e.bi];
+    if (bl._ok || usados.has(e.ci)) return;
     bl._ok = 2;
-    const c = cs[0];
-    const dv = Math.abs(c.valor - bl.valor), dd = dias(c.data, bl.data);
-    fecha(bl, [c], dv >= 0.005 ? ('difere R$ ' + fmt(dv)) : (dd ? ('data ' + dd + 'd') : 'exato'));
+    fecha(bl, [cand[e.ci]],
+      e.dv >= 0.005 ? ('difere R$ ' + fmt(e.dv)) : (e.dd ? ('data ' + e.dd + 'd') : 'exato'));
   });
 
-  // PASSE 3 — soma de 2 ou 3 lancamentos do app contra uma linha do banco.
-  // E a Claro desdobrada, o condominio com agua e gas, o rateio.
+  // PASSE 3 — soma de 2 a 4 lancamentos do app contra uma linha do banco.
+  // Quatro, nao tres: a Claro de 05/ago vem R$ 303,71 no extrato e no app
+  // esta como 94,25 + 50,56 + 119,90 + 39,00. Com o teto em 3 ela nunca
+  // fechava.
+  function somaQueFecha(pool, alvo, maxItens){
+    const n = Math.min(pool.length, 14);   // a combinacao cresce rapido
+    let achado = null;
+    (function rec(i, atual, soma){
+      if (achado) return;
+      if (atual.length >= 2 && Math.abs(soma - alvo) <= TOL) { achado = atual.slice(); return; }
+      if (atual.length >= maxItens || i >= n) return;
+      for (let k = i; k < n && !achado; k++) {
+        atual.push(pool[k]);
+        rec(k + 1, atual, soma + pool[k].valor);
+        atual.pop();
+      }
+    })(0, [], 0);
+    return achado;
+  }
   banco.forEach(bl => {
     if (bl._ok) return;
-    const pool = livres().filter(c => dias(c.data, bl.data) <= JAN && Math.sign(c.valor) === Math.sign(bl.valor));
+    const pool = livres()
+      .filter(c => dias(c.data, bl.data) <= JAN && Math.sign(c.valor) === Math.sign(bl.valor))
+      .sort((a, b) => dias(a.data, bl.data) - dias(b.data, bl.data));
     if (pool.length < 2) return;
-    const lim = Math.min(pool.length, 12);     // combinacao cresce rapido
-    for (let i = 0; i < lim; i++) {
-      for (let j = i+1; j < lim; j++) {
-        if (Math.abs(pool[i].valor + pool[j].valor - bl.valor) <= TOL) {
-          bl._ok = 3; fecha(bl, [pool[i], pool[j]], 'somou 2'); return;
-        }
-        for (let k = j+1; k < lim; k++) {
-          if (Math.abs(pool[i].valor + pool[j].valor + pool[k].valor - bl.valor) <= TOL) {
-            bl._ok = 3; fecha(bl, [pool[i], pool[j], pool[k]], 'somou 3'); return;
-          }
-        }
-      }
-    }
+    const achado = somaQueFecha(pool, bl.valor, 4);
+    if (achado) { bl._ok = 3; fecha(bl, achado, 'somou ' + achado.length); }
   });
 
-  return { pares, soBanco: banco.filter(b => !b._ok), soApp: livres() };
+  const porData = (a, b) => a.data < b.data ? -1 : a.data > b.data ? 1 : 0;
+  return {
+    pares,
+    soBanco: banco.filter(b => !b._ok).sort(porData),
+    soApp: livres().sort(porData)
+  };
 }
 
 // ============================================================
@@ -468,13 +508,22 @@ function desenhar(de, ate){
     (parcial ? ` <span style="color:var(--yellow)">O extrato começa em ${fmtD(de)}, depois da data-base — então a diferença inclui o que aconteceu antes e não está neste arquivo.</span>` : '');
 
   // ---- listas ----
-  const P = RES.pares, SB_ = RES.soBanco, SA = RES.soApp.filter(c => !c.conciliado);
+  // Nao escondo o que ja esta marcado como conciliado: some da lista e a
+  // conta para de fechar. Quem ja foi conciliado antes aparece com selo.
+  const P = RES.pares, SB_ = RES.soBanco, SA = RES.soApp;
   const somaB = SB_.reduce((s,x)=>s+x.valor,0), somaA = SA.reduce((s,x)=>s+x.valor,0);
   const impr = P.filter(p => p.nota !== 'exato');
+  // o botao marca LANCAMENTOS, nao casamentos: um casamento pode levar
+  // varias linhas do app (holerite, conta desdobrada). Os dois numeros
+  // discordavam na tela — 98 casamentos, 118 lancamentos.
+  const nLanc = P.reduce((s,p) => s + p.app.reduce((t,a) => t + a.ids.length, 0), 0);
 
   // passa o indice, nao o objeto: descricao com aspas quebraria o atributo
   const linB = (x,i) => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span><span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span><button class="ico" onclick="abrirLancar(${i})">Lançar</button></div>`;
-  const linA = x => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span><span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span><button class="ico" onclick="conciliarUm('${x.ids.join(',')}')">Conciliar</button></div>`;
+  const linA = x => `<div class="lin"><span class="lin-d">${fmtD(x.data)}</span><span class="lin-t">${esc(x.desc||'—')}</span>` +
+      (x.conciliado ? '<span class="badge b-info">já conciliado</span>' : '') +
+      `<span class="lin-v ${x.valor<0?'neg':'pos'}">${fmt(x.valor)}</span>` +
+      (x.conciliado ? '' : `<button class="ico" onclick="conciliarUm('${x.ids.join(',')}')">Conciliar</button>`) + `</div>`;
   const linP = p => `<div class="lin"><span class="lin-d">${fmtD(p.banco.data)}</span><span class="lin-t">${esc(p.banco.desc||'—')}</span>` +
       `<span class="badge ${p.nota==='exato'?'b-ok':'b-warn'}">${esc(p.nota)}</span>` +
       `<span class="lin-v ${p.banco.valor<0?'neg':'pos'}">${fmt(p.banco.valor)}</span></div>` +
@@ -493,7 +542,7 @@ function desenhar(de, ate){
     bloco('soapp', 'Só no app — não bateu com o banco', SA.length + ' · R$ ' + fmt(somaA), SA.length?'b-warn':'b-ok', SA, linA);
 
   document.getElementById('btnConciliar').textContent =
-    'Marcar os ' + P.length + ' casados como conciliados';
+    'Marcar ' + nLanc + ' lançamentos (' + P.length + ' casamentos) como conciliados';
   document.getElementById('btnConciliar').disabled = !P.length;
 }
 
@@ -543,9 +592,15 @@ function abrirLancar(i){
   document.getElementById('lcValor').value = 'R$ ' + fmt(bl.valor);
   const tipo = bl.valor >= 0 ? 'income' : 'expense';
   const raiz = CATS.filter(c => !c.subcategoria && c.ativo !== false);
-  const lista = raiz.filter(c => c.tipo === tipo || c.categoria === 'transferencia');
+  const lista = raiz.filter(c => c.tipo === tipo);
+  // 'transferencia' NAO tem linha-raiz na tabela categorias — e so uma
+  // string que o app grava. Por isso ela nunca aparecia aqui e so dava
+  // para lancar despesa. Entra sempre, a mao, e em primeiro lugar:
+  // transferencia entre contas e justamente o que mais falta lancar.
   document.getElementById('lcCat').innerHTML =
     '<option value="">— escolha —</option>' +
+    '<option value="transferencia">Transferência entre contas</option>' +
+    '<option value="" disabled>──────────</option>' +
     lista.map(c => `<option value="${esc(c.categoria)}">${esc(c.rotulo||c.categoria)}</option>`).join('');
   document.getElementById('lcCat').value = '';
   lcFillSub();
