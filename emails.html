@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.10.12-a';
+var APP_VERSION='v2026.11.02-a';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -230,7 +230,13 @@ function subKey(s){
 var CATTAB = null;
 async function carregaCatTab(){
   try{
-    var r = await fetch(SB+'/rest/v1/categorias?select=categoria,subcategoria,tipo,dedutivel&limit=2000',{headers:SBH});
+    // As SETE colunas que esta funcao usa. Faltavam rotulo, ativo e ordem:
+    // o PostgREST devolve 200 com as colunas pedidas e nada mais, sem
+    // reclamar das que o codigo le depois. Entao c.rotulo vinha undefined
+    // e era isso que o menu de categoria mostrava — "undefined" em todas.
+    // 'ativo' faltando deixava categoria desativada aparecer (undefined
+    // !== false) e 'ordem' faltando punha os menus em ordem aleatoria.
+    var r = await fetch(SB+'/rest/v1/categorias?select=categoria,subcategoria,rotulo,tipo,dedutivel,ativo,ordem&limit=2000',{headers:SBH});
     if(!r.ok) throw new Error(await r.text());
     var rows = await r.json();
     // Tabela vazia nao e tabela: o PostgREST devolve zero linhas sem erro
