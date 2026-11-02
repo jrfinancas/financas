@@ -152,7 +152,7 @@ document.addEventListener('focusout',function(e){
 <div class="toast" id="toast"></div>
 
 <script>
-var APP_VERSION='v2026.11.02-a';
+var APP_VERSION='v2026.11.02-b';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;
   // Esta tela não tinha login próprio; o auth.js injeta o dele.
@@ -299,6 +299,46 @@ function isDeductible(cat, sub){
   }
   return isDeductibleFixo(cat, sub);
 }
+// ---------- Parcelas, no mesmo molde da aba Normal ----------
+// Numero de parcelas de fato: o select, ou o campo livre quando 'Outro...'.
+function getInstEmail(idx){
+  var s = document.getElementById('sf_in'+idx);
+  if(!s) return 1;
+  if(s.value === 'custom'){
+    var n = parseInt(document.getElementById('sf_inc'+idx).value, 10);
+    return (n >= 2 && n <= 360) ? n : 1;
+  }
+  return parseInt(s.value, 10) || 1;
+}
+function onInstEmail(idx){
+  var s = document.getElementById('sf_in'+idx), c = document.getElementById('sf_inc'+idx);
+  if(c){ c.style.display = (s.value === 'custom') ? 'block' : 'none'; if(s.value==='custom') c.focus(); }
+  prevInstEmail(idx);
+}
+// O valor do e-mail e o TOTAL da compra, igual a aba Normal — mostro o
+// que vai ser gravado por parcela para nao ter duvida na hora de aprovar.
+function prevInstEmail(idx){
+  var el = document.getElementById('sf_inp'+idx);
+  if(!el) return;
+  var n = getInstEmail(idx);
+  var tot = vNum(String((document.getElementById('sf_a'+idx)||{}).value || ''));
+  if(n <= 1 || !tot){ el.textContent = ''; return; }
+  el.textContent = n + '× de R$ ' + (Math.round((tot/n)*100)/100).toLocaleString('pt-BR',
+                   {minimumFractionDigits:2, maximumFractionDigits:2}) + ' · total R$ ' +
+                   tot.toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+}
+// Data da parcela i: mesma regra da aba Normal, com o dia preso ao ultimo
+// dia do mes. Sem isto, uma compra em 31/01 em 3x caia em 03/03, porque o
+// setMonth do JS rola fevereiro 31 para marco.
+function dataParcela(date, i){
+  if(i === 0) return date;
+  var o = new Date(date+'T00:00:00');
+  var d = new Date(o.getFullYear(), o.getMonth()+i, 1);
+  var ultimo = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+  d.setDate(Math.min(o.getDate(), ultimo));
+  return d.toISOString().slice(0,10);
+}
+
 // Preenche o select de subcategoria conforme a categoria escolhida
 function fillSubEmail(idx, sel){
   var cat=document.getElementById('sf_c'+idx).value;
@@ -614,12 +654,23 @@ function renderSuggestion(idx, sug, email) {
     +'<div class="sug-grid">'
     +fxBadge
     +'<div class="sug-field full"><label>Fornecedor</label><input type="text" id="sf_p'+idx+'" value="'+esc(sug.payee||'')+'"></div>'
-    +'<div class="sug-field"><label>Valor R$</label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'"></div>'
+    +'<div class="sug-field"><label>Valor R$ <span style="font-size:10px;color:var(--muted)">total</span></label><input type="number" step="0.01" id="sf_a'+idx+'" value="'+(sug.amount||'')+'" oninput="prevInstEmail('+idx+')"></div>'
     +'<div class="sug-field"><label>Data</label><input type="date" id="sf_d'+idx+'" value="'+(sug.date||today)+'"></div>'
     +cardNote
     +'<div class="sug-field full"><label>Conta</label><select id="sf_ac'+idx+'" onchange="onAcctFX('+idx+')">'+acctOpts+'</select></div>'
     +'<div class="sug-field full"><label>Categoria <span id="sf_tag'+idx+'" style="font-size:10px;border-radius:4px;padding:1px 6px;margin-left:4px"></span></label><select id="sf_c'+idx+'" onchange="fillSubEmail('+idx+')">'+catOpts+'</select></div>'
-    +'<div class="sug-field"><label>Parcelas</label><select id="sf_in'+idx+'"><option value="1">1x</option><option value="2">2x</option><option value="3">3x</option><option value="6">6x</option><option value="12">12x</option></select></div>'
+    // A lista era 1, 2, 3, 6 e 12 — uma compra em 5x nao tinha onde ser
+    // lancada. Agora e a mesma da aba Normal: 1 a 12 e 'Outro...'.
+    +'<div class="sug-field"><label>Parcelas</label>'
+    +'<div style="display:flex;gap:6px;align-items:center">'
+    +'<select id="sf_in'+idx+'" onchange="onInstEmail('+idx+')" style="flex:1">'
+    +'<option value="1">À vista</option>'
+    +[2,3,4,5,6,7,8,9,10,11,12].map(function(n){ return '<option value="'+n+'">'+n+'×</option>'; }).join('')
+    +'<option value="custom">Outro...</option>'
+    +'</select>'
+    +'<input type="number" id="sf_inc'+idx+'" min="2" max="360" placeholder="Nº" style="display:none;width:66px" oninput="prevInstEmail('+idx+')">'
+    +'</div>'
+    +'<div id="sf_inp'+idx+'" style="font-size:11px;color:var(--muted);margin-top:4px"></div></div>'
     +'<div class="sug-field"><label>Subcategoria</label><select id="sf_s'+idx+'"><option value="">—</option></select></div>'
     +'<div class="sug-field full"><label>Observa\u00e7\u00e3o</label><input type="text" id="sf_m'+idx+'" value="'+esc(sug.memo||'')+'"></div>'
     +'</div>'
@@ -686,8 +737,7 @@ async function approve(idx, msgId) {
   var cat = document.getElementById('sf_c'+idx).value;
   var acctEl = document.getElementById('sf_ac'+idx);
   var acct = acctEl ? acctEl.value : 'santander-cc';
-  var instEl = document.getElementById('sf_in'+idx);
-  var inst = instEl ? parseInt(instEl.value) : 1;
+  var inst = getInstEmail(idx);
   var subEl = document.getElementById('sf_s'+idx);
   var sub = subEl ? (subEl.value || null) : null;
   var memo = document.getElementById('sf_m'+idx).value;
@@ -703,17 +753,26 @@ async function approve(idx, msgId) {
   var gid = Date.now();
   var rows = [];
   for (var i=0; i<inst; i++) {
-    var d = new Date(date+'T00:00:00'); d.setMonth(d.getMonth()+i);
     rows.push({
       id: gid+i, type: (INC.indexOf(cat)>=0 ? 'income' : 'expense'),
       amount: Math.round((amount/inst)*100)/100,
-      date: i===0 ? date : d.toISOString().slice(0,10),
-      payee: payee, payee_display: payee,
+      // dia preso ao ultimo dia do mes, igual a aba Normal
+      date: dataParcela(date, i),
+      payee: payee,
+      // a marca da parcela vai no payee_display, como no saveNormal. Antes
+      // ia no memo, e isso sobrescrevia a observacao que voce escreveu.
+      payee_display: inst>1 ? (payee+' ('+(i+1)+'/'+inst+')') : payee,
       account: acct, category: cat, subcategory: sub,
-      memo: inst>1 ? memo+' ('+(i+1)+'/'+inst+')' : memo,
+      memo: memo,
       is_deductible: isDeductible(cat, sub||''),
-      receipt_status:'attached', installments:inst, installment_num:i+1,
-      group_id:gid, from_recorrente:false, is_split:false, fx:fxData
+      // o comprovante e de UMA parcela, nao das cinco: so a primeira
+      // nasce 'attached'. Antes todas diziam ter recibo.
+      receipt_status: i===0 ? 'attached' : 'na',
+      installments:inst, installment_num:i+1,
+      group_id:gid, from_recorrente:false, is_split:false,
+      // os metadados de cambio ficam na primeira parcela so, senao o
+      // valor em moeda estrangeira conta cinco vezes
+      fx: i===0 ? fxData : null
     });
   }
   try {
