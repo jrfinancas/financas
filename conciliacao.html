@@ -210,7 +210,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.02-b';
+const APP_VERSION='v2026.11.02-c';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -341,9 +341,29 @@ function parseExtrato(texto){
         saldo: iSaldo >= 0 ? valorBR(c[iSaldo]) : NaN
       });
     }
-    if (out.length) return { linhas: out, sep };
+    if (out.length) return { linhas: out, sep, periodo: achaPeriodo(linhas, hi) };
   }
-  return { linhas: [], sep: null };
+  return { linhas: [], sep: null, periodo: null };
+}
+
+// O periodo que o BANCO diz ter entregado, do preambulo do CSV:
+//   Período do extrato;27/07/2026 a 24/10/2026
+// Deduzir o periodo das datas dos lancamentos erra para dentro: neste
+// arquivo o ultimo movimento e 22/10, mas o extrato cobre ate 24/10. A
+// diferenca nao e so cosmetica — o periodo define a janela em que um
+// lancamento do app sem par no banco conta como divergencia. Com a janela
+// curta, lancamento do app em 23 ou 24/10 ficava invisivel.
+function achaPeriodo(linhas, hi){
+  for (let i = 0; i < Math.min(hi >= 0 ? hi : linhas.length, 40); i++) {
+    const texto = (linhas[i] || []).join(' ');
+    if (!/per[ií]odo/i.test(texto)) continue;
+    const datas = texto.match(/\d{2}\/\d{2}\/\d{4}/g);
+    if (datas && datas.length >= 2) {
+      const ini = dataBR(datas[0]), fim = dataBR(datas[1]);
+      if (ini && fim && ini <= fim) return { ini, fim };
+    }
+  }
+  return null;
 }
 
 // ============================================================
@@ -532,6 +552,18 @@ function casar(banco, cand, TOL, JAN, MAO){
 // ============================================================
 
 let CONTAS = [], CATS = [], PAYEES = [], EXTRATO = [], TXS = [], RES = null, CONTA = null;
+let PERIODO = null;   // o periodo que o banco diz ter entregado, do preambulo do CSV
+// A janela do extrato era recalculada em seis lugares, cada um pelas datas
+// dos lancamentos. Agora e uma conta so, e ela prefere o periodo declarado
+// pelo banco — que e mais largo e e o que de fato foi conciliado.
+function janela(){
+  if (PERIODO && PERIODO.ini && PERIODO.fim) return { de: PERIODO.ini, ate: PERIODO.fim };
+  if (!EXTRATO.length) return { de: null, ate: null };
+  return {
+    de:  EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data),
+    ate: EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data)
+  };
+}
 let TOL = 0.05, JAN = 5;
 
 async function carregar(){
@@ -605,8 +637,7 @@ async function carregaUltimas(){
 // ---------- registrar a conciliacao fechada ----------
 async function registrarConciliacao(){
   if (!RES || !EXTRATO.length || !CONTA) return;
-  const de  = EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data);
-  const ate = EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data);
+  const { de, ate } = janela();
   const saldoExtrato = valorBR(document.getElementById('cSaldoFim').value);
   if (isNaN(saldoExtrato)){ toast('✕ Preencha o saldo final do extrato','var(--red)','white'); return; }
   const base = (CONTA.data_base && CONTA.saldo_base != null)
@@ -645,20 +676,25 @@ function onFile(ev){ const f = ev.target.files[0]; if (f) lerArquivo(f); }
 function lerArquivo(f){
   const r = new FileReader();
   r.onload = async e => {
-    const { linhas, sep } = parseExtrato(e.target.result);
+    const { linhas, sep, periodo } = parseExtrato(e.target.result);
     if (!linhas.length) {
       document.getElementById('arqInfo').innerHTML =
         '<span style="color:var(--red)">Não achei lançamentos nesse arquivo. Esperava uma linha de cabeçalho com <b>Data</b> e <b>Valor</b>.</span>';
       return;
     }
     EXTRATO = linhas;
-    const de = linhas.reduce((a,x)=> x.data < a ? x.data : a, linhas[0].data);
-    const ate = linhas.reduce((a,x)=> x.data > a ? x.data : a, linhas[0].data);
+    PERIODO = periodo || null;
+    const { de, ate } = janela();
+    // o ultimo movimento pode ser dias antes do fim do extrato
+    const ultMov = linhas.reduce((a,x)=> x.data > a ? x.data : a, linhas[0].data);
     document.getElementById('uzPh').innerHTML =
       `<div class="ubig">✅</div><div class="uprimary">${esc(f.name)}</div>` +
-      `<div class="usub">${linhas.length} lançamentos · ${fmtD(de)} a ${fmtD(ate)} · separador "${sep}"</div>`;
+      `<div class="usub">${linhas.length} lançamentos · extrato de ${fmtDA(de)} a ${fmtDA(ate)}` +
+      (PERIODO ? '' : ' <span style="color:var(--yellow)">(período deduzido dos lançamentos)</span>') +
+      (PERIODO && ultMov < ate ? ` · último movimento em ${fmtD(ultMov)}` : '') +
+      ` · separador "${sep}"</div>`;
     // o saldo da linha mais recente serve de palpite para o fechamento
-    const ult = linhas.filter(x => x.data === ate && !isNaN(x.saldo));
+    const ult = linhas.filter(x => x.data === ultMov && !isNaN(x.saldo));
     if (ult.length) document.getElementById('cSaldoFim').value = fmt(ult[0].saldo);
     document.getElementById('arqInfo').textContent = 'Lendo os lançamentos do app…';
     await rodar(de, ate);
@@ -795,8 +831,7 @@ function reRodar(){
   const tv = parseFloat(String(t).replace(',','.')), jv = parseInt(j, 10);
   if (!isNaN(tv)) TOL = Math.max(0, tv);
   if (!isNaN(jv)) JAN = Math.max(0, jv);
-  const de = EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data);
-  const ate = EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data);
+  const { de, ate } = janela();
   rodar(de, ate);
 }
 
@@ -926,8 +961,7 @@ async function desfazerMao(i){
     }
   }
   toast('✓ casamento desfeito');
-  const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
-  const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data);
+  const { de, ate } = janela();
   await rodar(de, ate);
 }
 
@@ -955,8 +989,7 @@ async function casarCom(j){
   alvo.conciliado = true;
   fecharCasar();
   toast('✓ casado à mão');
-  const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
-  const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data);
+  const { de, ate } = janela();
   desenhar(de, ate);
 }
 
@@ -1148,8 +1181,7 @@ async function lancarConfirma(){
     }
     toast(cat === 'transferencia' ? '✓ Lançado nas duas contas' : '✓ Lançado');
     fecharLancar();
-    const de = EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data);
-    const ate = EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data);
+    const { de, ate } = janela();
     await rodar(de, ate);
   }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
 }
@@ -1160,8 +1192,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('mdLancar').addEventListener('click', function(ev){ if (ev.target === this) fecharLancar(); });
   document.getElementById('mdCasar').addEventListener('click', function(ev){ if (ev.target === this) fecharCasar(); });
   document.getElementById('cSaldoFim').addEventListener('change', function(){
-    if (RES) { const de = EXTRATO.reduce((a,x)=> x.data<a?x.data:a, EXTRATO[0].data);
-               const ate = EXTRATO.reduce((a,x)=> x.data>a?x.data:a, EXTRATO[0].data); desenhar(de, ate); }
+    if (RES) { const { de, ate } = janela(); desenhar(de, ate); }
   });
   JRAuth.protege(function(){ carregar(); });
 });
