@@ -210,7 +210,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.02-c';
+const APP_VERSION='v2026.11.02-d';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -583,9 +583,20 @@ async function carregar(){
 // ---------- onde a ultima conciliacao parou ----------
 // O que voce precisa saber ao abrir a tela: de que data partir o proximo
 // extrato. Por isso este quadro vem antes do upload e nao depende dele.
-function diaSeguinte(d){
+// Quantos dias o proximo extrato volta atras. Nao e margem de seguranca
+// solta: o banco posta no dia util seguinte, entao um lancamento do app
+// num sabado so aparece no extrato na segunda — e, se o periodo fechou no
+// sabado, essa linha cai no extrato SEGUINTE. Sem sobreposicao os dois
+// ficam em arquivos diferentes e nunca se encontram: o lancamento do app
+// vira "so no app" num período, e a linha do banco vira "falta lancar" no
+// outro — convidando a lancar duplicado.
+// 7 dias cobrem feriado prolongado e ainda deixam folga sobre a janela de
+// casamento, que e de 5 dias.
+const SOBREPOE = 7;
+// De onde baixar o proximo extrato: antes do fim, nao depois.
+function recomeco(d){
   const x = new Date(d + 'T00:00:00');
-  x.setDate(x.getDate() + 1);
+  x.setDate(x.getDate() - SOBREPOE);
   return x.toISOString().slice(0,10);
 }
 async function carregaUltimas(){
@@ -618,7 +629,9 @@ async function carregaUltimas(){
         '<div class="sub2" style="margin-top:2px">extrato até <b>' + fmtDA(r.extrato_fim) + '</b>' +
         ' · conciliado em ' + fmtDA(String(r.criado_em).slice(0,10)) + '</div>' +
         '<div class="sub2" style="color:var(--accent)">próximo extrato a partir de <b>' +
-          fmtDA(diaSeguinte(r.extrato_fim)) + '</b></div>' +
+          fmtDA(recomeco(r.extrato_fim)) + '</b></div>' +
+        '<div class="sub2" style="opacity:.7">os ' + SOBREPOE + ' dias de sobreposição são de propósito: ' +
+          'o que o banco postar com atraso cai no mesmo arquivo e casa sozinho</div>' +
         (dif === null ? '' :
           '<div class="sub2" style="color:' + corDif + '">diferença no fechamento: R$ ' + fmt(dif) + '</div>') +
         '</span>' +
@@ -652,7 +665,8 @@ async function registrarConciliacao(){
             'Saldo do extrato: R$ ' + fmt(saldoExtrato) + '\n' +
             'Diferença: R$ ' + fmt(dif) + '\n' +
             'Casaram: ' + RES.pares.length + ' · sobraram ' + nSoB + ' no extrato e ' + nSoA + ' no app\n\n' +
-            'O próximo extrato você baixa a partir de ' + fmtDA(diaSeguinte(ate)) + '.';
+            'O próximo extrato você baixa a partir de ' + fmtDA(recomeco(ate)) +
+            ' — ' + SOBREPOE + ' dias antes do fim, de propósito, para pegar o que o banco postar com atraso.';
   if (nSoB || nSoA) msg += '\n\nAtenção: ainda há sobras. Registrar não resolve as sobras — só marca onde você parou.';
   if (!confirm(msg)) return;
   try{
@@ -813,7 +827,8 @@ function desenhar(de, ate){
       (isNaN(extratoFim) ? '—' : 'R$ ' + fmt(extratoFim)) + '</b> e a diferença de <b>' +
       (isNaN(dif) ? '—' : 'R$ ' + fmt(dif)) + '</b>.' +
       '<br>Depois disso o quadro do topo passa a dizer que o próximo extrato começa em <b>' +
-      fmtDA(diaSeguinte(ate)) + '</b>.' +
+      fmtDA(recomeco(ate)) + '</b> — ' + SOBREPOE + ' dias antes do fim, de propósito, ' +
+      'para pegar o que o banco postar com atraso.' +
       (limpo ? '' : '<br><span style="color:var(--yellow)">Ainda há ' + SB_.length +
         ' no extrato e ' + SA.length + ' no app sem par. Registrar não resolve isso — ' +
         'só marca onde você parou.</span>');
