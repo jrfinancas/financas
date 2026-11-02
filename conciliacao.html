@@ -102,6 +102,13 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 
 <div class="main">
 
+  <!-- Onde a ultima conciliacao parou. Fica ANTES do upload de proposito:
+       e o que diz de que data partir o proximo extrato. -->
+  <div class="card" id="cardUlt" style="display:none">
+    <div class="card-title">Onde você parou</div>
+    <div id="ultLista"></div>
+  </div>
+
   <div class="card">
     <div class="card-title">1 · Conta e extrato</div>
     <div class="fr">
@@ -134,6 +141,12 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       <div id="listas"></div>
       <button class="bsave" id="btnConciliar" onclick="conciliarCasados()" style="margin-top:6px">Marcar os casados como conciliados</button>
       <button class="bclear" onclick="reRodar()">Recalcular com outra tolerância</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">4 · Fechar e registrar</div>
+      <div class="nota" id="regNota"></div>
+      <button class="bsave" id="btnRegistrar" onclick="registrarConciliacao()" style="margin-top:10px">Registrar esta conciliação</button>
     </div>
 
   </div>
@@ -197,7 +210,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.10.31-d';
+const APP_VERSION='v2026.11.02-a';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -225,11 +238,28 @@ async function sbGet(t, q='') {
 }
 async function sbIns(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
 async function sbUpd(t,id,d){const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:SBH,body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json();}
+// Grava substituindo a linha que ja existir na chave unica. Um casamento
+// refeito na mesma linha do extrato tem de sobrescrever, nao duplicar.
+async function sbUpsert(t,d,chave){
+  const h=Object.assign({},SBH,{'Prefer':'return=representation,resolution=merge-duplicates'});
+  const r=await fetch(`${SB}/rest/v1/${t}?on_conflict=${chave}`,{method:'POST',headers:h,body:JSON.stringify(d)});
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+}
+async function sbDel(t,q){
+  const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{method:'DELETE',headers:SBH});
+  if(!r.ok)throw new Error(await r.text());
+  return true;
+}
 
 function toast(msg,bg,col){const t=document.getElementById('toast');t.textContent=msg;t.style.background=bg||'var(--green)';t.style.color=col||'#0d0f14';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
 function esc(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function fmt(v){return parseFloat(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtD(d){ if(!d) return ''; const p=String(d).slice(0,10).split('-'); return p[2]+'/'+p[1]; }
+// Com ano. O fmtD sem ano serve para as linhas de um extrato, onde o ano e
+// obvio. No registro da conciliacao nao e: "extrato ate 24/10" lido em
+// marco nao diz de que ano, e e justamente a data de partida do proximo.
+function fmtDA(d){ if(!d) return ''; const p=String(d).slice(0,10).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 function hoje(){ return new Date().toISOString().slice(0,10); }
 
 // ============================================================
@@ -514,6 +544,84 @@ async function carregar(){
     if (cc) sel.value = cc.id;
     CATS = await sbGet('categorias','select=categoria,subcategoria,rotulo,tipo,ativo,dedutivel&limit=2000');
     PAYEES = await sbGet('payees','select=name,category,subcategory&order=use_count.desc');
+    await carregaUltimas();        // precisa de CONTAS para nomear as contas
+  }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
+}
+
+// ---------- onde a ultima conciliacao parou ----------
+// O que voce precisa saber ao abrir a tela: de que data partir o proximo
+// extrato. Por isso este quadro vem antes do upload e nao depende dele.
+function diaSeguinte(d){
+  const x = new Date(d + 'T00:00:00');
+  x.setDate(x.getDate() + 1);
+  return x.toISOString().slice(0,10);
+}
+async function carregaUltimas(){
+  const box = document.getElementById('cardUlt'), lista = document.getElementById('ultLista');
+  try{
+    // uma linha por conta: a de extrato_fim mais recente
+    const rows = await sbGet('conciliacoes', 'order=extrato_fim.desc&limit=1000');
+    const porConta = {};
+    rows.forEach(r => { if (!porConta[r.conta_id]) porConta[r.conta_id] = r; });
+    const ultimas = Object.values(porConta)
+      .sort((a,b) => String(b.extrato_fim).localeCompare(String(a.extrato_fim)));
+    if (!ultimas.length){ box.style.display = 'none'; return; }
+    lista.innerHTML = ultimas.map(r => {
+      const c = CONTAS.find(x => x.id === r.conta_id);
+      const dif = r.diferenca == null ? null : parseFloat(r.diferenca);
+      const corDif = dif === null ? '' : (Math.abs(dif) < 0.005 ? 'var(--green)' : 'var(--yellow)');
+      return '<div class="lin" style="align-items:flex-start">' +
+        '<span class="lin-t"><b>' + esc(c ? (c.nome||c.id) : r.conta_id) + '</b>' +
+        '<div class="sub2" style="margin-top:2px">extrato até <b>' + fmtDA(r.extrato_fim) + '</b>' +
+        ' · conciliado em ' + fmtDA(String(r.criado_em).slice(0,10)) + '</div>' +
+        '<div class="sub2" style="color:var(--accent)">próximo extrato a partir de <b>' +
+          fmtDA(diaSeguinte(r.extrato_fim)) + '</b></div>' +
+        (dif === null ? '' :
+          '<div class="sub2" style="color:' + corDif + '">diferença no fechamento: R$ ' + fmt(dif) + '</div>') +
+        '</span>' +
+        '<span class="lin-v ' + (parseFloat(r.saldo_extrato) < 0 ? 'neg' : 'pos') + '">' +
+          (r.saldo_extrato == null ? '—' : 'R$ ' + fmt(parseFloat(r.saldo_extrato))) + '</span>' +
+        '</div>';
+    }).join('');
+    box.style.display = '';
+  }catch(e){
+    // nao e motivo para travar a tela: o quadro e informativo
+    box.style.display = '';
+    lista.innerHTML = '<div class="empty">Não consegui ler o histórico de conciliações: ' + esc(e.message) + '</div>';
+  }
+}
+
+// ---------- registrar a conciliacao fechada ----------
+async function registrarConciliacao(){
+  if (!RES || !EXTRATO.length || !CONTA) return;
+  const de  = EXTRATO.reduce((a,x)=> x.data < a ? x.data : a, EXTRATO[0].data);
+  const ate = EXTRATO.reduce((a,x)=> x.data > a ? x.data : a, EXTRATO[0].data);
+  const saldoExtrato = valorBR(document.getElementById('cSaldoFim').value);
+  if (isNaN(saldoExtrato)){ toast('✕ Preencha o saldo final do extrato','var(--red)','white'); return; }
+  const base = (CONTA.data_base && CONTA.saldo_base != null)
+             ? parseFloat(CONTA.saldo_base) : parseFloat(CONTA.saldo_inicial||0);
+  const movAte = TXS.filter(t => t.date <= ate)
+                    .reduce((s,t)=> s + (t.type==='income'?1:-1)*parseFloat(t.amount||0), 0);
+  const saldoApp = base + movAte;
+  const dif = saldoApp - saldoExtrato;
+  const nSoB = RES.soBanco.length, nSoA = RES.soApp.length;
+  let msg = 'Registrar a conciliação da ' + (CONTA.nome||CONTA.id) + '?\n\n' +
+            'Extrato: ' + fmtDA(de) + ' a ' + fmtDA(ate) + '\n' +
+            'Saldo do extrato: R$ ' + fmt(saldoExtrato) + '\n' +
+            'Diferença: R$ ' + fmt(dif) + '\n' +
+            'Casaram: ' + RES.pares.length + ' · sobraram ' + nSoB + ' no extrato e ' + nSoA + ' no app\n\n' +
+            'O próximo extrato você baixa a partir de ' + fmtDA(diaSeguinte(ate)) + '.';
+  if (nSoB || nSoA) msg += '\n\nAtenção: ainda há sobras. Registrar não resolve as sobras — só marca onde você parou.';
+  if (!confirm(msg)) return;
+  try{
+    await sbIns('conciliacoes', [{
+      conta_id: CONTA.id, extrato_ini: de, extrato_fim: ate,
+      saldo_extrato: saldoExtrato, saldo_app: saldoApp, diferenca: dif,
+      n_pares: RES.pares.length, n_so_banco: nSoB, n_so_app: nSoA,
+      observacao: (nSoB || nSoA) ? (nSoB + ' no extrato e ' + nSoA + ' no app em aberto') : null
+    }]);
+    toast('✓ conciliação registrada até ' + fmtDA(ate));
+    await carregaUltimas();
   }catch(e){ toast('✕ '+e.message,'var(--red)','white'); }
 }
 
@@ -551,6 +659,13 @@ async function rodar(de, ate){
   try{
     CONTA = CONTAS.find(c => c.id === document.getElementById('cConta').value);
     TXS = await sbGet('transactions', `account=eq.${encodeURIComponent(CONTA.id)}&date=gte.${de}&date=lte.${ate}&order=date.asc`);
+    // os vinculos feitos a mao, da tabela — e o que ficou no navegador
+    // antes da tabela existir sobe de uma vez
+    MAO = await carregaMao(CONTA.id);
+    try {
+      const n = await importaMaoLocal(CONTA.id);
+      if (n) toast('✓ ' + n + (n === 1 ? ' casamento' : ' casamentos') + ' do navegador movidos para o banco');
+    } catch(e){ /* a importacao e cortesia; nao atrapalha a conciliacao */ }
     EXTRATO.forEach(b => delete b._ok);
     RES = casar(EXTRATO, montaCandidatos(TXS), TOL, JAN, maoDaConta());
     desenhar(de, ate);
@@ -640,6 +755,25 @@ function desenhar(de, ate){
   document.getElementById('btnConciliar').textContent =
     'Marcar ' + nLanc + ' lançamentos (' + P.length + ' casamentos) como conciliados';
   document.getElementById('btnConciliar').disabled = !P.length;
+
+  // ---- o que vai ser registrado ----
+  const rn = document.getElementById('regNota');
+  if (rn){
+    const limpo = !SB_.length && !SA.length;
+    rn.innerHTML =
+      'Vai gravar: <b>' + esc(CONTA.nome || CONTA.id) + '</b>, extrato de <b>' + fmtDA(de) +
+      '</b> a <b>' + fmtDA(ate) + '</b>, saldo do extrato <b>' +
+      (isNaN(extratoFim) ? '—' : 'R$ ' + fmt(extratoFim)) + '</b> e a diferença de <b>' +
+      (isNaN(dif) ? '—' : 'R$ ' + fmt(dif)) + '</b>.' +
+      '<br>Depois disso o quadro do topo passa a dizer que o próximo extrato começa em <b>' +
+      fmtDA(diaSeguinte(ate)) + '</b>.' +
+      (limpo ? '' : '<br><span style="color:var(--yellow)">Ainda há ' + SB_.length +
+        ' no extrato e ' + SA.length + ' no app sem par. Registrar não resolve isso — ' +
+        'só marca onde você parou.</span>');
+    document.getElementById('btnRegistrar').textContent =
+      'Registrar esta conciliação até ' + fmtDA(ate);
+    document.getElementById('btnRegistrar').disabled = isNaN(extratoFim);
+  }
 }
 
 function reRodar(){
@@ -672,35 +806,66 @@ async function conciliarCasados(){
 
 // ---------- onde mora um casamento feito a mao ----------
 // A tabela transactions so tem o 'reconciled', que diz "bateu" mas nao diz
-// COM O QUE. Entao o vinculo linha-do-extrato <-> lancamento nao tem onde
-// morar na base, e eu nao vou pedir mudanca de schema por causa disso.
-// Fica aqui, no proprio navegador, por conta. E por navegador: um
-// casamento feito no computador nao aparece no celular.
-const MKEY = 'jr_conc_mao';
-function mapaMao(){
+// COM O QUE. Esse vinculo morava no localStorage, e localStorage e por
+// NAVEGADOR: um casamento feito no Chrome do computador nao existia no
+// iPhone, e a linha voltava para "falta lancar" do outro lado. Agora mora
+// na tabela conciliacao_mao, com chave unica (conta_id, fp).
+//
+// MAO fica em memoria durante a rodada; a tabela e a verdade.
+let MAO = {};
+const MKEY = 'jr_conc_mao';            // so para a importacao do que ficou para tras
+function mapaMaoLocal(){
   try { return JSON.parse(localStorage.getItem(MKEY) || '{}') || {}; } catch(e){ return {}; }
 }
-function gravaMao(m){ try { localStorage.setItem(MKEY, JSON.stringify(m)); } catch(e){} }
+// Le da tabela e monta { fp: {ids, antes} } para o PASSE 0.
+async function carregaMao(contaId){
+  const linhas = await sbGet('conciliacao_mao',
+    'select=fp,tx_ids,antes&conta_id=eq.' + encodeURIComponent(contaId) + '&limit=1000');
+  const m = {};
+  linhas.forEach(l => { m[l.fp] = { ids: l.tx_ids || [], antes: l.antes || [] }; });
+  return m;
+}
+// Importacao unica do que foi casado antes da tabela existir. So sobe o que
+// a tabela ainda nao tem — e nao apaga o localStorage, para o dado antigo
+// continuar la caso algo de errado.
+async function importaMaoLocal(contaId){
+  const local = mapaMaoLocal()[contaId];
+  if (!local) return 0;
+  const faltam = Object.keys(local).filter(fp => !MAO[fp]);
+  if (!faltam.length) return 0;
+  const linhas = faltam.map(fp => ({
+    conta_id: contaId, fp: fp,
+    tx_ids: local[fp].ids || [],
+    antes: local[fp].antes || (local[fp].ids || []).map(() => false)
+  }));
+  await sbUpsert('conciliacao_mao', linhas, 'conta_id,fp');
+  linhas.forEach(l => { MAO[l.fp] = { ids: l.tx_ids, antes: l.antes }; });
+  return linhas.length;
+}
 // Impressao digital da linha do extrato: o que nao muda entre dois
 // downloads do mesmo periodo. Descricao normalizada e cortada, para o
 // banco nao poder quebrar o vinculo mudando espaco ou acento.
 function fpBanco(b){
   return b.data + '|' + Number(b.valor).toFixed(2) + '|' + normNome(b.desc).slice(0, 40);
 }
-function maoDaConta(){ const m = mapaMao(); return (CONTA && m[CONTA.id]) || {}; }
-function salvaMao(bl, ids, antes){
+function maoDaConta(){ return MAO || {}; }
+// Grava na tabela e no mapa em memoria. Se a gravacao falhar, NAO mexe no
+// mapa: melhor o par voltar na proxima rodada do que a tela mostrar um
+// vinculo que o banco nao tem.
+async function salvaMao(bl, ids, antes){
   if (!CONTA) return;
-  const m = mapaMao();
-  const c = m[CONTA.id] || (m[CONTA.id] = {});
-  c[fpBanco(bl)] = { ids: ids.slice(), antes: antes.slice() };
-  gravaMao(m);
+  const fp = fpBanco(bl);
+  await sbUpsert('conciliacao_mao', [{
+    conta_id: CONTA.id, fp: fp, tx_ids: ids.slice(), antes: antes.slice()
+  }], 'conta_id,fp');
+  MAO[fp] = { ids: ids.slice(), antes: antes.slice() };
 }
-function apagaMao(bl){
+async function apagaMao(bl){
   if (!CONTA) return null;
-  const m = mapaMao(), c = m[CONTA.id];
-  if (!c) return null;
-  const fp = fpBanco(bl), reg = c[fp] || null;
-  delete c[fp]; gravaMao(m);
+  const fp = fpBanco(bl), reg = MAO[fp] || null;
+  await sbDel('conciliacao_mao',
+    'conta_id=eq.' + encodeURIComponent(CONTA.id) + '&fp=eq.' + encodeURIComponent(fp));
+  delete MAO[fp];
   return reg;
 }
 
@@ -738,7 +903,9 @@ async function desfazerMao(i){
   const p = RES.pares[i];
   if (!p || String(p.nota).indexOf('à mão') !== 0) return;
   if (!confirm('Desfazer este casamento?\n\nAs duas pontas voltam para as listas. Os lançamentos que já estavam conciliados antes deste casamento continuam conciliados.')) return;
-  const reg = apagaMao(p.bancos[0]);
+  let reg;
+  try { reg = await apagaMao(p.bancos[0]); }
+  catch(e){ toast('✕ não consegui apagar o vínculo: '+e.message,'var(--red)','white'); return; }
   // volta cada id ao estado anterior; quem ja era conciliado antes, fica
   for (const a of p.apps) {
     for (const id of a.ids) {
@@ -765,8 +932,12 @@ async function casarCom(j){
     const t = TXS.find(x => x.id === id);
     return !!(t && t.reconciled);
   });
+  // O vinculo vai PRIMEIRO. Se ele falhar, nao marco nada: um reconciled
+  // sem vinculo e justamente o estado que fazia o par voltar com o selo
+  // "ja conciliado" na rodada seguinte.
+  try { await salvaMao(bl, alvo.ids, antes); }
+  catch(e){ toast('✕ não consegui guardar o vínculo: '+e.message,'var(--red)','white'); return; }
   for (const id of alvo.ids) { try { await sbUpd('transactions', id, {reconciled:true}); } catch(e){} }
-  salvaMao(bl, alvo.ids, antes);
   RES.soApp = RES.soApp.filter(a => a !== alvo);
   RES.soBanco = RES.soBanco.filter(b => b !== bl);
   RES.pares.push({ bancos:[bl], apps:[alvo], nota: dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
