@@ -210,7 +210,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.02-a';
+const APP_VERSION='v2026.11.02-b';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -565,7 +565,18 @@ async function carregaUltimas(){
     rows.forEach(r => { if (!porConta[r.conta_id]) porConta[r.conta_id] = r; });
     const ultimas = Object.values(porConta)
       .sort((a,b) => String(b.extrato_fim).localeCompare(String(a.extrato_fim)));
-    if (!ultimas.length){ box.style.display = 'none'; return; }
+    // Esconder o quadro vazio foi erro de desenho: de fora, "nada
+    // registrado ainda" e "a tela nao funciona" ficam iguais. Agora o
+    // quadro aparece sempre e diz qual dos dois e.
+    if (!ultimas.length){
+      box.style.display = '';
+      lista.innerHTML =
+        '<div class="empty">Nenhuma conciliação registrada ainda.' +
+        '<div class="sub2" style="margin-top:6px">Carregue o extrato, confira os casamentos e use ' +
+        '<b>“Registrar esta conciliação”</b> no passo 4. A partir daí este quadro passa a dizer ' +
+        'até que data você já conciliou e de que data partir o próximo extrato.</div></div>';
+      return;
+    }
     lista.innerHTML = ultimas.map(r => {
       const c = CONTAS.find(x => x.id === r.conta_id);
       const dif = r.diferenca == null ? null : parseFloat(r.diferenca);
