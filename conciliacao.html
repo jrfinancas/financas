@@ -210,7 +210,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.02-d';
+const APP_VERSION='v2026.11.02-e';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -553,6 +553,22 @@ function casar(banco, cand, TOL, JAN, MAO){
 
 let CONTAS = [], CATS = [], PAYEES = [], EXTRATO = [], TXS = [], RES = null, CONTA = null;
 let PERIODO = null;   // o periodo que o banco diz ter entregado, do preambulo do CSV
+let SALDO_APP = NaN;  // saldo do app na data final do extrato, somando TODO o historico
+let NMOV = 0;         // quantos lancamentos entraram nesse saldo
+
+// O saldo do app na data final do extrato. Tem de somar tudo desde a
+// data-base da conta, nao so a janela do extrato — mesma regra do
+// contas.html. Consulta enxuta: so type e amount.
+async function calcSaldoApp(ate){
+  const base = (CONTA.data_base && CONTA.saldo_base != null)
+             ? parseFloat(CONTA.saldo_base) : parseFloat(CONTA.saldo_inicial || 0);
+  const db = CONTA.data_base || '2026-05-01';
+  const linhas = await sbGet('transactions',
+    'select=type,amount&account=eq.' + encodeURIComponent(CONTA.id) +
+    '&date=gte.' + db + '&date=lte.' + ate + '&order=date.asc');
+  NMOV = linhas.length;
+  return base + linhas.reduce((s,t)=> s + (t.type === 'income' ? 1 : -1) * parseFloat(t.amount || 0), 0);
+}
 // A janela do extrato era recalculada em seis lugares, cada um pelas datas
 // dos lancamentos. Agora e uma conta so, e ela prefere o periodo declarado
 // pelo banco — que e mais largo e e o que de fato foi conciliado.
@@ -653,11 +669,9 @@ async function registrarConciliacao(){
   const { de, ate } = janela();
   const saldoExtrato = valorBR(document.getElementById('cSaldoFim').value);
   if (isNaN(saldoExtrato)){ toast('✕ Preencha o saldo final do extrato','var(--red)','white'); return; }
-  const base = (CONTA.data_base && CONTA.saldo_base != null)
-             ? parseFloat(CONTA.saldo_base) : parseFloat(CONTA.saldo_inicial||0);
-  const movAte = TXS.filter(t => t.date <= ate)
-                    .reduce((s,t)=> s + (t.type==='income'?1:-1)*parseFloat(t.amount||0), 0);
-  const saldoApp = base + movAte;
+  // o mesmo numero que a tela mostra: todo o historico desde a data-base
+  const saldoApp = SALDO_APP;
+  if (isNaN(saldoApp)) { toast('✕ Não consegui calcular o saldo do app','var(--red)','white'); return; }
   const dif = saldoApp - saldoExtrato;
   const nSoB = RES.soBanco.length, nSoA = RES.soApp.length;
   let msg = 'Registrar a conciliação da ' + (CONTA.nome||CONTA.id) + '?\n\n' +
@@ -727,6 +741,7 @@ async function rodar(de, ate){
       const n = await importaMaoLocal(CONTA.id);
       if (n) toast('✓ ' + n + (n === 1 ? ' casamento' : ' casamentos') + ' do navegador movidos para o banco');
     } catch(e){ /* a importacao e cortesia; nao atrapalha a conciliacao */ }
+    SALDO_APP = await calcSaldoApp(ate);     // todo o historico, nao so a janela
     EXTRATO.forEach(b => delete b._ok);
     RES = casar(EXTRATO, montaCandidatos(TXS), TOL, JAN, maoDaConta());
     desenhar(de, ate);
@@ -740,21 +755,27 @@ function desenhar(de, ate){
   const base = (CONTA.data_base && CONTA.saldo_base != null) ? parseFloat(CONTA.saldo_base) : parseFloat(CONTA.saldo_inicial||0);
   const db = CONTA.data_base || '2026-05-01';
   const extratoFim = valorBR(document.getElementById('cSaldoFim').value);
-  const movAte = TXS.filter(t => t.date <= ate).reduce((s,t)=> s + (t.type==='income'?1:-1)*parseFloat(t.amount||0), 0);
-  // o app parte da data_base; se o extrato comeca depois, preciso do que
-  // veio entre as duas datas, que nao esta neste arquivo
-  const calc = base + movAte;
-  const dif = isNaN(extratoFim) ? NaN : (calc - extratoFim);
+  // O saldo do app vem de SALDO_APP, que soma TODO o historico desde a
+  // data-base. Antes somava so os lancamentos da janela do extrato, o que
+  // dava um numero sem sentido sempre que o extrato comecava depois da
+  // data-base — ou seja, quase sempre. Em 31/10 a tela dizia que o app
+  // calculava R$ 6.136,95 (base + 13 lancamentos da janela) quando o saldo
+  // real era R$ 17.880,84, e a "diferenca" saia por -8.212,72 em vez de
+  // 3.531,17. O aviso amarelo embaixo mascarava isso como se fosse
+  // limitacao do arquivo; era conta errada.
+  const calc = SALDO_APP;
+  const dif = (isNaN(extratoFim) || isNaN(calc)) ? NaN : (calc - extratoFim);
 
   document.getElementById('fechamento').innerHTML =
-    `<div class="fbox"><div class="flab">O app calcula</div><div class="fval">R$ ${fmt(calc)}</div></div>
+    `<div class="fbox"><div class="flab">O app calcula</div><div class="fval">${isNaN(calc)?'—':'R$ '+fmt(calc)}</div></div>
      <div class="fbox"><div class="flab">O extrato diz</div><div class="fval">${isNaN(extratoFim)?'—':'R$ '+fmt(extratoFim)}</div></div>
      <div class="fbox ${isNaN(dif)?'':(Math.abs(dif)<0.005?'ok':'bad')}"><div class="flab">Diferença</div><div class="fval">${isNaN(dif)?'—':'R$ '+fmt(dif)}</div></div>`;
 
   const parcial = db < de;
   document.getElementById('fechNota').innerHTML =
-    `Saldo de partida de <b>R$ ${fmt(base)}</b> em ${fmtD(db)}, mais ${TXS.length} lançamentos do app até ${fmtD(ate)}.` +
-    (parcial ? ` <span style="color:var(--yellow)">O extrato começa em ${fmtD(de)}, depois da data-base — então a diferença inclui o que aconteceu antes e não está neste arquivo.</span>` : '');
+    `Saldo de partida de <b>R$ ${fmt(base)}</b> em ${fmtD(db)}, mais <b>todos</b> os ${NMOV} lançamentos do app até ${fmtDA(ate)} ` +
+    `— não só os ${TXS.length} desta janela.` +
+    (parcial ? ` <span style="color:var(--yellow)">Como o extrato só cobre de ${fmtDA(de)} em diante, uma diferença pode ter nascido antes disso e não aparecer nas listas abaixo.</span>` : '');
 
   // ---- listas ----
   // Nao escondo o que ja esta marcado como conciliado: some da lista e a
