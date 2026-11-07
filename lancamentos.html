@@ -313,6 +313,8 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
 .recbadge.yearly  { background: rgba(52,211,153,.15); color: var(--green); }
 .recbadge.weekly  { background: rgba(251,191,36,.15); color: var(--yellow); }
 .recbadge.daily   { background: rgba(248,113,113,.15); color: var(--red); }
+.recbadge.quarterly  { background: rgba(124,106,247,.15); color: #9b8cf8; }
+.recbadge.semiannual { background: rgba(244,114,182,.15); color: #f472b6; }
 .recamt { font-family: 'DM Serif Display', serif; font-size: 18px; }
 .recnext { font-size: 11px; font-weight: 500; margin-top: 4px; }
 .recnext.ok { color: var(--muted); } .recnext.soon { color: var(--yellow); }
@@ -801,7 +803,7 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
         <button class="addline" onclick="addRecSLine()">+ Linha</button>
       </div>
       <div class="fr">
-        <div><label class="fl">Frequência</label><select class="fs" id="recFreq" onchange="updRecDate()"><option value="daily">Diária</option><option value="weekly">Semanal</option><option value="monthly" selected="">Mensal</option><option value="yearly">Anual</option></select></div>
+        <div><label class="fl">Frequência</label><select class="fs" id="recFreq" onchange="updRecDate()"><option value="daily">Diária</option><option value="weekly">Semanal</option><option value="monthly" selected="">Mensal</option><option value="quarterly">Trimestral</option><option value="semiannual">Semestral</option><option value="yearly">Anual</option></select></div>
         <div><label class="fl">Próximo vencimento</label><input type="date" class="fi" id="recNextDate"></div>
       </div>
       <div class="fr">
@@ -1314,7 +1316,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.11.02-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.11.07-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2992,13 +2994,10 @@ function addRecSLine(pre) {
 }
 
 function updRecDate() {
+  // o mesmo nextAfter da lista, para a sugestao nao discordar do que sera gravado
   const f=document.getElementById('recFreq').value;
-  const d=new Date();
-  if(f==='daily')d.setDate(d.getDate()+1);
-  else if(f==='weekly')d.setDate(d.getDate()+7);
-  else if(f==='monthly')d.setMonth(d.getMonth()+1);
-  else d.setFullYear(d.getFullYear()+1);
-  document.getElementById('recNextDate').value=d.toISOString().slice(0,10);
+  const hoje=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  document.getElementById('recNextDate').value=nextAfter({frequency:f}, hoje);
 }
 
 async function saveRec() {
@@ -3074,8 +3073,22 @@ function clearRec() {
 }
 
 function daysUntil(s){const t=new Date();t.setHours(0,0,0,0);const x=new Date(s+'T00:00:00');x.setHours(0,0,0,0);return Math.round((x-t)/(86400000));}
-function nextAfter(rec,from){const d=new Date(from+'T00:00:00');if(rec.frequency==='daily')d.setDate(d.getDate()+1);else if(rec.frequency==='weekly')d.setDate(d.getDate()+7);else if(rec.frequency==='monthly')d.setMonth(d.getMonth()+1);else d.setFullYear(d.getFullYear()+1);return d.toISOString().slice(0,10);}
-const FLAB={daily:'Diária',weekly:'Semanal',monthly:'Mensal',yearly:'Anual'};
+function nextAfter(rec,from){
+  // Dia a dia e semana a semana nao tem armadilha; mes em diante tem.
+  // setMonth(+1) a partir de 31/01 cai em 03/03, e setMonth(+3) a partir
+  // de 31/08 cai em 01/12. O dataParcela prende no ultimo dia do mes, e e
+  // a mesma funcao que as parcelas usam — uma conta so para os dois.
+  if(rec.frequency==='daily'||rec.frequency==='weekly'){
+    const d=new Date(from+'T00:00:00');
+    d.setDate(d.getDate()+(rec.frequency==='daily'?1:7));
+    return d.toISOString().slice(0,10);
+  }
+  return dataParcela(from, FMESES[rec.frequency]||1);
+}
+const FLAB={daily:'Diária',weekly:'Semanal',monthly:'Mensal',quarterly:'Trimestral',semiannual:'Semestral',yearly:'Anual'};
+// Quantos MESES cada frequencia avanca. Mensal/trimestral/semestral/anual
+// sao o mesmo calculo com passo diferente — nao merecem quatro ramos.
+const FMESES={monthly:1,quarterly:3,semiannual:6,yearly:12};
 
 function renderRecs() {
   document.getElementById('recCount').textContent=`(${recs.length})`;
