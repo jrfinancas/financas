@@ -1316,7 +1316,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.11.07-a';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.11.07-b';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2677,7 +2677,20 @@ async function loadIR() {
     // holerite da Kaizen caía aqui desenhado como despesa, com sinal negativo.
     const pend=allTxs.filter(t=>t.type==='expense' && t.receipt_status==='pending'
                                 && dedutivelDespesa(t.category, t.subcategory||''));
-    const te=de.reduce((s,t)=>s+parseFloat(t.amount),0), ti=di.reduce((s,t)=>s+parseFloat(t.amount),0);
+    // ---- Reembolso ABATE a deducao ----
+    // Valor reembolsado nao e dedutivel. Um reembolso lancado como ENTRADA
+    // numa subcategoria que deduz do lado da despesa (ex.: o plano de saude
+    // devolvendo a consulta em saude/fisioterapeuta) tem de sair da deducao.
+    // Antes nao saia: a deducao somava so type='expense', entao o reembolso
+    // ficava no quadro "Entradas que nao sao rendimento" e a deducao
+    // continuava cheia. Em 07/11 isso inflava 2026 em R$ 686,64.
+    const dreemb = allTxs.filter(t => t.type==='income'
+                                   && !rendimentoDeclaravel(t.category, t.subcategory||'')
+                                   && dedutivelDespesa(t.category, t.subcategory||''));
+    const treemb = dreemb.reduce((s,t)=>s+parseFloat(t.amount),0);
+    const tbruto = de.reduce((s,t)=>s+parseFloat(t.amount),0);
+    const te = tbruto - treemb;
+    const ti = di.reduce((s,t)=>s+parseFloat(t.amount),0);
 
     // ---- Informados na declaracao, mas NAO sao deducao ----
     // IRRF retido na fonte entra no campo de imposto ja pago.
@@ -2690,7 +2703,7 @@ async function loadIR() {
     const tIrrf=irrf.reduce((s,t)=>s+parseFloat(t.amount),0);
     const tInss=inss.reduce((s,t)=>s+parseFloat(t.amount),0);
     document.getElementById('irKpis').innerHTML=`
-      <div class="irkpi-card"><div class="irkpi-label">Despesas Dedutíveis</div><div class="irkpi-val neg">-R$ ${fmt(te)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${de.length} lançamentos</div></div>
+      <div class="irkpi-card"><div class="irkpi-label">Despesas Dedutíveis</div><div class="irkpi-val neg">-R$ ${fmt(te)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${de.length} lançamentos${treemb>0?` · já abatido R$ ${fmt(treemb)} de reembolso`:''}</div></div>
       <div class="irkpi-card"><div class="irkpi-label">Rendimentos decl.</div><div class="irkpi-val pos">+R$ ${fmt(ti)}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">${di.length} lançamentos</div></div>
       <div class="irkpi-card" style="background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.2)"><div class="irkpi-label" style="color:var(--yellow)">Pendentes</div><div class="irkpi-val" style="color:var(--yellow)">${pend.length}</div></div>
       <div class="irkpi-card" style="background:rgba(52,211,153,.06);border-color:rgba(52,211,153,.2)"><div class="irkpi-label" style="color:var(--green)">Documentados</div><div class="irkpi-val" style="color:var(--green)">${txs.filter(t=>t.receipt_status==='attached').length}</div></div>`;
@@ -2701,7 +2714,10 @@ async function loadIR() {
       <div class="ircrow"><span style="font-weight:600">INSS retido <span style="font-size:10px;color:var(--muted)">(${inss.length}) · é dedução, já somado acima</span></span>
         <span style="font-weight:600;color:var(--green)">R$ ${fmt(tInss)}</span></div>
       <div class="ircrow"><span style="font-weight:600">IRRF retido na fonte <span style="font-size:10px;color:var(--muted)">(${irrf.length}) · imposto já pago, não é dedução</span></span>
-        <span style="font-weight:600;color:var(--yellow)">R$ ${fmt(tIrrf)}</span></div>
+        <span style="font-weight:600;color:var(--yellow)">R$ ${fmt(tIrrf)}</span></div>` +
+      (treemb>0?`<div class="ircrow"><span style="font-weight:600">Reembolsos <span style="font-size:10px;color:var(--muted)">(${dreemb.length}) · entradas em subcategoria que deduz; já abatidas da dedução</span></span>
+        <span style="font-weight:600;color:var(--yellow)">−R$ ${fmt(treemb)}</span></div>
+      <div style="font-size:11px;color:var(--muted);padding:4px 0 0">Bruto R$ ${fmt(tbruto)} − reembolso R$ ${fmt(treemb)} = R$ ${fmt(te)}.</div>`:'') + `
       <div style="font-size:11px;color:var(--muted);padding:8px 0 0">Confira contra o informe de rendimentos de cada fonte pagadora.</div>`;
     document.getElementById('irPend').innerHTML=pend.length?pend.slice(0,20).map(t=>`<div class="irpitem"><div><div style="font-size:13px;font-weight:500">${t.payee}</div><div style="font-size:11px;color:var(--muted)">${fmtDate(t.date)} · ${CLABEL[t.category]||t.category}</div></div><div style="text-align:right"><div style="font-size:13px;font-weight:600;color:var(--red)">-R$ ${fmt(t.amount)}</div><button class="irbtn" onclick="markOK(${t.id})">Marcar OK</button> <button class="irbtn" style="background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.3);color:var(--red)" onclick="naoDeduzir(${t.id})" title="Sem comprovante: tira da dedução sem mexer na categoria">Não deduzir</button></div></div>`).join(''):'<div class="empty" style="padding:16px"><div class="big">✅</div><div>Nenhum pendente!</div></div>';
     const bc={};de.forEach(t=>{if(!bc[t.category])bc[t.category]=0;bc[t.category]+=parseFloat(t.amount);});
@@ -2751,6 +2767,18 @@ async function loadIR() {
                               semPar:!!(CATTAB && sub && !CATTAB.porSub[k])};
         mapa[k].n++; mapa[k].v+=parseFloat(t.amount)||0;
       });
+      // Os reembolsos entram aqui ABATENDO a subcategoria que devolveram.
+      // Sem isto a Conferencia somaria o bruto, discordaria do total do
+      // painel (que ja abate) e dispararia o aviso amarelo sem motivo.
+      dreemb.forEach(function(t){
+        const sub=String(t.subcategory||''), k=t.category+'|'+sub;
+        if(!mapa[k]) mapa[k]={cat:t.category,sub:sub,n:0,v:0,nr:0,
+                              deduz:dedutivelDespesa(t.category,sub),
+                              ignorada:NAO_DEDUZ_NUNCA.has(k),
+                              naLista:REF_IRPF.has(k),
+                              semPar:!!(CATTAB && sub && !CATTAB.porSub[k])};
+        mapa[k].nr=(mapa[k].nr||0)+1; mapa[k].v-=parseFloat(t.amount)||0;
+      });
       const linhas=Object.values(mapa).sort((a,b)=>b.v-a.v);
       const soma=a=>a.reduce((s,l)=>s+l.v,0);
       const dentro=linhas.filter(l=>l.deduz), fora=linhas.filter(l=>!l.deduz);
@@ -2764,6 +2792,7 @@ async function loadIR() {
         + arr.map(l=>'<div class="ircrow" style="font-size:12px'+(l.naLista?';background:rgba(251,191,36,.07)':'')+'">'
             + '<span>' + (CLABEL[l.cat]||l.cat) + ' / <b>' + (l.sub||'(sem subcategoria)') + '</b>'
             + ' <span style="font-size:10px;color:var(--muted)">(' + l.n + ')</span>'
+            + (l.nr?' <span style="font-size:10px;color:var(--yellow)">− '+l.nr+' reembolso'+(l.nr>1?'s':'')+'</span>':'')
             + (l.ignorada?' <span style="font-size:10px;color:var(--red)">⚠ não é dedução</span>':'')
             + (l.naLista?' <span style="font-size:10px;color:var(--yellow)">⚠ está na lista do IRPF</span>':'')
             + (l.semPar?' <span style="font-size:10px;color:var(--red)">⚠ sem par na tabela</span>':'')
