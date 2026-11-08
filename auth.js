@@ -451,6 +451,63 @@ window.JRAuth = (function () {
     return false;
   }
 
+  /* ---------------- Token sempre válido nas chamadas ao banco -------------
+
+     O access token do Supabase dura uma hora. Até aqui, pronto() — que é
+     quem renova pelo refresh token — era chamada UMA VEZ, no carregamento
+     da página. Depois disso cada tela montava o header com token(), que
+     devolve o que está em memória sem olhar a validade. Resultado: qualquer
+     tela aberta por mais de uma hora passava a falhar em tudo com
+     PGRST303 "JWT expired" — e a Conciliação, onde se passa horas, era a
+     que mais sofria.
+
+     A correção fica aqui, e não nas treze telas, porque a regra é uma só.
+     O embrulho age apenas nas chamadas ao PostgREST: renova antes quando o
+     token está por vencer e, se mesmo assim vier JWT expired, renova e
+     repete a requisição uma vez. /auth/v1 fica de fora, senão a renovação
+     chamaria a si mesma.                                                  */
+  const REST   = SB + '/rest/v1/';
+  const _fetch = window.fetch.bind(window);
+
+  // Resolve os getters do objeto de headers e aplica o token do momento.
+  function comTokenAtual(opt) {
+    const o = Object.assign({}, opt || {});
+    let h = o.headers;
+    if (h instanceof Headers) {
+      const copia = new Headers(h);
+      if (copia.has('Authorization')) copia.set('Authorization', 'Bearer ' + (token() || KEY));
+      o.headers = copia;
+    } else if (h && typeof h === 'object') {
+      const copia = Object.assign({}, h);          // lê os getters agora
+      for (const k in copia) {
+        if (k.toLowerCase() === 'authorization') copia[k] = 'Bearer ' + (token() || KEY);
+      }
+      o.headers = copia;
+    }
+    return o;
+  }
+
+  function ehJwtVencido(txt) {
+    return /PGRST303/.test(txt) || /jwt expired/i.test(txt);
+  }
+
+  window.fetch = async function (entrada, opcoes) {
+    const url = (typeof entrada === 'string') ? entrada
+              : (entrada && entrada.url) ? entrada.url : '';
+    if (url.indexOf(REST) !== 0) return _fetch(entrada, opcoes);
+
+    try { await pronto(); } catch (e) { /* segue: o 401 abaixo trata */ }
+    let r = await _fetch(entrada, comTokenAtual(opcoes));
+    if (r.status !== 401 && r.status !== 403) return r;
+
+    let corpo = '';
+    try { corpo = await r.clone().text(); } catch (e) { return r; }
+    if (!ehJwtVencido(corpo)) return r;
+
+    try { await renovar(); } catch (e) { return r; }     // sem refresh: devolve o erro original
+    return _fetch(entrada, comTokenAtual(opcoes));
+  };
+
   // Ao carregar a página, tenta retomar a sessão da aba antes de
   // qualquer coisa: é o que permite trocar de módulo sem destravar.
   restauraSessaoDaAba();
@@ -462,6 +519,6 @@ window.JRAuth = (function () {
     habilitarBio, entrarComBio, bioHabilitado, desabilitarBio,
     sair, quemSou,
     protege, mostraLogin, escondeLogin,
-    VERSION: 'v2026.10.03-f'
+    VERSION: 'v2026.11.08-a'
   };
 })();
