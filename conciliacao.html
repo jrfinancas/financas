@@ -181,6 +181,11 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <div class="modal-title">Casar à mão</div>
     <div class="nota" id="csSub" style="margin-bottom:14px"></div>
     <div id="csLista"></div>
+    <label class="fl" id="csAjusteBox" style="display:none;align-items:flex-start;gap:8px;margin-top:12px;cursor:pointer;text-transform:none;letter-spacing:0">
+      <input type="checkbox" id="csAjusta" checked style="margin-top:2px">
+      <span>Quando o valor diferir, <b>corrigir o lançamento do app</b> para o valor do extrato.
+        <span class="sub2" style="display:block">O banco é a referência. Vale só para lançamento de uma linha só e quando o sinal for o mesmo.</span></span>
+    </label>
     <button class="bclear" onclick="fecharCasar()">Cancelar</button>
   </div>
 </div>
@@ -210,7 +215,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.02-e';
+const APP_VERSION='v2026.11.08-a';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -976,6 +981,10 @@ function abrirCasar(i){
           ? `<div class="sub2">${o.dv>=0.005?'R$ '+fmt(o.dv)+' de diferença':''}${o.dv>=0.005&&o.dd?' · ':''}${o.dd?o.dd+'d de distância':''}</div>`
           : '')).join('')
     : '<div class="empty">Não há linha do extrato sobrando para casar.</div>';
+  // a caixa de ajuste so faz sentido num lancamento de uma linha so:
+  // num grupo de quatro nao ha como saber qual delas corrigir
+  document.getElementById('csAjusteBox').style.display =
+    (CS.ids && CS.ids.length === 1 && opc.length) ? 'flex' : 'none';
   document.getElementById('mdCasar').classList.add('on');
 }
 function fecharCasar(){ document.getElementById('mdCasar').classList.remove('on'); CS = null; }
@@ -984,7 +993,10 @@ function fecharCasar(){ document.getElementById('mdCasar').classList.remove('on'
 async function desfazerMao(i){
   const p = RES.pares[i];
   if (!p || String(p.nota).indexOf('à mão') !== 0) return;
-  if (!confirm('Desfazer este casamento?\n\nAs duas pontas voltam para as listas. Os lançamentos que já estavam conciliados antes deste casamento continuam conciliados.')) return;
+  const corrigiu = /valor corrigido/.test(String(p.nota));
+  if (!confirm('Desfazer este casamento?\n\nAs duas pontas voltam para as listas. ' +
+      'Os lançamentos que já estavam conciliados antes deste casamento continuam conciliados.' +
+      (corrigiu ? '\n\nAtenção: o valor que foi corrigido NÃO volta ao que era. A correção foi uma decisão à parte; se quiser desfazê-la, edite o lançamento.' : ''))) return;
   let reg;
   try { reg = await apagaMao(p.bancos[0]); }
   catch(e){ toast('✕ não consegui apagar o vínculo: '+e.message,'var(--red)','white'); return; }
@@ -1005,8 +1017,33 @@ async function casarCom(j){
   const bl = RES.soBanco[j], alvo = CS;
   if (!bl || !alvo) return;
   const dv = Math.abs(bl.valor - alvo.valor);
-  if (dv >= 0.005 && !confirm('Os valores diferem em R$ ' + fmt(dv) +
-      '.\n\nCasar assim registra que bateram, mas a diferença continua no saldo. Confirma?')) return;
+
+  // ---- corrigir o valor do app pelo extrato ----
+  // O banco e a referencia: o lancamento a mao e que costuma sair errado.
+  // So no caso 1-para-1 (num grupo nao da para saber qual linha corrigir) e
+  // so com o MESMO sinal — se o app tem despesa e o banco um credito, nao e
+  // valor errado, e lancamento trocado, e corrigir o numero esconderia isso.
+  const umaLinha   = alvo.ids && alvo.ids.length === 1;
+  const mesmoSinal = (bl.valor < 0) === (alvo.valor < 0);
+  const cx = document.getElementById('csAjusta');
+  const querAjustar = !!(cx && cx.checked);
+  let ajuste = null;
+  if (dv >= 0.005) {
+    if (umaLinha && mesmoSinal && querAjustar) {
+      if (!confirm('O extrato diz R$ ' + fmt(Math.abs(bl.valor)) +
+                   ' e o app tem R$ ' + fmt(Math.abs(alvo.valor)) + '.\n\n' +
+                   'Vou corrigir o lançamento do app para R$ ' + fmt(Math.abs(bl.valor)) +
+                   ' e casar os dois. Confirma?')) return;
+      ajuste = Math.round(Math.abs(bl.valor) * 100) / 100;
+    } else {
+      const porque = !umaLinha   ? '\n\n(São várias linhas do app somadas; não dá para saber qual corrigir.)'
+                   : !mesmoSinal ? '\n\n(Os sinais são opostos — isso não é valor errado, é entrada contra saída. Vale conferir o lançamento.)'
+                   : '';
+      if (!confirm('Os valores diferem em R$ ' + fmt(dv) +
+          '.\n\nCasar assim registra que bateram, mas a diferença continua no saldo.' +
+          porque + '\n\nConfirma?')) return;
+    }
+  }
   // guardo como cada id estava ANTES, para o desfazer nao apagar um
   // reconciled que ja vinha de outra rodada
   const antes = alvo.ids.map(id => {
@@ -1018,14 +1055,39 @@ async function casarCom(j){
   // "ja conciliado" na rodada seguinte.
   try { await salvaMao(bl, alvo.ids, antes); }
   catch(e){ toast('✕ não consegui guardar o vínculo: '+e.message,'var(--red)','white'); return; }
-  for (const id of alvo.ids) { try { await sbUpd('transactions', id, {reconciled:true}); } catch(e){} }
+  // A correcao de valor vai junto com o reconciled, na mesma gravacao.
+  const antigo = ajuste !== null ? Math.abs(alvo.valor) : null;
+  for (const id of alvo.ids) {
+    const campos = { reconciled: true };
+    if (ajuste !== null) {
+      campos.amount = ajuste;
+      const t = TXS.find(x => x.id === id);
+      const nota = 'valor corrigido na conciliação de ' + fmt(antigo) + ' para ' + fmt(ajuste);
+      campos.memo = (t && t.memo) ? (t.memo + ' · ' + nota) : nota;
+    }
+    try {
+      await sbUpd('transactions', id, campos);
+      const t = TXS.find(x => x.id === id);
+      if (t && ajuste !== null) { t.amount = ajuste; t.memo = campos.memo; }
+      if (t) t.reconciled = true;
+    } catch(e) {
+      toast('✕ não consegui gravar o lançamento: '+e.message,'var(--red)','white');
+      return;
+    }
+  }
+  if (ajuste !== null) alvo.valor = bl.valor;     // o par passa a fechar
   RES.soApp = RES.soApp.filter(a => a !== alvo);
   RES.soBanco = RES.soBanco.filter(b => b !== bl);
-  RES.pares.push({ bancos:[bl], apps:[alvo], nota: dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
+  RES.pares.push({ bancos:[bl], apps:[alvo],
+    nota: ajuste !== null ? 'à mão · valor corrigido de R$ ' + fmt(antigo) + ' para R$ ' + fmt(ajuste)
+        : dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
   alvo.conciliado = true;
   fecharCasar();
-  toast('✓ casado à mão');
+  toast(ajuste !== null ? '✓ casado e valor corrigido para R$ ' + fmt(ajuste) : '✓ casado à mão');
   const { de, ate } = janela();
+  // mexer no valor muda o saldo do app: recalcula antes de redesenhar,
+  // senao o quadro do fechamento mostra o numero de antes da correcao
+  if (ajuste !== null) { try { SALDO_APP = await calcSaldoApp(ate); } catch(e){} }
   desenhar(de, ate);
 }
 
