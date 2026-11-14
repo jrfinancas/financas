@@ -1316,7 +1316,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.11.07-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.11.14-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2961,7 +2961,12 @@ function montaSelectsConta(){
     : '';
   const cartoes = cs.filter(c => viva(c) && c.tipo === 'cartao');
   const demais  = cs.filter(c => viva(c) && c.tipo !== 'cartao');
-  ['nAcct','eAcct','sAcct','recAcct','pAcct'].forEach(function(id){
+  // nAcctDest (Conta Destino da transferencia) ficou de fora na primeira
+  // vez e repetiu o mesmo erro que esta anotado acima: continuava com a
+  // lista chumbada no HTML, sem as contas criadas depois — a XP 2, criada
+  // em 14/nov/26, nao aparecia como destino — e ainda oferecendo o
+  // Daycoval, ja encerrado, que o filtro viva() exclui.
+  ['nAcct','eAcct','sAcct','recAcct','pAcct','nAcctDest'].forEach(function(id){
     const el = document.getElementById(id); if (!el) return;
     const atual = el.value;
     const vazia = el.querySelector('option[value=""]');
