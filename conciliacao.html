@@ -215,7 +215,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.08-a';
+const APP_VERSION='v2026.11.08-b';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -314,54 +314,179 @@ function dataBR(s){
   return m[3] + '-' + m[2] + '-' + m[1];
 }
 
+// 'd/m/aa' e 'm/d/aa' sao indistinguiveis linha a linha. Esta funcao so
+// separa os componentes crus; quem decide quem e dia e quem e mes e a
+// ordemData(), olhando o arquivo inteiro.
+function partesData(s){
+  const t = String(s||'').trim();
+  const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
+  if (!m) return null;
+  let ano = +m[3];
+  if (ano < 100) ano += 2000;
+  return { a: +m[1], b: +m[2], ano, bruto: t };
+}
+
+function montaISO(p, ordem){
+  if (!p) return null;
+  const mes = ordem === 'MD' ? p.a : p.b;
+  const dia = ordem === 'MD' ? p.b : p.a;
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  return p.ano + '-' + String(mes).padStart(2,'0') + '-' + String(dia).padStart(2,'0');
+}
+
+// A XP exporta em XLSX e, convertido para CSV, o Excel escreve a data em
+// MES/DIA/ANO: "7/1/26" e 1o de julho, nao 7 de janeiro. No extrato de
+// mai-jul/26, 12 das 22 linhas sao ambiguas — e entre elas esta o TED de
+// 6.899,81 ("5/12/26"), unico movimento que cruza com o Santander, que
+// lido como dia/mes vira 5 de dezembro, seis meses fora do extrato.
+//
+// Chutar errado aqui nao gera erro nenhum: o total do periodo continua
+// identico, so as datas mudam de lugar — exatamente a armadilha dos PDFs
+// do Santander, que nenhuma conferencia de soma detecta. Por isso a ordem
+// e decidida pelo ARQUIVO INTEIRO, em provas em cascata, e quando nenhuma
+// delas decide o arquivo e RECUSADO em vez de adivinhado.
+function ordemData(brutas, periodo){
+  const ps = brutas.map(partesData);
+  if (!ps.length)        return { ordem: null, motivo: 'nenhuma data reconhecida' };
+  if (ps.some(p => !p))  return { ordem: null, motivo: 'tem data em formato que eu não sei ler' };
+
+  // 0) dd/mm/aaaa, dois digitos e quatro: o formato brasileiro de sempre,
+  //    que e o que o Santander manda. Nao ha nada a decidir.
+  if (ps.every(p => /^\d{2}[\/\-.]\d{2}[\/\-.]\d{4}$/.test(p.bruto)))
+    return { ordem: 'DM', motivo: null };
+
+  // 1) componente acima de 12 so pode ser dia
+  const aGrande = ps.some(p => p.a > 12), bGrande = ps.some(p => p.b > 12);
+  if (aGrande && bGrande) return { ordem: null, motivo: 'datas incoerentes: os dois campos passam de 12' };
+  if (aGrande) return { ordem: 'DM', motivo: 'o 1º campo passa de 12, então é dia/mês' };
+  if (bGrande) return { ordem: 'MD', motivo: 'o 2º campo passa de 12, então é <b>mês/dia</b> — como o Excel exporta' };
+
+  // 2) o periodo do preambulo vem em dd/mm/aaaa, sem ambiguidade
+  if (periodo && periodo.ini && periodo.fim) {
+    const cabe = o => ps.every(p => { const d = montaISO(p, o); return d && d >= periodo.ini && d <= periodo.fim; });
+    const dm = cabe('DM'), md = cabe('MD');
+    if (dm !== md) return { ordem: dm ? 'DM' : 'MD', motivo: 'só assim as datas caem dentro do período do extrato' };
+  }
+
+  // 3) o extrato vem ordenado por data; a leitura certa preserva a ordem
+  const ordenado = o => {
+    const ds = ps.map(p => montaISO(p, o));
+    if (ds.some(x => !x)) return false;
+    return ds.every((x,i) => i === 0 || x >= ds[i-1]) || ds.every((x,i) => i === 0 || x <= ds[i-1]);
+  };
+  const dm = ordenado('DM'), md = ordenado('MD');
+  if (dm !== md) return { ordem: dm ? 'DM' : 'MD', motivo: 'só assim o extrato fica em ordem de data' };
+
+  return { ordem: null, motivo: 'todas as datas são ambíguas e nada no arquivo decide se é dia/mês ou mês/dia' };
+}
+
+// Duas familias de cabecalho. A do banco tem uma coluna "Data"; a da
+// corretora tem "Movimentação" e "Liquidação" e nenhuma "Data" (XP).
+// A segunda tentativa roda SO quando a primeira nao acha nada, para nao
+// mudar em nada a leitura dos arquivos que ja funcionam — e porque
+// "Movimentação" casa com /^movimento/, que aqui marca a coluna de VALOR:
+// sem essa separacao a tela leria a data como valor.
+function achaCabecalho(linhas){
+  const lim = Math.min(linhas.length, 40);
+  for (let i = 0; i < lim; i++) {
+    const L = linhas[i].map(x => x.trim().toLowerCase());
+    const d = L.findIndex(x => x === 'data');
+    const v = L.findIndex(x => /^valor/.test(x) || /^movimento/.test(x));
+    if (d >= 0 && v >= 0) return {
+      hi: i, iData: d, iVal: v, layout: 'banco',
+      iDesc:  L.findIndex(x => /descri|hist[oó]rico|lan[çc]amento/.test(x)),
+      iSaldo: L.findIndex(x => /^saldo/.test(x))
+    };
+  }
+  for (let i = 0; i < lim; i++) {
+    const L = linhas[i].map(x => x.trim().toLowerCase());
+    // A data que o saldo segue e a de LIQUIDACAO; a de movimentacao e
+    // quando a ordem foi executada. Na XP as duas coincidem, mas quando
+    // divergirem e a liquidacao que casa com o extrato.
+    const dMov = L.findIndex(x => /^movimenta[çc]/.test(x));
+    let d = L.findIndex(x => /^liquida[çc]/.test(x));
+    if (d < 0) d = dMov;
+    const v = L.findIndex(x => /^valor/.test(x));
+    if (d < 0 || v < 0) continue;
+    return {
+      hi: i, iData: d, iVal: v, layout: 'corretora',
+      iDesc:  L.findIndex(x => /lan[çc]amento|descri|hist[oó]rico/.test(x)),
+      iSaldo: L.findIndex(x => /^saldo/.test(x))
+    };
+  }
+  return null;
+}
+
+// A coluna Saldo permite uma prova que nenhum total detecta: se a
+// conversao perdeu, repetiu ou deslocou um movimento, a cadeia de saldos
+// para de fechar. E a mesma validacao dia a dia que conferiu os PDFs do
+// Santander. Aqui e aviso, nao bloqueio: extrato parcial tambem chega.
+function confereSaldo(out){
+  if (out.length < 2 || out.some(x => isNaN(x.saldo))) return null;
+  const cresce   = out.every((x,i) => i === 0 || x.data >= out[i-1].data);
+  const decresce = out.every((x,i) => i === 0 || x.data <= out[i-1].data);
+  if (!cresce && !decresce) return null;          // fora de ordem: a cadeia nao se aplica
+  const seq = cresce ? out : out.slice().reverse();
+  let erros = 0, primeiro = null;
+  for (let i = 1; i < seq.length; i++) {
+    const esperado = Math.round((seq[i-1].saldo + seq[i].valor) * 100) / 100;
+    if (Math.abs(esperado - seq[i].saldo) >= 0.005) {
+      erros++;
+      if (!primeiro) primeiro = { data: seq[i].data, desc: seq[i].desc, esperado, achado: seq[i].saldo };
+    }
+  }
+  return { erros, passos: seq.length - 1, primeiro };
+}
+
 // Acha o cabecalho em qualquer lugar do arquivo e devolve os lancamentos.
-// Nao assume numero de linhas de preambulo: procura a linha que tem
-// Data e Valor.
+// Nao assume numero de linhas de preambulo.
+//
+// Sao DUAS passadas, nao uma: a primeira junta as linhas cruas, a segunda
+// converte as datas. A ordem dia/mes nao pode ser decidida enquanto o
+// arquivo nao estiver todo na mao.
 function parseExtrato(texto){
   for (const sep of [';', ',', '\t']) {
     const linhas = lerCSV(texto, sep);
-    let hi = -1, iData = -1, iVal = -1, iDesc = -1, iSaldo = -1;
-    for (let i = 0; i < Math.min(linhas.length, 40); i++) {
-      const L = linhas[i].map(x => x.trim().toLowerCase());
-      const d = L.findIndex(x => x === 'data');
-      const v = L.findIndex(x => /^valor/.test(x) || /^movimento/.test(x));
-      if (d >= 0 && v >= 0) {
-        hi = i; iData = d; iVal = v;
-        iDesc = L.findIndex(x => /descri|hist[oó]rico|lan[çc]amento/.test(x));
-        iSaldo = L.findIndex(x => /^saldo/.test(x));
-        break;
-      }
-    }
-    if (hi < 0) continue;
-    const out = [];
-    for (let i = hi + 1; i < linhas.length; i++) {
+    const h = achaCabecalho(linhas);
+    if (!h) continue;
+    const periodo = achaPeriodo(linhas, h.hi);
+
+    const cru = [];
+    for (let i = h.hi + 1; i < linhas.length; i++) {
       const c = linhas[i];
-      if (!c || c.length <= Math.max(iData, iVal)) continue;
-      const data = dataBR(c[iData]);
-      const valor = valorBR(c[iVal]);
-      if (!data || isNaN(valor)) continue;
-      out.push({
-        data, valor,
-        desc: iDesc >= 0 ? String(c[iDesc]||'').replace(/\s+/g,' ').trim() : '',
-        saldo: iSaldo >= 0 ? valorBR(c[iSaldo]) : NaN
-      });
+      if (!c || c.length <= Math.max(h.iData, h.iVal)) continue;
+      const p = partesData(c[h.iData]);
+      const valor = valorBR(c[h.iVal]);
+      if (!p || isNaN(valor)) continue;
+      cru.push({ p, valor,
+        desc:  h.iDesc  >= 0 ? String(c[h.iDesc]||'').replace(/\s+/g,' ').trim() : '',
+        saldo: h.iSaldo >= 0 ? valorBR(c[h.iSaldo]) : NaN });
     }
-    if (out.length) return { linhas: out, sep, periodo: achaPeriodo(linhas, hi) };
+    if (!cru.length) continue;
+
+    const od = ordemData(cru.map(x => x.p.bruto), periodo);
+    if (!od.ordem) return { linhas: [], sep, periodo, erroData: od.motivo };
+
+    const out = cru.map(x => ({ data: montaISO(x.p, od.ordem), valor: x.valor, desc: x.desc, saldo: x.saldo }))
+                   .filter(x => x.data);
+    if (out.length) return { linhas: out, sep, periodo, layout: h.layout,
+                             avisoData: od.motivo, saldo: confereSaldo(out) };
   }
   return { linhas: [], sep: null, periodo: null };
 }
 
 // O periodo que o BANCO diz ter entregado, do preambulo do CSV:
-//   Período do extrato;27/07/2026 a 24/10/2026
-// Deduzir o periodo das datas dos lancamentos erra para dentro: neste
-// arquivo o ultimo movimento e 22/10, mas o extrato cobre ate 24/10. A
+//   Período do extrato;27/07/2026 a 24/10/2026     (Santander)
+//   De: 01/05/2026 Até: 30/07/2026                 (XP)
+// Deduzir o periodo das datas dos lancamentos erra para dentro: num dos
+// arquivos o ultimo movimento e 22/10, mas o extrato cobre ate 24/10. A
 // diferenca nao e so cosmetica — o periodo define a janela em que um
 // lancamento do app sem par no banco conta como divergencia. Com a janela
 // curta, lancamento do app em 23 ou 24/10 ficava invisivel.
 function achaPeriodo(linhas, hi){
   for (let i = 0; i < Math.min(hi >= 0 ? hi : linhas.length, 40); i++) {
     const texto = (linhas[i] || []).join(' ');
-    if (!/per[ií]odo/i.test(texto)) continue;
+    if (!/per[ií]odo/i.test(texto) && !/\bde:\s*\d/i.test(texto)) continue;
     const datas = texto.match(/\d{2}\/\d{2}\/\d{4}/g);
     if (datas && datas.length >= 2) {
       const ini = dataBR(datas[0]), fim = dataBR(datas[1]);
@@ -709,10 +834,14 @@ function onFile(ev){ const f = ev.target.files[0]; if (f) lerArquivo(f); }
 function lerArquivo(f){
   const r = new FileReader();
   r.onload = async e => {
-    const { linhas, sep, periodo } = parseExtrato(e.target.result);
+    const { linhas, sep, periodo, layout, avisoData, saldo, erroData } = parseExtrato(e.target.result);
     if (!linhas.length) {
-      document.getElementById('arqInfo').innerHTML =
-        '<span style="color:var(--red)">Não achei lançamentos nesse arquivo. Esperava uma linha de cabeçalho com <b>Data</b> e <b>Valor</b>.</span>';
+      // Recusar e melhor que chutar: data lida ao contrario nao muda o
+      // total do periodo, so troca os movimentos de dia, e passa batido.
+      document.getElementById('arqInfo').innerHTML = erroData
+        ? '<span style="color:var(--red)">Não consegui decidir o formato das datas: ' + esc(erroData) + '.</span>' +
+          '<div class="usub" style="margin-top:4px">Abra o arquivo no Excel, formate a coluna de data como <b>DD/MM/AAAA</b> e salve o CSV de novo.</div>'
+        : '<span style="color:var(--red)">Não achei lançamentos nesse arquivo. Esperava um cabeçalho com <b>Data</b> e <b>Valor</b>, ou <b>Liquidação</b> e <b>Valor</b>.</span>';
       return;
     }
     EXTRATO = linhas;
@@ -725,7 +854,15 @@ function lerArquivo(f){
       `<div class="usub">${linhas.length} lançamentos · extrato de ${fmtDA(de)} a ${fmtDA(ate)}` +
       (PERIODO ? '' : ' <span style="color:var(--yellow)">(período deduzido dos lançamentos)</span>') +
       (PERIODO && ultMov < ate ? ` · último movimento em ${fmtD(ultMov)}` : '') +
-      ` · separador "${sep}"</div>`;
+      ` · separador "${sep}"${layout === 'corretora' ? ' · layout de corretora' : ''}</div>` +
+      // quando a data vem ambigua, dizer QUAL leitura foi usada e por que:
+      // se a prova estiver errada, o erro tem que ficar visivel
+      (avisoData ? `<div class="usub" style="color:var(--yellow)">Datas lidas como ${avisoData}</div>` : '') +
+      (saldo && saldo.erros
+        ? `<div class="usub" style="color:var(--yellow)">A cadeia de saldos não fecha em ${saldo.erros} de ${saldo.passos} passos` +
+          (saldo.primeiro ? ` — o 1º em ${fmtD(saldo.primeiro.data)}: pelo saldo anterior daria ${fmt(saldo.primeiro.esperado)}, o arquivo diz ${fmt(saldo.primeiro.achado)}` : '') +
+          `. Pode haver movimento perdido ou fora de lugar na conversão.</div>`
+        : saldo ? `<div class="usub">Cadeia de saldos confere nos ${saldo.passos} passos ✓</div>` : '');
     // o saldo da linha mais recente serve de palpite para o fechamento
     const ult = linhas.filter(x => x.data === ultMov && !isNaN(x.saldo));
     if (ult.length) document.getElementById('cSaldoFim').value = fmt(ult[0].saldo);
