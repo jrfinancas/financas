@@ -181,11 +181,13 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <div class="modal-title">Casar à mão</div>
     <div class="nota" id="csSub" style="margin-bottom:14px"></div>
     <div id="csLista"></div>
+    <div class="nota" id="csSoma" style="display:none;margin-top:12px"></div>
     <label class="fl" id="csAjusteBox" style="display:none;align-items:flex-start;gap:8px;margin-top:12px;cursor:pointer;text-transform:none;letter-spacing:0">
       <input type="checkbox" id="csAjusta" checked style="margin-top:2px">
       <span>Quando o valor diferir, <b>corrigir o lançamento do app</b> para o valor do extrato.
         <span class="sub2" style="display:block">O banco é a referência. Vale só para lançamento de uma linha só e quando o sinal for o mesmo.</span></span>
     </label>
+    <button class="bsave" id="csBtn" onclick="casarSel()" style="display:none;margin-top:10px">Casar</button>
     <button class="bclear" onclick="fecharCasar()">Cancelar</button>
   </div>
 </div>
@@ -215,7 +217,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.08-b';
+const APP_VERSION='v2026.11.14-a';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -550,6 +552,18 @@ function casar(banco, cand, TOL, JAN, MAO){
   const livres = () => cand.filter((c,i) => !usados.has(i));
   const idx = c => cand.indexOf(c);
 
+  // TOL e absoluta e isso nao escala para baixo. Com TOL = 0,05 (o padrao)
+  // um lancamento de R$ 0,10 casa com qualquer linha entre 0,05 e 0,15 —
+  // a tolerancia vale metade do valor. No extrato da XP isso e a regra e
+  // nao a excecao: taxa de intermediacao de 0,02, IRRF de 0,01, credito de
+  // BTC de 0,06. Em 14/nov/26 um lancamento de 0,10 que correspondia a
+  // TRES linhas do extrato era consumido antes pelo passe 2, ou fechava
+  // com duas linhas no passe 4, e nos dois casos sobrava linha dos dois
+  // lados. A tolerancia efetiva passa a ser 2% do valor, com teto no TOL
+  // escolhido e piso de meio centavo — que e o "exato" do resto do
+  // arquivo. Acima de R$ 2,50 nada muda: continua valendo o TOL inteiro.
+  const tolDe = v => Math.min(TOL, Math.max(0.005, Math.abs(v) * 0.02));
+
   // Um casamento tem N linhas de cada lado. Comecou com uma do banco
   // contra varias do app, mas o inverso existe: em 03/ago o extrato traz
   // IOF em duas linhas (-1,46 e -0,08) e o app tem uma so de -1,54.
@@ -565,16 +579,31 @@ function casar(banco, cand, TOL, JAN, MAO){
   // passe, toda nova rodada refazia o casamento do zero e o par se
   // desfazia — a ponta do app voltava com o selo "ja conciliado" e a do
   // extrato voltava como "falta lancar", convidando a lancar duplicado.
+  // Um casamento a mao pode ter VARIAS linhas do extrato contra um
+  // lancamento do app: em 14/nov/26 um lancamento de R$ 0,10 na XP
+  // correspondia a tres creditos no extrato. Cada linha do extrato guarda
+  // seu proprio vinculo apontando para a MESMA lista de ids, entao elas
+  // precisam fechar JUNTAS — fechando uma por uma, a primeira consumia o
+  // candidato (usados.add) e as outras voltavam como "falta lancar".
   const M = MAO || {};
+  const grupos = new Map();
   banco.forEach(bl => {
     if (bl._ok) return;
     const reg = M[fpBanco(bl)];
     const ids = reg && reg.ids;
     if (!ids || !ids.length) return;
-    const cs = cand.filter((c, i) => !usados.has(i) && c.ids.some(id => ids.indexOf(id) >= 0));
+    const chave = ids.slice().sort().join(',');
+    if (!grupos.has(chave)) grupos.set(chave, { ids, bls: [] });
+    grupos.get(chave).bls.push(bl);
+  });
+  grupos.forEach(g => {
+    const cs = cand.filter((c, i) => !usados.has(i) && c.ids.some(id => g.ids.indexOf(id) >= 0));
     if (!cs.length) return;                    // o lancamento foi apagado depois
-    const dv = Math.abs(bl.valor - cs.reduce((s, c) => s + c.valor, 0));
-    fecha([bl], cs, dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão');
+    const somaB = g.bls.reduce((s, b) => s + b.valor, 0);
+    const dv = Math.abs(somaB - cs.reduce((s, c) => s + c.valor, 0));
+    fecha(g.bls, cs,
+      'à mão' + (g.bls.length > 1 ? ' · ' + g.bls.length + ' do extrato' : '') +
+      (dv >= 0.005 ? ' · difere R$ ' + fmt(dv) : ''));
   });
 
   // PASSE 1 — data e valor batendo na mosca
@@ -599,7 +628,8 @@ function casar(banco, cand, TOL, JAN, MAO){
     cand.forEach((c, ci) => {
       if (usados.has(ci)) return;
       const dv = Math.abs(c.valor - bl.valor), dd = dias(c.data, bl.data);
-      if (dv <= TOL && dd <= JAN) arestas.push({ bi, ci, dv, dd });
+      const tol = tolDe(Math.max(Math.abs(bl.valor), Math.abs(c.valor)));
+      if (dv <= tol && dd <= JAN) arestas.push({ bi, ci, dv, dd });
     });
   });
   arestas.sort((a, b) => (a.dv - b.dv) || (a.dd - b.dd));
@@ -614,20 +644,32 @@ function casar(banco, cand, TOL, JAN, MAO){
   // Quatro, nao tres: a Claro de 05/ago vem R$ 303,71 no extrato e no app
   // esta como 94,25 + 50,56 + 119,90 + 39,00. Com o teto em 3 ela nunca
   // fechava.
+  // Procura a MELHOR soma, nao a primeira que cabe na tolerancia. Parar no
+  // primeiro achado fechava com o subconjunto errado: para um alvo de 0,10
+  // com TOL de 0,05, a dupla 0,02+0,06 = 0,08 "cabia" (difere 0,02) e
+  // consumia duas das tres linhas que fechavam exato. Agora varre as
+  // combinacoes de ate maxItens e fica com a de menor diferenca; no empate,
+  // a de menos itens. Com o teto de 14 no pool e 4 itens sao 1.470
+  // combinacoes por alvo, barato o bastante para varrer tudo.
   function somaQueFecha(pool, alvo, maxItens){
     const n = Math.min(pool.length, 14);   // a combinacao cresce rapido
-    let achado = null;
+    const tol = tolDe(alvo);
+    let melhor = null;
     (function rec(i, atual, soma){
-      if (achado) return;
-      if (atual.length >= 2 && Math.abs(soma - alvo) <= TOL) { achado = atual.slice(); return; }
+      if (atual.length >= 2) {
+        const d = Math.abs(soma - alvo);
+        if (d <= tol && (!melhor || d < melhor.d - 1e-9 ||
+            (Math.abs(d - melhor.d) < 1e-9 && atual.length < melhor.itens.length)))
+          melhor = { d, itens: atual.slice() };
+      }
       if (atual.length >= maxItens || i >= n) return;
-      for (let k = i; k < n && !achado; k++) {
+      for (let k = i; k < n; k++) {
         atual.push(pool[k]);
         rec(k + 1, atual, soma + pool[k].valor);
         atual.pop();
       }
     })(0, [], 0);
-    return achado;
+    return melhor && melhor.itens;
   }
   banco.forEach(bl => {
     if (bl._ok) return;
@@ -1105,24 +1147,60 @@ function abrirCasar(i){
   document.getElementById('csSub').innerHTML =
     'Lançamento do app: <b>' + esc(CS.desc||'—') + '</b> · ' + fmt(CS.valor) + ' em ' + fmtD(CS.data) +
     '<br>Escolha a linha do extrato que corresponde a ele.';
+  // Varias linhas do extrato podem corresponder a UM lancamento do app: na
+  // XP, um lancamento de 0,10 contra tres creditos de BTC. O motor ja sabia
+  // somar esse caso (passe 4), mas a mao so dava para escolher UMA linha,
+  // entao quando o automatico nao pegava nao havia saida. Agora e selecao
+  // multipla, com a soma e a diferenca na tela antes de confirmar.
   const opc = RES.soBanco
     .map((b, j) => ({ b, j, dv: Math.abs(b.valor - CS.valor), dd: dias(b.data, CS.data) }))
     .sort((x, y) => (x.dv * 100 + x.dd) - (y.dv * 100 + y.dd))
     .slice(0, 12);
   document.getElementById('csLista').innerHTML = opc.length
-    ? opc.map(o => `<div class="lin"><span class="lin-d">${fmtD(o.b.data)}</span>` +
+    ? opc.map(o => `<label class="lin" style="cursor:pointer">` +
+        `<input type="checkbox" class="csOp" value="${o.j}" onchange="csAtualiza()" style="margin-right:8px">` +
+        `<span class="lin-d">${fmtD(o.b.data)}</span>` +
         `<span class="lin-t">${esc(o.b.desc||'—')}</span>` +
-        `<span class="lin-v ${o.b.valor<0?'neg':'pos'}">${fmt(o.b.valor)}</span>` +
-        `<button class="ico" onclick="casarCom(${o.j})">Casar</button></div>` +
+        `<span class="lin-v ${o.b.valor<0?'neg':'pos'}">${fmt(o.b.valor)}</span></label>` +
         (o.dv >= 0.005 || o.dd
           ? `<div class="sub2">${o.dv>=0.005?'R$ '+fmt(o.dv)+' de diferença':''}${o.dv>=0.005&&o.dd?' · ':''}${o.dd?o.dd+'d de distância':''}</div>`
           : '')).join('')
     : '<div class="empty">Não há linha do extrato sobrando para casar.</div>';
+  document.getElementById('csBtn').style.display = opc.length ? '' : 'none';
+  csAtualiza();
+  document.getElementById('mdCasar').classList.add('on');
+}
+
+// Soma dos selecionados contra o lancamento do app, ao vivo. Mostrar a
+// diferenca ANTES de confirmar e o que evita casar 2 linhas quando sao 3.
+function csSelecionadas(){
+  return Array.prototype.slice.call(document.querySelectorAll('.csOp'))
+    .filter(e => e.checked).map(e => RES.soBanco[+e.value]).filter(Boolean);
+}
+function csAtualiza(){
+  const bls = csSelecionadas();
+  const cx = document.getElementById('csSoma'), bt = document.getElementById('csBtn');
+  const aj = document.getElementById('csAjusteBox');
+  if (!CS) return;
+  if (!bls.length) {
+    cx.style.display = 'none';
+    if (bt) { bt.disabled = true; bt.textContent = 'Casar'; }
+    if (aj) aj.style.display = 'none';
+    return;
+  }
+  const soma = bls.reduce((s, b) => s + b.valor, 0);
+  const dv = Math.abs(soma - CS.valor);
+  cx.style.display = '';
+  cx.innerHTML =
+    `${bls.length} linha${bls.length>1?'s':''} do extrato: <b>${fmt(soma)}</b> · ` +
+    `lançamento do app: <b>${fmt(CS.valor)}</b><br>` +
+    (dv < 0.005
+      ? '<span style="color:var(--green)">Fecha ao centavo ✓</span>'
+      : `<span style="color:var(--yellow)">Difere R$ ${fmt(dv)}</span>`);
+  if (bt) { bt.disabled = false; bt.textContent = 'Casar ' + bls.length + ' linha' + (bls.length>1?'s':''); }
   // a caixa de ajuste so faz sentido num lancamento de uma linha so:
   // num grupo de quatro nao ha como saber qual delas corrigir
-  document.getElementById('csAjusteBox').style.display =
-    (CS.ids && CS.ids.length === 1 && opc.length) ? 'flex' : 'none';
-  document.getElementById('mdCasar').classList.add('on');
+  if (aj) aj.style.display = (CS.ids && CS.ids.length === 1 && dv >= 0.005) ? 'flex' : 'none';
 }
 function fecharCasar(){ document.getElementById('mdCasar').classList.remove('on'); CS = null; }
 
@@ -1134,8 +1212,13 @@ async function desfazerMao(i){
   if (!confirm('Desfazer este casamento?\n\nAs duas pontas voltam para as listas. ' +
       'Os lançamentos que já estavam conciliados antes deste casamento continuam conciliados.' +
       (corrigiu ? '\n\nAtenção: o valor que foi corrigido NÃO volta ao que era. A correção foi uma decisão à parte; se quiser desfazê-la, edite o lançamento.' : ''))) return;
-  let reg;
-  try { reg = await apagaMao(p.bancos[0]); }
+  // Um casamento a mao pode ter varias linhas do extrato, cada uma com o
+  // seu vinculo. Apagar so a primeira deixava as outras presas: na rodada
+  // seguinte o passe 0 reabria o par com soma incompleta.
+  let reg = null;
+  try {
+    for (const b of p.bancos) { const r = await apagaMao(b); if (!reg) reg = r; }
+  }
   catch(e){ toast('✕ não consegui apagar o vínculo: '+e.message,'var(--red)','white'); return; }
   // volta cada id ao estado anterior; quem ja era conciliado antes, fica
   for (const a of p.apps) {
@@ -1150,10 +1233,11 @@ async function desfazerMao(i){
   await rodar(de, ate);
 }
 
-async function casarCom(j){
-  const bl = RES.soBanco[j], alvo = CS;
-  if (!bl || !alvo) return;
-  const dv = Math.abs(bl.valor - alvo.valor);
+async function casarSel(){
+  const bls = csSelecionadas(), alvo = CS;
+  if (!bls.length || !alvo) return;
+  const soma = Math.round(bls.reduce((s, b) => s + b.valor, 0) * 100) / 100;
+  const dv = Math.abs(soma - alvo.valor);
 
   // ---- corrigir o valor do app pelo extrato ----
   // O banco e a referencia: o lancamento a mao e que costuma sair errado.
@@ -1161,17 +1245,18 @@ async function casarCom(j){
   // so com o MESMO sinal — se o app tem despesa e o banco um credito, nao e
   // valor errado, e lancamento trocado, e corrigir o numero esconderia isso.
   const umaLinha   = alvo.ids && alvo.ids.length === 1;
-  const mesmoSinal = (bl.valor < 0) === (alvo.valor < 0);
+  const mesmoSinal = (soma < 0) === (alvo.valor < 0);
   const cx = document.getElementById('csAjusta');
   const querAjustar = !!(cx && cx.checked);
   let ajuste = null;
   if (dv >= 0.005) {
     if (umaLinha && mesmoSinal && querAjustar) {
-      if (!confirm('O extrato diz R$ ' + fmt(Math.abs(bl.valor)) +
+      if (!confirm('O extrato diz R$ ' + fmt(Math.abs(soma)) +
+                   (bls.length > 1 ? ' (soma de ' + bls.length + ' linhas)' : '') +
                    ' e o app tem R$ ' + fmt(Math.abs(alvo.valor)) + '.\n\n' +
-                   'Vou corrigir o lançamento do app para R$ ' + fmt(Math.abs(bl.valor)) +
+                   'Vou corrigir o lançamento do app para R$ ' + fmt(Math.abs(soma)) +
                    ' e casar os dois. Confirma?')) return;
-      ajuste = Math.round(Math.abs(bl.valor) * 100) / 100;
+      ajuste = Math.round(Math.abs(soma) * 100) / 100;
     } else {
       const porque = !umaLinha   ? '\n\n(São várias linhas do app somadas; não dá para saber qual corrigir.)'
                    : !mesmoSinal ? '\n\n(Os sinais são opostos — isso não é valor errado, é entrada contra saída. Vale conferir o lançamento.)'
@@ -1190,8 +1275,19 @@ async function casarCom(j){
   // O vinculo vai PRIMEIRO. Se ele falhar, nao marco nada: um reconciled
   // sem vinculo e justamente o estado que fazia o par voltar com o selo
   // "ja conciliado" na rodada seguinte.
-  try { await salvaMao(bl, alvo.ids, antes); }
-  catch(e){ toast('✕ não consegui guardar o vínculo: '+e.message,'var(--red)','white'); return; }
+  // Com varias linhas, cada uma guarda o seu vinculo apontando para os
+  // mesmos ids. Se uma falhar no meio, as que foram gravadas sao desfeitas:
+  // vinculo pela metade faria o passe 0 fechar com soma incompleta na
+  // rodada seguinte, e a diferenca apareceria como erro de conciliacao.
+  const gravados = [];
+  for (const b of bls) {
+    try { await salvaMao(b, alvo.ids, antes); gravados.push(b); }
+    catch(e){
+      for (const g of gravados) { try { await apagaMao(g); } catch(e2){} }
+      toast('✕ não consegui guardar o vínculo: '+e.message,'var(--red)','white');
+      return;
+    }
+  }
   // A correcao de valor vai junto com o reconciled, na mesma gravacao.
   const antigo = ajuste !== null ? Math.abs(alvo.valor) : null;
   for (const id of alvo.ids) {
@@ -1212,15 +1308,17 @@ async function casarCom(j){
       return;
     }
   }
-  if (ajuste !== null) alvo.valor = bl.valor;     // o par passa a fechar
+  if (ajuste !== null) alvo.valor = soma;         // o par passa a fechar
   RES.soApp = RES.soApp.filter(a => a !== alvo);
-  RES.soBanco = RES.soBanco.filter(b => b !== bl);
-  RES.pares.push({ bancos:[bl], apps:[alvo],
-    nota: ajuste !== null ? 'à mão · valor corrigido de R$ ' + fmt(antigo) + ' para R$ ' + fmt(ajuste)
-        : dv >= 0.005 ? 'à mão · difere R$ ' + fmt(dv) : 'à mão' });
+  RES.soBanco = RES.soBanco.filter(b => bls.indexOf(b) < 0);
+  RES.pares.push({ bancos: bls, apps:[alvo],
+    nota: 'à mão' + (bls.length > 1 ? ' · ' + bls.length + ' do extrato' : '') +
+      (ajuste !== null ? ' · valor corrigido de R$ ' + fmt(antigo) + ' para R$ ' + fmt(ajuste)
+       : dv >= 0.005 ? ' · difere R$ ' + fmt(dv) : '') });
   alvo.conciliado = true;
   fecharCasar();
-  toast(ajuste !== null ? '✓ casado e valor corrigido para R$ ' + fmt(ajuste) : '✓ casado à mão');
+  toast(ajuste !== null ? '✓ casado e valor corrigido para R$ ' + fmt(ajuste)
+      : '✓ casado à mão' + (bls.length > 1 ? ' com ' + bls.length + ' linhas' : ''));
   const { de, ate } = janela();
   // mexer no valor muda o saldo do app: recalcula antes de redesenhar,
   // senao o quadro do fechamento mostra o numero de antes da correcao
