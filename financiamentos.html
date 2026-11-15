@@ -218,7 +218,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 <div id="pagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:440px;width:100%">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div class="card-title" style="margin-bottom:0">✓ Pagar parcela</div>
+      <div class="card-title" style="margin-bottom:0" id="pgTitulo">✓ Pagar parcela</div>
       <button onclick="fecharPag()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
     </div>
     <div id="pgInfo" class="sub" style="margin-bottom:14px"></div>
@@ -241,7 +241,7 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <div><label class="fl2">Saldo devedor depois, pelo extrato R$</label><input type="number" step="0.01" class="fi2" id="pgSaldo" oninput="calcPag()"></div>
     <div id="pgResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin:14px 0"></div>
     <div style="display:flex;gap:8px">
-      <button class="btn pri" style="flex:1" onclick="salvarPag()">✓ Registrar</button>
+      <button class="btn pri" style="flex:1" id="pgBtn" onclick="salvarPag()">✓ Registrar</button>
       <button class="btn" onclick="fecharPag()">Cancelar</button>
     </div>
   </div>
@@ -302,7 +302,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.11.15-b';
+const APP_VERSION='v2026.11.15-c';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Chamada ao Supabase com erro legivel ----------
@@ -718,11 +718,19 @@ function render(){
           return '<div class="pr-row '+(p.pago?'paga':'')+' '+(venc?'venc':'')+'">'
             +'<div class="num">'+p.numero+'</div>'
             +'<div class="num">'+fmtDate(p.vencimento)+'</div>'
+            // Parcela paga nao tinha botao nenhum: uma vez registrada, a
+            // quebra ficava congelada mesmo errada. Era o caso das parcelas
+            // de abr e mai/26, as pausas, que precisavam de amortizacao
+            // negativa e nao havia por onde corrigir.
             +'<div>'+(p.pago?(p.data_pagamento
                  ? '<span style="color:var(--green)">✓ pago '+fmtDate(p.data_pagamento)+'</span>'
+                   +' <span onclick="abrirPag('+p.id+',false,true)" title="Corrigir a quebra desta parcela" '
+                   +'style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span>'
                  : (p.vencimento>=desdeQuando(f)
                     ? '<button class="btn" style="padding:4px 8px;font-size:10px" title="cria os lançamentos desta parcela no caixa" onclick="abrirPag('+p.id+',true)">⤓ lançar no caixa</button>'
-                    : '<span class="sub">✓ paga (fora do controle)</span>'))
+                    : '<span class="sub">✓ paga (fora do controle)</span>'
+                      +' <span onclick="abrirPag('+p.id+',false,true)" title="Corrigir a quebra desta parcela" '
+                      +'style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span>'))
                             :'<button class="btn g" style="padding:4px 10px;font-size:11px'
                                +(venc?';background:var(--red);color:#fff':'')+'" onclick="abrirPag('+p.id+')">'
                                +(venc?'Pagar (vencida)':'Pagar')+'</button>')+'</div>'
@@ -929,20 +937,31 @@ async function salvarEvento(){
 }
 
 // ---------- Pagamento ----------
-let _pgParc=null, _pgRetro=false;
-function abrirPag(id, retro){
+let _pgParc=null, _pgRetro=false, _pgCorrige=false;
+function abrirPag(id, retro, corrige){
   _pgParc=PARCS.find(p=>String(p.id)===String(id)); if(!_pgParc) return;
-  _pgRetro=!!retro;
+  _pgRetro=!!retro; _pgCorrige=!!corrige;
   const f=FINS.find(x=>x.id===_pgParc.financiamento_id);
+  document.getElementById('pgTitulo').textContent=_pgCorrige? '✎ Corrigir parcela' : '✓ Pagar parcela';
   document.getElementById('pgInfo').textContent=f.nome+' · parcela '+_pgParc.numero+'/'+f.prazo_meses+' · vence '+fmtDate(_pgParc.vencimento)
-    +(_pgRetro? ' · lançamento retroativo':'');
+    +(_pgRetro? ' · lançamento retroativo':'')+(_pgCorrige? ' · já registrada':'');
   // parcela antiga: a data que importa e a do vencimento, nao hoje
-  document.getElementById('pgData').value=_pgRetro? _pgParc.vencimento : TODAY;
+  document.getElementById('pgData').value=_pgCorrige? (_pgParc.data_pagamento||_pgParc.vencimento)
+                                        : (_pgRetro? _pgParc.vencimento : TODAY);
   document.getElementById('pgValor').value=(+(_pgParc.valor_pago||_pgParc.valor_previsto)).toFixed(2);
-  proporPag();
+  if(_pgCorrige){
+    // corrigir parte do que ESTA gravado, nao de uma proposta nova — senao
+    // o que ele ja tinha conferido com o banco era sobrescrito ao abrir
+    const g=(id,v)=>{document.getElementById(id).value=(+v||0).toFixed(2);};
+    g('pgJuros',_pgParc.juros); g('pgAmort',_pgParc.amortizacao);
+    g('pgSeg',_pgParc.seguro);  g('pgTaxa',_pgParc.taxa_adm);
+    g('pgSaldo',_pgParc.saldo_apos);
+    calcPag();
+  } else proporPag();
+  document.getElementById('pgBtn').textContent=_pgCorrige? '✎ Corrigir' : '✓ Registrar';
   document.getElementById('pagModal').style.display='flex';
 }
-function fecharPag(){ document.getElementById('pagModal').style.display='none'; _pgParc=null; _pgRetro=false; }
+function fecharPag(){ document.getElementById('pagModal').style.display='none'; _pgParc=null; _pgRetro=false; _pgCorrige=false; }
 // Reparte o valor realmente pago entre juros/amortizacao/seguro/taxa.
 // Diferenca pequena (indexador) ajusta os juros. Diferenca grande — parcela
 // renegociada, por exemplo — rateia proporcionalmente, senao os juros viram negativos.
@@ -1055,7 +1074,31 @@ async function salvarPag(){
         body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,
           valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
     }
-    if(f.conta_id){
+    // Em correcao o caixa ja pode ter as quatro linhas da vez anterior, com
+    // os valores velhos. Refazer e opcional e com pergunta, porque se essas
+    // linhas ja foram conciliadas, apagar desfaz a conciliacao.
+    let refazer=true;
+    if(_pgCorrige && f.conta_id){
+      let antigos=[];
+      try{
+        antigos=await sbGet('transactions',
+          'select=id,payee,amount,date,reconciled&account=eq.'+encodeURIComponent(f.conta_id)
+          +'&date=eq.'+(p.data_pagamento||data));
+        antigos=antigos.filter(t=>String(t.payee||'').indexOf(f.nome+' — ')===0);
+      }catch(e){ antigos=[]; }
+      if(antigos.length){
+        const conc=antigos.filter(t=>t.reconciled).length;
+        refazer=confirm('Achei '+antigos.length+' lançamento(s) desta parcela no caixa'
+          +(conc? ', sendo '+conc+' já conciliado(s)':'')+'.\n\n'
+          +'OK = apagar e recriar com os valores novos'+(conc? ' (a conciliação desses se perde)':'')+'\n'
+          +'Cancelar = deixar o caixa como está e corrigir só a parcela');
+        if(refazer) for(const t of antigos)
+          await sbCall('transactions?id=eq.'+t.id,{method:'DELETE',headers:SBH});
+      }else{
+        refazer=confirm('Não achei lançamentos desta parcela no caixa.\n\nCriar as quatro linhas agora?');
+      }
+    }
+    if(f.conta_id && (!_pgCorrige || refazer)){
       const gid=Date.now();
       const linhas=[];
       linhas.push({id:gid,type:'expense',amount:juros,date:data,payee:f.nome+' — juros',payee_display:f.nome+' — juros',
@@ -1072,7 +1115,7 @@ async function salvarPag(){
         is_deductible:false,receipt_status:'na',installments:1,installment_num:1,group_id:gid,from_recorrente:false,is_split:true,split_total:pago});
       await sbCall('transactions',{method:'POST',headers:SBH,body:JSON.stringify(linhas)});
     }
-    toast('✓ Parcela '+p.numero+' registrada','var(--green)','#0d0f14');
+    toast('✓ Parcela '+p.numero+(_pgCorrige?' corrigida':' registrada'),'var(--green)','#0d0f14');
     fecharPag(); await carregar();
   }catch(e){ toast('✕ Erro: '+e.message,'var(--red)','white'); }
 }
