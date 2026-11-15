@@ -217,7 +217,7 @@ const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6
 const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json','Prefer':'return=representation'};
-const APP_VERSION='v2026.11.14-a';
+const APP_VERSION='v2026.11.15-a';
 
 // mesmo sbGet paginado das outras telas (teto de 1000 linhas da API)
 async function sbGet(t, q='') {
@@ -1332,7 +1332,9 @@ function abrirLancar(i){
   if (!bl) return;
   LC = bl;
   document.getElementById('lcSub').innerHTML =
-    'Linha do extrato de <b>' + fmtD(bl.data) + '</b> que não existe no app.';
+    'Linha do extrato de <b>' + fmtD(bl.data) + '</b> que não existe no app.' +
+    (bl.desc ? '<br><span class="sub2">Histórico: ' + esc(bl.desc) +
+               ' — fica guardado no memo mesmo que você troque o fornecedor.</span>' : '');
   // A descricao do banco ("Pix enviado Marildete vale santos men") nao
   // pode virar fornecedor novo: suja a base e quebra o autocomplete das
   // outras telas. Procura o fornecedor que ja existe e propoe esse.
@@ -1444,6 +1446,18 @@ function lcFillSub(){
 }
 function fecharLancar(){ document.getElementById('mdLancar').classList.remove('on'); LC = null; }
 
+// O historico do extrato ("PIX ENVIADO 05/11 MARILDETE VALE SANTOS MEN")
+// e a unica pista de ONDE o lancamento veio, e sumia: o campo Fornecedor
+// e trocado pelo nome limpo (de proposito, para nao sujar a base de
+// fornecedores) e o memo era um texto fixo. Depois de lancado nao havia
+// como saber a que linha do extrato aquilo correspondia. Agora o
+// historico vai junto, no memo.
+function memoDoExtrato(desc){
+  const hist = String(desc||'').replace(/\s+/g,' ').trim();
+  return 'Conciliação bancária' + (hist ? ' · extrato: ' + hist
+                                        : ' · lançado a partir do extrato');
+}
+
 async function lancarConfirma(){
   if (!LC) return;
   const cat = document.getElementById('lcCat').value;
@@ -1483,14 +1497,16 @@ async function lancarConfirma(){
           id: idSai, group_id: idSai, type: 'expense', account: origemId,
           payee: debito ? desc : ('Transferência para ' + nomeAqui),
           payee_display: debito ? desc : ('Transf. para ' + nomeAqui),
-          memo: 'Conciliação bancária · saída da transferência',
+          // o historico so cabe na perna que CORRESPONDE a linha do
+          // extrato: se e debito, a saida; se e credito, a entrada
+          memo: debito ? memoDoExtrato(LC.desc) : 'Conciliação bancária · saída da transferência',
           reconciled: debito
         }),
         Object.assign({}, base, {
           id: idEnt, group_id: idEnt, type: 'income', account: destinoId,
           payee: 'Transferência de ' + nomeOrig,
           payee_display: 'Transf. de ' + nomeOrig,
-          memo: 'Conciliação bancária · entrada da transferência',
+          memo: debito ? 'Conciliação bancária · entrada da transferência' : memoDoExtrato(LC.desc),
           reconciled: !debito
         })
       ];
@@ -1499,7 +1515,7 @@ async function lancarConfirma(){
         id: gid, group_id: gid, type: tipo, amount: v, date: data,
         payee: desc, payee_display: desc, account: CONTA.id,
         category: cat, subcategory: sub,
-        memo: 'Conciliação bancária · lançado a partir do extrato',
+        memo: memoDoExtrato(LC.desc),
         is_deductible: marcaDed(cat, sub), receipt_status: 'na', reconciled: true,
         installments: 1, installment_num: 1, from_recorrente: false
       }];

@@ -514,9 +514,9 @@ nav a.active, nav a:hover { background: var(--surface2); color: var(--accent); }
           <div id="nTrfFxRow" style="display:none;flex:1"><label class="fl">Taxa de câmbio <span style="font-size:10px;color:var(--muted)">(1 BRL = ? moeda)</span></label><input type="text" inputmode="decimal" class="fi" id="nTrfFx" placeholder="ex: 0.18 USD"></div>
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.45">
-          As duas contas preenchidas gravam <b>as duas pernas</b>. Deixe uma em
-          “Selecionar…” para gravar <b>uma perna só</b> — aplicação (só origem)
-          ou resgate (só destino) cujo outro lado já está em Investimentos.
+          As <b>duas contas</b> são obrigatórias: toda transferência grava as duas pernas.
+          <b>Aplicação e resgate</b> não se lançam aqui — registre em <b>Investimentos</b>,
+          que lança a movimentação do ativo e a do caixa de uma vez.
         </div>
       </div>
       <div class="fg"><label class="fl">Valor <span class="aibadge" id="nAmtBadge" style="display:none">IA</span></label>
@@ -1321,7 +1321,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.11.14-c';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.11.15-a';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2277,10 +2277,18 @@ async function saveNormal() {
   // XP em 14/nov/26. Criar a segunda perna para um ativo que ja esta no
   // modulo contaria o mesmo dinheiro duas vezes.
   const destPre=document.getElementById('nAcctDest')?.value||'';
-  const faltaConta = (nType==='trf') ? (!acct && !destPre) : !acct;
-  if(!amt||!date||!payee||faltaConta||(nType!=='trf'&&!cat)){
+  // Transferencia exige AS DUAS contas, de novo. A perna unica foi
+  // acrescentada aqui em 14/nov/26 para dar conta de aplicacao e resgate —
+  // sem ter verificado que o modulo de Investimentos JA lancava essa perna
+  // sozinho ("Aplicação — <ativo>" na saida, "Resgate — <ativo>" na
+  // entrada, categoria transferencia, uma linha so). Era funcionalidade
+  // repetida, e com o defeito de ser acionada por campo em branco: bastava
+  // esquecer o destino numa transferencia comum para gravar perneta sem
+  // aviso. Aplicacao e resgate entram pelo modulo, que registra o ativo e
+  // o caixa de uma vez e mantem os dois lados coerentes.
+  if(!amt||!date||!payee||!acct||(nType==='trf'&&!destPre)||(nType!=='trf'&&!cat)){
     toast(nType==='trf'
-      ? '⚠ Preencha: valor, data, fornecedor e ao menos uma conta (origem ou destino)'
+      ? '⚠ Transferência precisa de conta de origem E de destino. Aplicação e resgate: registre em Investimentos.'
       : '⚠ Preencha: valor, data, fornecedor, conta e categoria','#fbbf24','#0d0f14');return;}
   // Nome parecido com fornecedor existente? Pergunta antes de criar outro.
   if(nType!=='trf'){
@@ -2302,17 +2310,13 @@ Continuar mesmo assim?`;
   btn.disabled=true; btn.textContent='Salvando...'; sync('busy');
   try {
     const gid=Date.now(); const p=amt/inst; const rows=[];
-    // Transferencia sem origem: a propria linha e a ENTRADA, no destino.
-    // Nos outros casos a linha e a saida na origem, como antes.
-    const soEntra  = (nType==='trf' && !acct && !!destPre);
-    const contaLin = soEntra ? destPre : acct;
-    const tipoLin  = soEntra ? 'income' : ((nType==='exp'||nType==='trf')?'expense':'income');
+    const tipoLin = (nType==='exp'||nType==='trf')?'expense':'income';
     for(let i=0;i<inst;i++){
       rows.push({id:gid+i,type:tipoLin,amount:p,
         // a mesma funcao que a previa usa, para nao haver duas contas
         date:dataParcela(date, i),
         payee,payee_display:inst>1?`${payee} (${i+1}/${inst})`:null,
-        account:contaLin,category:cat,subcategory:document.getElementById('nSub').value||null,
+        account:acct,category:cat,subcategory:document.getElementById('nSub').value||null,
         memo:document.getElementById('nMemo').value||null,
         receipt_status:i===0?(nRS==='att'?'attached':nRS==='pending'?'pending':'na'):'na',is_deductible:marcaIR(tipoLin, cat, sub),
         installments:inst,installment_num:i+1,group_id:gid,
@@ -2325,9 +2329,7 @@ Continuar mesmo assim?`;
       const destAcct=document.getElementById('nAcctDest')?.value;
       const srcOpts=document.getElementById('nAcct');
       const srcName=srcOpts?.options[srcOpts?.selectedIndex]?.text||acct;
-      // So com as DUAS pontas. Sem origem, a linha de cima ja e a entrada;
-      // criar outra duplicaria. Sem destino, e perna unica de saida.
-      if(acct && destAcct){
+      if(destAcct){
         const trfIn=rows.map(function(r,j){
           return {id:r.id+99999+j,type:'income',amount:r.amount,date:r.date,
             payee:'Transferência de '+srcName,payee_display:'Transf. de '+srcName,
