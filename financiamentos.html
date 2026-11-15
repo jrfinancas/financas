@@ -224,9 +224,22 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
     <div id="pgInfo" class="sub" style="margin-bottom:14px"></div>
     <div class="fr2">
       <div><label class="fl2">Data do pagamento</label><input type="date" class="fi2" id="pgData"></div>
-      <div><label class="fl2">Valor pago R$</label><input type="number" step="0.01" class="fi2" id="pgValor" oninput="calcPag()"></div>
+      <div><label class="fl2">Valor pago R$</label><input type="number" step="0.01" class="fi2" id="pgValor" oninput="proporPag()"></div>
     </div>
-    <div id="pgResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin-bottom:14px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px">
+      <div class="fl2" style="margin:0">Quebra da parcela — confira com o banco</div>
+      <span onclick="proporPag()" style="cursor:pointer;color:var(--muted);font-size:11px;text-decoration:underline">repropor</span>
+    </div>
+    <div class="fr2">
+      <div><label class="fl2">Juros R$</label><input type="number" step="0.01" class="fi2" id="pgJuros" oninput="calcPag()"></div>
+      <div><label class="fl2">Amortização R$</label><input type="number" step="0.01" class="fi2" id="pgAmort" oninput="calcPag()"></div>
+    </div>
+    <div class="fr2">
+      <div><label class="fl2">Seguros R$ <span style="opacity:.6">(MIP+DFI)</span></label><input type="number" step="0.01" class="fi2" id="pgSeg" oninput="calcPag()"></div>
+      <div><label class="fl2">Tarifa R$</label><input type="number" step="0.01" class="fi2" id="pgTaxa" oninput="calcPag()"></div>
+    </div>
+    <div><label class="fl2">Saldo devedor depois, pelo extrato R$</label><input type="number" step="0.01" class="fi2" id="pgSaldo" oninput="calcPag()"></div>
+    <div id="pgResumo" style="background:var(--surface2);border-radius:10px;padding:12px;font-size:12px;line-height:1.7;margin:14px 0"></div>
     <div style="display:flex;gap:8px">
       <button class="btn pri" style="flex:1" onclick="salvarPag()">✓ Registrar</button>
       <button class="btn" onclick="fecharPag()">Cancelar</button>
@@ -289,7 +302,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.17-c';
+const APP_VERSION='v2026.11.15-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Chamada ao Supabase com erro legivel ----------
@@ -668,7 +681,7 @@ function render(){
   const saldo=FINS.reduce((s,f)=>{
     const ps=PARCS.filter(p=>p.financiamento_id===f.id);
     const ult=ps.filter(p=>p.pago).sort((a,b)=>b.numero-a.numero)[0];
-    return s+(ult? +ult.saldo_apos : +f.valor_financiado);
+    return s+(ult? +ult.saldo_apos : (+f.saldo_devedor || +f.valor_financiado));
   },0);
   const amort=pagas.reduce((s,p)=>s+ +(p.amortizacao||0),0);
   const juros=pagas.reduce((s,p)=>s+ +(p.juros||0),0);
@@ -684,7 +697,7 @@ function render(){
     const ps=PARCS.filter(p=>p.financiamento_id===f.id).sort((a,b)=>a.numero-b.numero);
     const pg=ps.filter(p=>p.pago).length;
     const ult=ps.filter(p=>p.pago).sort((a,b)=>b.numero-a.numero)[0];
-    const sd=ult? +ult.saldo_apos : +f.valor_financiado;
+    const sd=ult? +ult.saldo_apos : (+f.saldo_devedor || +f.valor_financiado);
     const pctPago=ps.length? pg/ps.length*100 : 0;
     const aberto=_abertos[f.id];
     const mostrar = aberto ? ps : ps.filter(p=>!p.pago).slice(0,6);
@@ -897,6 +910,16 @@ async function salvarEvento(){
       for(const L of r.linhas) await fetch(SB+'/rest/v1/parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
         body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
       await fetch(SB+'/rest/v1/financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,body:JSON.stringify({saldo_devedor:v})});
+      // A TELA mostra o saldo_apos da ultima parcela PAGA — nunca o
+      // saldo_devedor do financiamento, que ate 15/nov/26 era gravado aqui
+      // e nao era lido em lugar nenhum. Era por isso que "ajustar o saldo"
+      // nao mudava nada: o valor ia para um campo morto. Gravar tambem na
+      // ultima paga deixa a cadeia coerente, porque e desse valor que as
+      // parcelas seguintes acabaram de ser reprojetadas.
+      const ultPaga=PARCS.filter(x=>x.financiamento_id===f.id && x.pago)
+                         .sort((a,b)=>b.numero-a.numero)[0];
+      if(ultPaga) await fetch(SB+'/rest/v1/parcelas?id=eq.'+ultPaga.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({saldo_apos:v})});
       if(r.linhas.length) await anotarParcela(r.linhas[0].id,
         'Saldo ajustado pelo extrato em '+fmtDate(data)+' — calculado R$ '+fmt(sd)+' → extrato R$ '+fmt(v));
       toast('✓ Saldo ajustado','var(--green)','#0d0f14');
@@ -916,7 +939,7 @@ function abrirPag(id, retro){
   // parcela antiga: a data que importa e a do vencimento, nao hoje
   document.getElementById('pgData').value=_pgRetro? _pgParc.vencimento : TODAY;
   document.getElementById('pgValor').value=(+(_pgParc.valor_pago||_pgParc.valor_previsto)).toFixed(2);
-  calcPag();
+  proporPag();
   document.getElementById('pagModal').style.display='flex';
 }
 function fecharPag(){ document.getElementById('pagModal').style.display='none'; _pgParc=null; _pgRetro=false; }
@@ -942,25 +965,63 @@ function ratear(p, pago){
   return r;
 }
 
+// O saldo com que esta parcela comeca: o saldo_apos da anterior. Sem isso
+// nao da para calcular o indice implicito nem propor a amortizacao.
+function saldoAntesDe(p){
+  const ps=PARCS.filter(x=>x.financiamento_id===p.financiamento_id).sort((a,b)=>a.numero-b.numero);
+  const i=ps.findIndex(x=>String(x.id)===String(p.id));
+  if(i>0) return +ps[i-1].saldo_apos||0;
+  const f=FINS.find(x=>x.id===p.financiamento_id);
+  return +(f&&f.valor_financiado)||0;
+}
+
+// A quebra PROPOSTA — ponto de partida, nao veredito. Quem manda e o
+// extrato, porque a parcela depende da TR do mes, que ninguem preve: o
+// proprio banco projeta o futuro com TR zero. Por isso os quatro campos
+// sao editaveis e o saldo depois tambem.
+function proporPag(){
+  if(!_pgParc) return;
+  const pago=parseFloat(document.getElementById('pgValor').value)||0;
+  const r=ratear(_pgParc,pago);
+  document.getElementById('pgJuros').value=r.juros.toFixed(2);
+  document.getElementById('pgAmort').value=r.amortizacao.toFixed(2);
+  document.getElementById('pgSeg').value=r.seguro.toFixed(2);
+  document.getElementById('pgTaxa').value=r.taxa.toFixed(2);
+  document.getElementById('pgSaldo').value=Math.max(0, saldoAntesDe(_pgParc)-r.amortizacao).toFixed(2);
+  calcPag();
+}
+
+function lerQuebra(){
+  const v=id=>parseFloat(document.getElementById(id).value)||0;
+  return {juros:v('pgJuros'), amortizacao:v('pgAmort'), seguro:v('pgSeg'),
+          taxa:v('pgTaxa'), saldo:v('pgSaldo'), pago:v('pgValor')};
+}
+
 function calcPag(){
   if(!_pgParc) return;
-  const p=_pgParc;
-  const pago=parseFloat(document.getElementById('pgValor').value)||0;
-  const prev=+p.valor_previsto;
-  const dif=pago-prev;
+  const p=_pgParc, q=lerQuebra();
   const f=FINS.find(x=>x.id===p.financiamento_id);
   const conta=(CONTAS.find(c=>c.id===f.conta_id)||{}).nome||'—';
-  const r=ratear(p,pago);
+  const soma=+(q.juros+q.amortizacao+q.seguro+q.taxa).toFixed(2);
+  const dif=+(soma-q.pago).toFixed(2);
+  const ant=saldoAntesDe(p);
+  // indice implicito do mes: (saldo_depois + amortizacao) / saldo_antes.
+  // E a TR que o banco aplicou, derivada em vez de adivinhada — serve de
+  // conferencia: 1,0017 e normal; 1,05 quer dizer que algum numero esta
+  // trocado.
+  const idx = ant>0 ? (q.saldo+q.amortizacao)/ant : null;
   document.getElementById('pgResumo').innerHTML=
-     'Juros (despesa): <b>R$ '+fmt(r.juros)+'</b><br>'
-    +'Amortização (reduz a dívida): <b>R$ '+fmt(r.amortizacao)+'</b><br>'
-    +(r.seguro? 'Seguro: <b>R$ '+fmt(r.seguro)+'</b><br>':'')
-    +(r.taxa? 'Taxa admin.: <b>R$ '+fmt(r.taxa)+'</b><br>':'')
-    +'Debitado de: <b>'+conta+'</b>'
-    +(Math.abs(dif)>0.01? '<br><span style="color:var(--yellow)">Diferença de R$ '+fmt(Math.abs(dif))+' vs. o previsto de R$ '+fmt(prev)+' — '
-       +(r.modo==='juros'? 'lançada como ajuste de juros.' : 'rateada proporcionalmente entre os quatro componentes.')+'</span>':'')
-    +(_pgRetro? '<br><span style="color:var(--yellow)">Retroativo: cria os lançamentos no caixa sem alterar o saldo devedor de hoje.</span>':'')
-    +'<br><span class="sub">Saldo após: R$ '+fmt(p.saldo_apos)+'</span>';
+     (Math.abs(dif)<0.005
+       ? '<span style="color:var(--green)">As quatro partes somam o valor pago ✓</span>'
+       : '<span style="color:var(--yellow)">As quatro partes somam R$ '+fmt(soma)
+         +' — '+(dif>0?'R$ '+fmt(dif)+' a mais':'faltam R$ '+fmt(-dif))+' para o valor pago de R$ '+fmt(q.pago)+'</span>')
+    +'<br>Debitado de: <b>'+conta+'</b>'
+    +'<br><span class="sub">Saldo: R$ '+fmt(ant)+' → R$ '+fmt(q.saldo)+'</span>'
+    +(idx!==null? '<br><span class="sub">Índice do mês implícito: '+idx.toFixed(6).replace('.',',')
+       +(idx<0.98||idx>1.05? ' — <span style="color:var(--yellow)">fora do esperado, confira os valores</span>':'')+'</span>':'')
+    +(q.amortizacao<0? '<br><span style="color:var(--yellow)">Amortização negativa: os juros foram capitalizados e o saldo <b>sobe</b>. '
+       +'É o que acontece numa pausa — foi o caso das parcelas de abr e mai/2026.</span>':'')
+    +(_pgRetro? '<br><span style="color:var(--yellow)">Retroativo: cria os lançamentos no caixa sem reprojetar as parcelas seguintes.</span>':'');
 }
 async function salvarPag(){
   if(!_pgParc) return;
@@ -968,14 +1029,32 @@ async function salvarPag(){
   const data=document.getElementById('pgData').value;
   const pago=parseFloat(document.getElementById('pgValor').value)||0;
   if(!data||!pago){ toast('⚠ Informe data e valor','#fbbf24','#0d0f14'); return; }
-  const rt=ratear(p,pago);
+  // os valores CONFIRMADOS na tela, nao os propostos: com TR, a quebra do
+  // banco nao e reproduzivel por formula, entao quem decide e o extrato
+  const rt=lerQuebra();
   const juros=rt.juros;
+  const soma=+(rt.juros+rt.amortizacao+rt.seguro+rt.taxa).toFixed(2);
+  if(Math.abs(soma-pago)>=0.005 &&
+     !confirm('As quatro partes somam R$ '+fmt(soma)+', e o valor pago é R$ '+fmt(pago)+
+              '.\n\nDiferença de R$ '+fmt(Math.abs(soma-pago))+
+              '. Os lançamentos no caixa vão somar '+fmt(soma)+' e não vão fechar com o extrato.\n\nRegistrar assim mesmo?')) return;
   try{
     await sbCall('parcelas?id=eq.'+p.id,{method:'PATCH',headers:SBH,
-      body:JSON.stringify({pago:true,data_pagamento:data,valor_pago:pago})});
+      body:JSON.stringify({pago:true,data_pagamento:data,valor_pago:pago,
+        juros:rt.juros,amortizacao:rt.amortizacao,seguro:rt.seguro,taxa_adm:rt.taxa,
+        saldo_apos:rt.saldo})});
     // retroativo: o saldo de hoje ja reflete essa parcela — nao rebobinar
-    if(!_pgRetro) await sbCall('financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,
-      body:JSON.stringify({saldo_devedor:+p.saldo_apos})});
+    if(!_pgRetro){
+      await sbCall('financiamentos?id=eq.'+f.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({saldo_devedor:rt.saldo})});
+      // As parcelas seguintes saem do saldo REAL, nao do projetado. Sem
+      // isso o erro da TR deste mes ficava no saldo para sempre e so
+      // aparecia na conciliacao do mes seguinte.
+      const r=reprojetar(f, rt.saldo, null);
+      for(const L of r.linhas) await sbCall('parcelas?id=eq.'+L.id,{method:'PATCH',headers:SBH,
+        body:JSON.stringify({juros:L.juros,amortizacao:L.amortizacao,seguro:L.seguro,
+          valor_previsto:L.valor_previsto,saldo_apos:L.saldo_apos})});
+    }
     if(f.conta_id){
       const gid=Date.now();
       const linhas=[];
