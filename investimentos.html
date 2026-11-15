@@ -279,6 +279,18 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 </div>
 
 
+<div id="movsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="card-title" style="margin-bottom:0">☰ Movimentos do ativo</div>
+      <button onclick="fecharMovs()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="mvNome" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+    <div id="mvLista"></div>
+    <div id="mvConfirma" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:14px"></div>
+  </div>
+</div>
+
 <div id="cupomModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:460px;width:100%;max-height:90vh;overflow:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -399,7 +411,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.17-c';
+const APP_VERSION='v2026.11.15-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -642,7 +654,7 @@ async function carregar(){
     CARTEIRAS = await sbGet('carteiras','order=ordem.asc');
     ATIVOS    = await sbGet('ativos','ativo=is.true&order=valor_atual.desc');
     HIST      = await sbGet('posicoes_hist','select=ativo_id,data,valor&order=data.asc&limit=5000');
-    MOVS      = await sbGet('movimentos','select=ativo_id,data,tipo,valor&order=data.asc&limit=2000');
+    MOVS      = await sbGet('movimentos','select=id,ativo_id,data,tipo,valor,ganho,custo_baixado,conta_id,memo&order=data.asc&limit=2000');
     render();
   }catch(e){
     document.getElementById('carteiras').innerHTML='<div class="card" style="color:var(--red)">Erro ao carregar: '+e.message+'</div>';
@@ -689,7 +701,8 @@ function render(){
             +'<div class="at-nome"><div>'+a.nome
             +' <span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">↩</span>'
             +(a.paga_cupom?' <span onclick="abrirCupom('+a.id+')" title="Registrar cupom/juros recebidos" style="cursor:pointer;color:var(--green);font-size:11px;padding:0 3px">💰</span>':'')
-            +' <span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span></div>'
+            +' <span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span>'
+            +' <span onclick="abrirMovs('+a.id+')" title="Histórico de movimentos" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">☰</span></div>'
             +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
             +(a.paga_cupom?' · <span style="color:var(--green)">cupom '+(a.periodicidade||'')+'</span>':'')
             +(a.data_compra?' · desde '+fmtDate(a.data_compra):'')
@@ -837,6 +850,129 @@ function onAjCupom(){
 
 // ---------- Cupom / juros ----------
 let _cpAtivo=null;
+// ---------- Historico de movimentos, e como desfazer um ----------
+// Ate 15/nov/26 nao havia como VER nem apagar um movimento: registrar um
+// cupom ou um resgate era irreversivel pela interface, e so dava para
+// desfazer por SQL. Foi o que aconteceu com o cupom da NTN-B AGO/2030
+// lancado duas vezes.
+//
+// Duas assimetrias que esta tela precisa deixar claras:
+//  - APLICACAO nao grava em 'movimentos' (so mexe em ativos/posicoes_hist
+//    e lanca o caixa). Entao aporte nao aparece aqui e nao da para desfazer
+//    por aqui.
+//  - a posicao NAO e revertida. Reverter custo_total, quantidade e os
+//    campos de resgate sem errar exigiria um historico que nao existe;
+//    melhor avisar e deixar o ✎ Ajuste corrigir do que quebrar calado.
+let _mvAtivo=null, _mvAlvo=null, _mvCaixa=[];
+const escMv = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const rotuloMov = t => ({cupom:'Cupom / juros', resgate_total:'Resgate total',
+                         resgate_parcial:'Resgate parcial'})[t] || t;
+
+function abrirMovs(id){
+  const a=ATIVOS.find(x=>x.id===id); if(!a) return;
+  _mvAtivo=a; _mvAlvo=null; _mvCaixa=[];
+  document.getElementById('mvNome').textContent=a.nome;
+  document.getElementById('mvConfirma').style.display='none';
+  pintaMovs();
+  document.getElementById('movsModal').style.display='flex';
+}
+function fecharMovs(){
+  document.getElementById('movsModal').style.display='none';
+  _mvAtivo=null; _mvAlvo=null; _mvCaixa=[];
+}
+
+function pintaMovs(){
+  if(!_mvAtivo) return;
+  const ms=MOVS.filter(m=>m.ativo_id===_mvAtivo.id).slice().reverse();
+  document.getElementById('mvLista').innerHTML = (ms.length
+    ? ms.map(m=>
+        '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div><b>'+rotuloMov(m.tipo)+'</b> <span class="at-sub">· '+fmtDate(m.data)+'</span></div>'
+          +(m.memo?'<div class="at-sub" style="word-break:break-word">'+escMv(m.memo)+'</div>':'')
+        +'</div>'
+        +'<div style="text-align:right;white-space:nowrap">R$ '+fmt(m.valor)
+          +(m.ganho!=null?'<div class="at-sub">ganho R$ '+fmt(m.ganho)+'</div>':'')+'</div>'
+        +'<button onclick="pedeExcluirMov('+m.id+')" title="Excluir este movimento" '
+          +'style="background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;padding:0 2px">×</button>'
+        +'</div>').join('')
+    : '<div class="at-sub">Nenhum cupom ou resgate registrado para este ativo.</div>')
+    + '<div class="at-sub" style="margin-top:12px">As <b>aplicações</b> não aparecem aqui: elas '
+    + 'não geram registro em movimentos — alteram a posição e lançam o caixa.</div>';
+}
+
+async function pedeExcluirMov(id){
+  const m=MOVS.find(x=>x.id===id); if(!m) return;
+  _mvAlvo=m; _mvCaixa=[];
+  const cx=document.getElementById('mvConfirma');
+  cx.style.display=''; cx.innerHTML='<div class="at-sub">Procurando o que este registro criou…</div>';
+
+  // O vinculo e a marca 'cx:<gid>' no memo, gravada desde 15/nov/26.
+  // Registro anterior a isso nao tem a marca: ai a busca e por data e
+  // conta, filtrando pelos textos que o proprio modulo escreve — e
+  // PALPITE, por isso quem confirma a lista e voce.
+  const marca=(m.memo||'').match(/cx:(\d+)/);
+  let achados=[], exato=!!marca, erro=null;
+  try{
+    if(marca){
+      achados=await sbGet('transactions','select=id,date,payee,amount,type,account&group_id=eq.'+marca[1]);
+    }else if(m.conta_id){
+      achados=await sbGet('transactions',
+        'select=id,date,payee,amount,type,account&date=eq.'+m.data+'&account=eq.'+encodeURIComponent(m.conta_id));
+      achados=achados.filter(t=>/^(Juros|Resgate|Aplicação) — |^IR(\/IOF)? sobre /.test(t.payee||''));
+    }
+  }catch(e){ erro=e.message; }
+
+  let posAviso='';
+  try{
+    const ph=await sbGet('posicoes_hist','select=id,data,valor&ativo_id=eq.'+m.ativo_id+'&data=eq.'+m.data);
+    if(ph && ph.length) posAviso=
+      '<div style="color:var(--yellow);margin-top:10px">Este registro também alterou a <b>posição</b> em '
+      +fmtDate(m.data)+'. Isso <b>não</b> é revertido aqui — depois de excluir, confira a posição do ativo '
+      +'e corrija pelo ✎ se precisar.</div>';
+  }catch(e){}
+
+  _mvCaixa=achados;
+  cx.innerHTML =
+    '<div style="margin-bottom:8px">Excluir <b>'+rotuloMov(m.tipo)+'</b> de '+fmtDate(m.data)
+      +' — R$ '+fmt(m.valor)+'?</div>'
+    +(erro?'<div style="color:var(--red)">Não consegui procurar os lançamentos de caixa: '+escMv(erro)+'</div>':'')
+    +(achados.length
+      ? '<div class="at-sub" style="margin:8px 0 4px">Lançamentos de caixa '
+         +(exato?'ligados a este registro':'que <b>parecem</b> ser deste registro — confira antes de marcar')+':</div>'
+        +achados.map(t=>'<label style="display:flex;gap:8px;align-items:center;padding:4px 0;cursor:pointer">'
+          +'<input type="checkbox" class="mvCx" value="'+t.id+'"'+(exato?' checked':'')+'>'
+          +'<span style="flex:1">'+escMv(t.payee||'—')+' <span class="at-sub">· '+fmtDate(t.date)+'</span></span>'
+          +'<span style="color:'+(t.type==='income'?'var(--green)':'var(--red)')+'">'
+          +(t.type==='income'?'+':'−')+' R$ '+fmt(t.amount)+'</span></label>').join('')
+      : '<div class="at-sub" style="margin:8px 0">Nenhum lançamento de caixa encontrado'
+        +(m.conta_id?'':' (este registro não tinha conta)')+'.</div>')
+    +posAviso
+    +'<div style="display:flex;gap:8px;margin-top:14px">'
+      +'<button onclick="excluirMovConfirma()" style="flex:1;background:var(--red);color:#fff;border:none;border-radius:9px;padding:10px;cursor:pointer;font-size:13px">Excluir</button>'
+      +'<button onclick="document.getElementById(\'mvConfirma\').style.display=\'none\'" style="flex:1;background:none;color:var(--muted);border:1px solid var(--border);border-radius:9px;padding:10px;cursor:pointer;font-size:13px">Cancelar</button>'
+    +'</div>';
+}
+
+async function excluirMovConfirma(){
+  const m=_mvAlvo; if(!m) return;
+  const ids=Array.prototype.slice.call(document.querySelectorAll('.mvCx'))
+    .filter(e=>e.checked).map(e=>e.value);
+  try{
+    // o caixa sai primeiro e o MOVIMENTO por ultimo: se algo falhar no
+    // meio, o movimento continua na lista apontando que ficou pela metade
+    for(const id of ids){
+      const r=await fetch(SB+'/rest/v1/transactions?id=eq.'+id,{method:'DELETE',headers:SBH});
+      if(!r.ok) throw new Error('lançamento de caixa '+id+' (HTTP '+r.status+')');
+    }
+    const r=await fetch(SB+'/rest/v1/movimentos?id=eq.'+m.id,{method:'DELETE',headers:SBH});
+    if(!r.ok) throw new Error('movimento (HTTP '+r.status+')');
+    toast('✓ Movimento excluído'+(ids.length?' e '+ids.length+' lançamento'+(ids.length>1?'s':'')+' de caixa':''),
+          'var(--green)','#0d0f14');
+    fecharMovs(); await carregar();
+  }catch(e){ toast('✕ Não consegui excluir: '+e.message,'var(--red)','white'); }
+}
+
 function abrirCupom(id){
   _cpAtivo=ATIVOS.find(a=>String(a.id)===String(id)); if(!_cpAtivo) return;
   document.getElementById('cpNome').textContent=_cpAtivo.nome+' · posição atual R$ '+fmt(_cpAtivo.valor_atual);
@@ -877,11 +1013,15 @@ async function salvarCupom(){
         body:JSON.stringify({valor_atual:novo,preco_unit:a.quantidade?+(novo/a.quantidade).toFixed(6):a.preco_unit,data_preco:data})});
       await fetch(SB+'/rest/v1/posicoes_hist',{method:'POST',headers:SBH,body:JSON.stringify({ativo_id:a.id,data:data,valor:novo})});
     }
+    // O gid nasce ANTES do movimento para ir junto no memo, como 'cx:<gid>'.
+    // E o vinculo entre o movimento e os lancamentos de caixa que ele cria:
+    // sem isso, desfazer um registro exige adivinhar quais lancamentos sao
+    // dele por data, valor e descricao. Nao precisa de coluna nova.
+    const gid=Date.now();
     await fetch(SB+'/rest/v1/movimentos',{method:'POST',headers:SBH,body:JSON.stringify({
       ativo_id:a.id,data:data,tipo:'cupom',valor:bruto,ganho:bruto,conta_id:conta||null,
-      memo:'Cupom de '+a.nome+(ir?' · IR R$ '+ir.toFixed(2):'')})});
+      memo:'Cupom de '+a.nome+(ir?' · IR R$ '+ir.toFixed(2):'')+(conta?' · cx:'+gid:'')})});
     if(conta){
-      const gid=Date.now();
       await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
         id:gid,type:'income',amount:+(bruto-ir).toFixed(2),date:data,
         payee:'Juros — '+a.nome,payee_display:'Juros — '+a.nome,
@@ -1007,13 +1147,13 @@ async function salvarResgate(){
       await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
         body:JSON.stringify({valor_atual:+(posic-bruto).toFixed(2),custo_total:+(custo-custoBaixado).toFixed(2),quantidade:novaQtd,data_preco:data})});
     }
+    const gid=Date.now();            // ver a nota do cupom: 'cx:<gid>' e o vinculo
     await fetch(SB+'/rest/v1/movimentos',{method:'POST',headers:SBH,body:JSON.stringify({
       ativo_id:a.id,data:data,tipo:total?'resgate_total':'resgate_parcial',
       valor:bruto,custo_baixado:custoBaixado,ganho:ganho,conta_id:conta||null,
-      memo:'Resgate '+a.nome+(ir?' · IR/IOF R$ '+ir.toFixed(2):'')})});
+      memo:'Resgate '+a.nome+(ir?' · IR/IOF R$ '+ir.toFixed(2):'')+(conta?' · cx:'+gid:'')})});
 
     if(conta){
-      const gid=Date.now();
       await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
         id:gid,type:'income',amount:liquido,date:data,
         payee:'Resgate — '+a.nome,payee_display:'Resgate — '+a.nome,
