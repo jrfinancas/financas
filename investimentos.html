@@ -411,7 +411,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.11.15-a';
+const APP_VERSION='v2026.11.15-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -993,7 +993,9 @@ function calcCupom(){
   const novo=parseFloat(document.getElementById('cpNovoValor').value);
   const posic=+_cpAtivo.valor_atual||0;
   document.getElementById('cpResumo').innerHTML=
-     'Entra no caixa: <b>R$ '+fmt(bruto-ir)+'</b>'+(ir?' <span class="at-sub">(bruto R$ '+fmt(bruto)+' − IR R$ '+fmt(ir)+')</span>':'')+'<br>'
+     (ir? 'Entra no caixa: <b>R$ '+fmt(bruto)+'</b> e sai o IR de <b>R$ '+fmt(ir)+'</b>'
+           +' <span class="at-sub">— duas linhas, líquido R$ '+fmt(bruto-ir)+', como o banco faz</span>'
+        : 'Entra no caixa: <b>R$ '+fmt(bruto)+'</b>')+'<br>'
     +'O cupom é <b>rendimento</b>: não reduz o custo de aquisição.<br>'
     +(isNaN(novo)? '<span style="color:var(--yellow)">Posição mantida em R$ '+fmt(posic)+' — informe o valor do extrato para corrigir.</span>'
                  : 'Nova posição: <b>R$ '+fmt(novo)+'</b> <span class="at-sub">(era R$ '+fmt(posic)+')</span>');
@@ -1023,7 +1025,15 @@ async function salvarCupom(){
       memo:'Cupom de '+a.nome+(ir?' · IR R$ '+ir.toFixed(2):'')+(conta?' · cx:'+gid:'')})});
     if(conta){
       await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
-        id:gid,type:'income',amount:+(bruto-ir).toFixed(2),date:data,
+        // O BRUTO, nao o liquido. Quando ha IR, ele ja e lancado como
+        // despesa logo abaixo — gravar aqui o liquido descontava o imposto
+        // DUAS vezes e o caixa ficava menor que o real pelo valor do IR.
+        // No cupom da NTN-B AGO/2030 de 17/08/26: banco credita 140,20 e
+        // debita 12,21 (liquido 127,99); o app gravava 127,99 e tirava
+        // 12,21 de novo, chegando a 115,78 — R$ 24,42 a menos, que e
+        // exatamente 2 x o IR. Bruto + IR separado tambem e o que casa
+        // com o extrato, que traz as duas linhas.
+        id:gid,type:'income',amount:+bruto.toFixed(2),date:data,
         payee:'Juros — '+a.nome,payee_display:'Juros — '+a.nome,
         account:conta,category:'outras-entradas',subcategory:'outros_cr_ditos',
         memo:'Cupom semestral'+(ir?' · IR retido R$ '+ir.toFixed(2):''),
@@ -1121,7 +1131,9 @@ function calcResg(){
   document.getElementById('rgResumo').innerHTML=
      'Custo baixado: <b>R$ '+fmt(custoBaixado)+'</b><br>'
     +'Ganho na operação: <b style="color:'+(ganho>=0?'var(--green)':'var(--red)')+'">'+(ganho>=0?'+':'−')+' R$ '+fmt(Math.abs(ganho))+'</b>'+(ir?' · IR/IOF R$ '+fmt(ir):'')+'<br>'
-    +'Entra no caixa: <b>R$ '+fmt(liquido)+'</b>'
+    +(ir? 'Entra no caixa: <b>R$ '+fmt(bruto)+'</b> e sai o IR/IOF de <b>R$ '+fmt(ir)+'</b>'
+          +' <span class="at-sub">— duas linhas, líquido R$ '+fmt(liquido)+'</span>'
+       : 'Entra no caixa: <b>R$ '+fmt(bruto)+'</b>')
     +(total?'<br><span style="color:var(--yellow)">O ativo será marcado como resgatado.</span>':'<br>Resta na carteira: R$ '+fmt(Math.max(0,posic-bruto)));
 }
 async function salvarResgate(){
@@ -1155,7 +1167,10 @@ async function salvarResgate(){
 
     if(conta){
       await fetch(SB+'/rest/v1/transactions',{method:'POST',headers:SBH,body:JSON.stringify({
-        id:gid,type:'income',amount:liquido,date:data,
+        // o BRUTO, pelo mesmo motivo do cupom (ver a nota la): o IR vai
+        // como despesa separada logo abaixo. O extrato da XP tambem traz
+        // as duas linhas — "RESGATE <fundo>" e "IRRF S/RESGATE FUNDOS".
+        id:gid,type:'income',amount:+bruto.toFixed(2),date:data,
         payee:'Resgate — '+a.nome,payee_display:'Resgate — '+a.nome,
         account:conta,category:'transferencia',subcategory:null,
         memo:'Resgate de '+a.nome+(ganho?' · ganho R$ '+ganho.toFixed(2):'')+(ir?' · IR/IOF R$ '+ir.toFixed(2):''),
