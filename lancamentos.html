@@ -1321,7 +1321,7 @@ document.addEventListener('focusout',function(e){
 // ============================================================
 const SB  = 'https://tggtktjblunlbsjbhlls.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZ3RrdGpibHVubGJzamJobGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODM0MTksImV4cCI6MjA5MTg1OTQxOX0.POdSpd63K5WfCoLWn0LwqSm5SFRTOSEukLGRExCrP_o';
-const APP_VERSION = 'v2026.11.14-b';  // atualizar a cada publicação
+const APP_VERSION = 'v2026.11.14-c';  // atualizar a cada publicação
 document.addEventListener('DOMContentLoaded',()=>{const e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 const PROXY = SB + '/functions/v1/analyze-receipt';
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
@@ -2988,16 +2988,24 @@ function montaSelectsConta(){
     : '';
   const cartoes = cs.filter(c => viva(c) && c.tipo === 'cartao');
   const demais  = cs.filter(c => viva(c) && c.tipo !== 'cartao');
-  // nAcctDest (Conta Destino da transferencia) ficou de fora na primeira
-  // vez e repetiu o mesmo erro que esta anotado acima: continuava com a
-  // lista chumbada no HTML, sem as contas criadas depois — a XP 2, criada
-  // em 14/nov/26, nao aparecia como destino — e ainda oferecendo o
-  // Daycoval, ja encerrado, que o filtro viva() exclui.
-  ['nAcct','eAcct','sAcct','recAcct','pAcct','nAcctDest'].forEach(function(id){
+  // Esta lista ja foi esquecida DUAS vezes, sempre do mesmo jeito: o select
+  // novo fica com a lista chumbada no HTML e so se descobre quando uma conta
+  // criada depois nao aparece nele. Foi o nAcctDest (Conta Destino) em
+  // 14/nov/26, sem a XP 2 e ainda oferecendo o Daycoval encerrado, e logo
+  // depois o histAcct, pelo mesmo motivo. Select de conta que nascer daqui
+  // em diante entra AQUI, nao no HTML.
+  //
+  // O filtro do historico e a excecao da regra de esconder conta encerrada:
+  // para OLHAR o passado e justamente a conta encerrada que interessa — sem
+  // isso nao da para filtrar os lancamentos do Daycoval. Nos selects de
+  // lancamento continua escondida, que ali o risco e lancar em conta morta.
+  const encerradas = cs.filter(c => !viva(c));
+  ['nAcct','eAcct','sAcct','recAcct','pAcct','nAcctDest','histAcct'].forEach(function(id){
     const el = document.getElementById(id); if (!el) return;
     const atual = el.value;
     const vazia = el.querySelector('option[value=""]');
-    el.innerHTML = (vazia ? vazia.outerHTML : '') + grupo('Contas', demais) + grupo('Cartões', cartoes);
+    el.innerHTML = (vazia ? vazia.outerHTML : '') + grupo('Contas', demais) + grupo('Cartões', cartoes) +
+      (id === 'histAcct' ? grupo('Encerradas', encerradas) : '');
     // conta encerrada nao entra na lista, mas se o lancamento aberto for
     // de uma delas, devolve a opcao para nao trocar a conta sem querer
     if (atual) {
