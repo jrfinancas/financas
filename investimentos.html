@@ -92,7 +92,15 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
 .at-hd{display:grid;grid-template-columns:1fr 104px 78px 78px 78px 78px 76px;gap:5px;padding:4px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border)}
 .at-hd div:not(:first-child){text-align:right}
 .at-row:last-child{border-bottom:none}
-.at-nome{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.at-nome{min-width:0}
+/* Os icones ficavam DENTRO do bloco que trunca com reticencias, na mesma
+   linha de texto do nome: ativo de nome comprido empurrava ✎ e ☰ para
+   fora e o overflow os cortava — o CRA da Minerva em 20/nov/26. Agora o
+   nome encolhe e os botoes tem largura propria, que nao cede. */
+.at-top{display:flex;align-items:center;gap:2px;min-width:0}
+.at-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.at-acoes{flex:none;white-space:nowrap;margin-left:4px}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .at-sub{font-size:10px;color:var(--muted)}
 .at-num{text-align:right;font-variant-numeric:tabular-nums}
 .tag{font-size:9px;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--muted);margin-left:5px}
@@ -334,6 +342,21 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
         <input type="date" class="fi2" id="ajCompra">
         <div class="at-sub" style="margin-top:4px">períodos anteriores a esta data aparecem como “—”, em vez de rendimento inventado</div></div>
     </div>
+    <!-- Indexador e taxa eram gravados no formulario de aplicacao e nunca
+         mais apareciam: nao havia como CONFERIR o que tinha sido cadastrado,
+         muito menos corrigir — so pelo Supabase. Entraram aqui, no mesmo
+         lugar onde o valor de mercado ja e ajustado. -->
+    <div class="fl2" style="margin:14px 0 6px">Como rende</div>
+    <div class="fr2">
+      <div><label class="fl2">Indexador</label><select class="fi2" id="ajIdx" onchange="descRemun()">
+        <option value="">—</option><option value="cdi">CDI</option><option value="selic">Selic</option>
+        <option value="ipca">IPCA+</option><option value="pre">Prefixado</option>
+      </select></div>
+      <div><label class="fl2">% do índice</label><input type="number" step="0.01" class="fi2" id="ajPct" placeholder="84" oninput="descRemun()"></div>
+    </div>
+    <div><label class="fl2">% a.a. fixo <span style="opacity:.6">(prefixado, ou o spread do IPCA+)</span></label>
+      <input type="number" step="0.01" class="fi2" id="ajTaxa" placeholder="7,30" oninput="descRemun()"></div>
+    <div id="ajRemun" class="at-sub" style="margin:6px 0 12px"></div>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:10px">
       <input type="checkbox" id="ajManual" style="width:16px;height:16px;accent-color:var(--accent)">
       <span>Não estimar automaticamente este ativo (uso o extrato)</span>
@@ -411,7 +434,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.11.15-b';
+const APP_VERSION='v2026.11.20-b';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -698,12 +721,16 @@ function render(){
       + its.map(a=>{
           const auto=AUTO_TIPOS[a.tipo];
           return '<div class="at-row">'
-            +'<div class="at-nome"><div>'+a.nome
-            +' <span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">↩</span>'
-            +(a.paga_cupom?' <span onclick="abrirCupom('+a.id+')" title="Registrar cupom/juros recebidos" style="cursor:pointer;color:var(--green);font-size:11px;padding:0 3px">💰</span>':'')
-            +' <span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span>'
-            +' <span onclick="abrirMovs('+a.id+')" title="Histórico de movimentos" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">☰</span></div>'
-            +'<div class="at-sub">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
+            +'<div class="at-nome"><div class="at-top">'
+            +'<span class="at-txt" title="'+esc3(a.nome)+'">'+a.nome+'</span>'
+            +'<span class="at-acoes">'
+            +'<span onclick="abrirResgate('+a.id+')" title="Registrar resgate" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">↩</span>'
+            +(a.paga_cupom?'<span onclick="abrirCupom('+a.id+')" title="Registrar cupom/juros recebidos" style="cursor:pointer;color:var(--green);font-size:11px;padding:0 3px">💰</span>':'')
+            +'<span onclick="abrirAjuste('+a.id+')" title="Informar valor de mercado" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">✎</span>'
+            +'<span onclick="abrirMovs('+a.id+')" title="Histórico de movimentos" style="cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px">☰</span>'
+            +'</span></div>'
+            +'<div class="at-sub trunc">'+tipoLabel(a.tipo)+(a.ticker?' · '+a.ticker:'')
+            +(remunDe(a)?' · '+remunDe(a):'')+(a.vencimento?' · vence '+fmtDate(a.vencimento):'')
             +(a.paga_cupom?' · <span style="color:var(--green)">cupom '+(a.periodicidade||'')+'</span>':'')
             +(a.data_compra?' · desde '+fmtDate(a.data_compra):'')
             +'<span class="tag '+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'man')+'">'+(auto&&!a.paga_cupom&&!a.preco_manual?'auto':'manual')+'</span></div></div>'
@@ -864,6 +891,8 @@ let _cpAtivo=null;
 //    campos de resgate sem errar exigiria um historico que nao existe;
 //    melhor avisar e deixar o ✎ Ajuste corrigir do que quebrar calado.
 let _mvAtivo=null, _mvAlvo=null, _mvCaixa=[];
+const esc3 = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const escMv = v => String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const rotuloMov = t => ({cupom:'Cupom / juros', resgate_total:'Resgate total',
                          resgate_parcial:'Resgate parcial'})[t] || t;
@@ -1053,11 +1082,45 @@ async function salvarCupom(){
 
 // ---------- Ajuste manual de valor ----------
 let _ajAtivo=null;
+// A mesma regra do rendeRF(), curtinha, para a linha do ativo.
+function remunDe(a){
+  if(a.pct_indexador) return a.pct_indexador+'% do '+(a.indexador==='selic'?'Selic':'CDI');
+  if(a.indexador==='ipca') return 'IPCA'+(a.taxa?'+'+a.taxa+'%':'');
+  if(a.taxa) return a.taxa+'% a.a.';
+  if(a.indexador==='selic') return 'Selic';
+  if(a.indexador==='cdi') return 'CDI';
+  return '';
+}
+
+// Diz em palavras qual regra vai valer. A ordem e a MESMA do rendeRF(), que
+// e quem decide de verdade: "% do indice" preenchido ganha de tudo, depois
+// IPCA+spread, depois taxa fixa, depois o indexador puro. Sem isso nao da
+// para saber qual dos tres campos esta mandando.
+function descRemun(){
+  const el=document.getElementById('ajRemun'); if(!el) return;
+  const idx=document.getElementById('ajIdx').value;
+  const pct=parseFloat(document.getElementById('ajPct').value);
+  const tx=parseFloat(document.getElementById('ajTaxa').value);
+  let txt;
+  if(pct)                txt='<b>'+pct+'% do '+(idx==='selic'?'Selic':'CDI')+'</b>'
+                             +(idx==='ipca'||idx==='pre'?' <span style="color:var(--yellow)">— o “% do índice” tem precedência e ignora o indexador escolhido</span>':'');
+  else if(idx==='ipca')  txt='<b>IPCA'+(tx?' + '+tx+'%':'')+'</b>'+(tx?'':' <span style="color:var(--yellow)">— sem spread: só a variação do IPCA</span>');
+  else if(tx)            txt='<b>'+tx+'% a.a. prefixado</b>';
+  else if(idx==='selic') txt='<b>Selic cheia</b>';
+  else if(idx==='cdi')   txt='<b>CDI cheio</b>';
+  else                   txt='<b>CDI cheio</b> <span style="color:var(--yellow)">— nada preenchido, o app assume CDI como estimativa</span>';
+  el.innerHTML='Vai render como: '+txt;
+}
+
 function abrirAjuste(id){
   _ajAtivo=ATIVOS.find(a=>String(a.id)===String(id)); if(!_ajAtivo) return;
   document.getElementById('ajNome').textContent=_ajAtivo.nome+' · hoje R$ '+fmt(_ajAtivo.valor_atual);
   document.getElementById('ajData').value=TODAY;
   document.getElementById('ajValor').value=(+_ajAtivo.valor_atual).toFixed(2);
+  document.getElementById('ajIdx').value=_ajAtivo.indexador||'';
+  document.getElementById('ajPct').value=_ajAtivo.pct_indexador!=null?_ajAtivo.pct_indexador:'';
+  document.getElementById('ajTaxa').value=_ajAtivo.taxa!=null?_ajAtivo.taxa:'';
+  descRemun();
   document.getElementById('ajManual').checked=!!_ajAtivo.preco_manual;
   document.getElementById('ajCompra').value=_ajAtivo.data_compra||'';
   const per=(_ajAtivo.periodicidade||'');
@@ -1080,6 +1143,9 @@ async function salvarAjuste(){
   try{
     await fetch(SB+'/rest/v1/ativos?id=eq.'+a.id,{method:'PATCH',headers:SBH,
       body:JSON.stringify({valor_atual:v,preco_unit:a.quantidade?+(v/a.quantidade).toFixed(6):a.preco_unit,data_preco:data,preco_manual:manual,data_compra:compra,
+        indexador:document.getElementById('ajIdx').value||null,
+        pct_indexador:parseFloat(document.getElementById('ajPct').value)||null,
+        taxa:parseFloat(document.getElementById('ajTaxa').value)||null,
         paga_cupom:document.getElementById('ajCupom').checked,
         periodicidade:document.getElementById('ajCupom').checked?
           (document.getElementById('ajPeriod').value + (document.getElementById('ajMeses').value.trim()? ' ('+document.getElementById('ajMeses').value.trim()+')':'')) : null})});
