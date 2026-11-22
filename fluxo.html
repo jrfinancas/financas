@@ -123,7 +123,8 @@ nav a.active,nav a:hover{background:var(--surface2);color:var(--accent)}
       <span style="font-size:13px;color:var(--muted)">Saldo Total</span>
       <span style="font-family:'DM Serif Display',serif;font-size:24px" id="saldoTotal">R$ 0,00</span>
     </div>
-    <div style="font-size:11px;color:var(--muted)">* Baseado no saldo inicial cadastrado + transações registradas. Não inclui investimentos.</div>
+    <div id="saldoInvBox" style="display:none"></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">* Saldo inicial cadastrado + transações registradas.</div>
   </div>
 
   <!-- PROJEÇÃO -->
@@ -159,7 +160,7 @@ const SBH={'apikey':KEY,
   get 'Authorization'(){ return 'Bearer '+((window.JRAuth&&JRAuth.token())||KEY); },
   'Content-Type':'application/json',};
 try{ localStorage.removeItem('jr_auth_v3'); localStorage.removeItem('jr_pin_hash'); }catch(e){}
-const APP_VERSION='v2026.10.17-d';
+const APP_VERSION='v2026.11.22-a';
 document.addEventListener('DOMContentLoaded',function(){var e=document.getElementById('appVer');if(e)e.textContent=APP_VERSION;});
 
 // ---------- Biometria (Face ID / Touch ID) via WebAuthn ----------
@@ -332,8 +333,49 @@ function addYears(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setFullYear
 let dias=30, chartFluxo=null;
 const TODAY=new Date().toISOString().slice(0,10);
 
-// Contas que compõem saldo operacional (não investimentos)
-const CONTAS_SALDO=['santander-cc','carteira','wise'];
+// De onde veio cada evento. Recorrente e estimativa cadastrada a mao;
+// financiamento e parcela contratada; fatura e a soma do que ja foi gasto
+// no cartao. Misturar os tres sem dizer qual e qual faz a projecao parecer
+// mais (ou menos) firme do que e.
+const SELO={
+  financiamento:'<span style="background:rgba(248,113,113,.14);color:var(--red);border-radius:5px;padding:1px 5px;margin-right:5px;font-size:9px">PARCELA</span>',
+  fatura:'<span style="background:rgba(251,191,36,.14);color:var(--yellow);border-radius:5px;padding:1px 5px;margin-right:5px;font-size:9px">FATURA</span>'
+};
+
+// CONTAS_SALDO, uma lista de tres contas chumbada aqui, foi removida em
+// 22/nov/26: estava declarada e NUNCA era usada. Quem decide e o tipo da
+// conta, vindo da tabela.
+
+// Conta encerrada nao entra no saldo nem na projecao. O resto do app ja
+// usa data_encerramento (viva(), em lancamentos.html); o fluxo olhava so
+// 'ativo' e continuaria somando uma conta fechada.
+function contaViva(c){
+  return c.ativo!==false && !(c.data_encerramento && c.data_encerramento <= TODAY);
+}
+
+// dia do mes com limite: dia 31 em fevereiro vira o ultimo dia do mes, em
+// vez de virar marco. Mesmo cuidado do dataParcela() do lancamentos.html.
+// Dado o cartao e o mes do VENCIMENTO, devolve o ciclo que vence ali:
+// quando abriu, quando fechou e o mes de referencia. A regra do fechamento
+// e a que o faturas.html ja usa — o ciclo vai do dia seguinte ao fechamento
+// anterior ate o fechamento. Se o vencimento cai DEPOIS do fechamento, os
+// dois sao do mesmo mes; se cai antes (fecha dia 28, vence dia 5), o ciclo
+// fechou no mes anterior.
+function cicloFatura(c, ano, mes){
+  const dv=+c.dia_vencimento, df=+c.dia_fechamento;
+  const venc=dataDe(ano,mes,dv);
+  const dF=new Date(ano, mes-1+(dv>df?0:-1), 1);
+  const fAno=dF.getFullYear(), fMes=dF.getMonth()+1;
+  const fecha=dataDe(fAno,fMes,df);
+  const dA=new Date(fAno, fMes-2, 1);
+  const abre=addDays(dataDe(dA.getFullYear(),dA.getMonth()+1,df),1);
+  return {venc, fecha, abre, ym:fecha.slice(0,7)};
+}
+
+function dataDe(ano, mes, dia){
+  const ult=new Date(ano, mes, 0).getDate();
+  return ano+'-'+String(mes).padStart(2,'0')+'-'+String(Math.min(dia,ult)).padStart(2,'0');
+}
 
 async function startApp(){
   await loadSaldos();
@@ -370,23 +412,41 @@ async function loadSaldos(){
       if(!saldoMap[t.account])saldoMap[t.account]=0;
       saldoMap[t.account]+=(t.type==='income'?v:-v);
     });
-    // Only show operational accounts (not cartao/investimento)
-    const opContas=contas.filter(c=>!['cartao','investimento'].includes(c.tipo));
+    // Operacional e o que paga conta: corrente, dinheiro, internacional.
+    // Cartao fica de fora (e divida, nao saldo). Investimento aparece, mas
+    // em bloco proprio e FORA do total — decisao do Roberto em 22/nov/26:
+    // o caixa da corretora e dele, mas nao e o dinheiro com que ele conta
+    // para pagar as contas do mes, entao nao deve inflar a projecao.
+    const vivas=contas.filter(contaViva);
+    const saldoDe=c=>parseFloat(c.saldo_inicial||0)+(saldoMap[c.id]||0);
+    const opContas=vivas.filter(c=>!['cartao','investimento'].includes(c.tipo));
+    const invContas=vivas.filter(c=>c.tipo==='investimento');
     let totalSaldo=0;
-    const grid=document.getElementById('saldoGrid');
-    grid.innerHTML=opContas.map(c=>{
-      const saldo=parseFloat(c.saldo_inicial||0)+(saldoMap[c.id]||0);
-      totalSaldo+=saldo;
+    const cartao=c=>{
+      const saldo=saldoDe(c);
       const pos=saldo>=0;
       return `<div class="saldo-item">
         <div class="saldo-nome">${c.nome}</div>
         <div class="saldo-val" style="color:${pos?'var(--green)':'var(--red)'}">R$ ${fmt(saldo)}</div>
       </div>`;
-    }).join('');
+    };
+    document.getElementById('saldoGrid').innerHTML=opContas.map(c=>{totalSaldo+=saldoDe(c);return cartao(c);}).join('');
     document.getElementById('saldoTotal').textContent='R$ '+fmt(totalSaldo);
     document.getElementById('saldoTotal').style.color=totalSaldo>=0?'var(--green)':'var(--red)';
+
+    const boxInv=document.getElementById('saldoInvBox');
+    if(invContas.length){
+      const totalInv=invContas.reduce((t,c)=>t+saldoDe(c),0);
+      boxInv.style.display='';
+      boxInv.innerHTML='<div style="font-size:11px;color:var(--muted);margin:14px 0 6px">'
+        +'Caixa em corretora — <b>fora</b> do total acima e da projeção</div>'
+        +'<div class="saldo-grid">'+invContas.map(cartao).join('')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted)">Soma: R$ '+fmt(totalInv)+'</div>';
+    } else boxInv.style.display='none';
+
     window._saldoAtual=totalSaldo;
     window._opContas=opContas;
+    window._contas=vivas;
     window._saldoMap=saldoMap;
   } catch(e) { console.error(e); }
 }
@@ -397,6 +457,64 @@ async function loadFluxo(){
     const endDate=addDays(TODAY,dias);
     // Generate projection events
     const eventos=[];
+
+    // ================= financiamento =================
+    // Ate 22/nov/26 esta projecao lia SO 'recorrentes'. A parcela do
+    // financiamento — o maior compromisso fixo do mes — nao entrava, e a
+    // tela dizia que sobrava dinheiro que nao sobrava. Nao e estimativa:
+    // as parcelas em aberto estao na tabela, com vencimento e valor.
+    try{
+      const parcs=await sbGet('parcelas',
+        `pago=eq.false&vencimento=gte.${TODAY}&vencimento=lte.${endDate}&order=vencimento.asc`);
+      const fins={}; (await sbGet('financiamentos','')).forEach(f=>{fins[f.id]=f;});
+      parcs.forEach(p=>{
+        const f=fins[p.financiamento_id]||{};
+        eventos.push({date:p.vencimento, fonte:'financiamento',
+          name:(f.nome||'Financiamento')+' · parcela '+p.numero,
+          amount:+p.valor_previsto||0, type:'expense', category:'juros',
+          account:f.conta_id, estimated:true});
+      });
+    }catch(e){ console.error('financiamento no fluxo:',e); }
+
+    // ================= faturas de cartao =================
+    // Nao existe tabela de faturas: o valor e a soma dos lancamentos do
+    // cartao no ciclo (dia seguinte ao fechamento anterior ate o
+    // fechamento), e o pagamento cai no dia de vencimento. Como o app ja
+    // grava as parcelas futuras das compras parceladas, o ciclo que ainda
+    // vai fechar tem valor de verdade, nao chute.
+    try{
+      const cartoes=(window._contas||[]).filter(c=>c.tipo==='cartao'&&c.dia_fechamento&&c.dia_vencimento);
+      if(cartoes.length){
+        const desde=addDays(TODAY,-75);
+        const gastos=await sbGet('transactions',
+          `select=account,amount,type,date&date=gte.${desde}&date=lte.${endDate}`
+          +`&is_fatura_payment=eq.false&limit=5000`);
+        // fatura ja paga nao entra de novo: o pagamento fica marcado com
+        // is_fatura_payment e o mes de referencia do ciclo
+        let pagas=[];
+        try{ pagas=await sbGet('transactions','select=fatura_cartao,fatura_ym&is_fatura_payment=eq.true'); }catch(e){}
+        const jaPaga=new Set(pagas.map(x=>x.fatura_cartao+'|'+x.fatura_ym));
+        for(const c of cartoes){
+          const dv=+c.dia_vencimento, df=+c.dia_fechamento;
+          const ini=new Date(TODAY+'T12:00:00');
+          for(let k=0;k<=Math.ceil(dias/28)+1;k++){
+            const ref=new Date(ini.getFullYear(), ini.getMonth()+k, 1);
+            const cic=cicloFatura(c, ref.getFullYear(), ref.getMonth()+1);
+            if(cic.venc<TODAY||cic.venc>endDate) continue;
+            if(jaPaga.has(c.id+'|'+cic.ym)) continue;
+            const total=gastos.filter(t=>t.account===c.id&&t.date>=cic.abre&&t.date<=cic.fecha)
+              .reduce((sum,t)=>sum+(t.type==='income'?-1:1)*(parseFloat(t.amount)||0),0);
+            if(total<=0.004) continue;
+            eventos.push({date:cic.venc, fonte:'fatura',
+              name:c.nome+' · fatura',
+              amount:+total.toFixed(2), type:'expense', category:'contas',
+              account:c.id, estimated:cic.fecha>TODAY,
+              detalhe:'ciclo '+fmtDate(cic.abre).slice(0,5)+'–'+fmtDate(cic.fecha).slice(0,5)});
+          }
+        }
+      }
+    }catch(e){ console.error('faturas no fluxo:',e); }
+
     for(const r of recs){
       if(r.end_date && r.end_date<TODAY) continue; // ended
       let d=r.next_date;
@@ -404,7 +522,7 @@ async function loadFluxo(){
         if(d>=TODAY){
           eventos.push({
             date:d, name:r.name, amount:r.amount,
-            type:r.type, category:r.category,
+            type:r.type, category:r.category, fonte:'recorrente',
             account:r.account, estimated:r.is_estimated,
             freq:r.frequency
           });
@@ -419,7 +537,14 @@ async function loadFluxo(){
     }
     // Sort by date
     eventos.sort((a,b)=>a.date.localeCompare(b.date));
-    document.getElementById('projCount').textContent=`(${eventos.length} eventos)`;
+    // quantos vieram de cada fonte: sem isso nao da para saber se a
+    // parcela e a fatura realmente entraram
+    const porFonte={};
+    eventos.forEach(e=>{porFonte[e.fonte||'recorrente']=(porFonte[e.fonte||'recorrente']||0)+1;});
+    const rot={recorrente:'recorrentes', financiamento:'financiamento', fatura:'faturas'};
+    document.getElementById('projCount').textContent=
+      `(${eventos.length} eventos · `+Object.keys(rot).filter(k=>porFonte[k])
+        .map(k=>porFonte[k]+' '+rot[k]).join(' · ')+')';
     // Calculate running balance
     let saldo=parseFloat(window._saldoAtual||0);
     const alertas=[];
@@ -491,7 +616,7 @@ async function loadFluxo(){
         <div class="proj-data">${fmtDate(e.date)}</div>
         <div class="proj-desc">
           <div class="proj-nome">${e.name}${e.estimated?' <span style="font-size:10px;color:var(--yellow)">≈</span>':''}</div>
-          <div class="proj-cat">${CLABEL[e.category]||e.category||''} · ${ALABEL[e.account]||e.account||''}</div>
+          <div class="proj-cat">${SELO[e.fonte]||''}${CLABEL[e.category]||e.category||''} · ${ALABEL[e.account]||e.account||''}${e.detalhe?' · '+e.detalhe:''}</div>
         </div>
         <div class="proj-val" style="color:${pos?'var(--green)':'var(--red)'}">${pos?'+':'-'}R$ ${fmt(e.amount)}</div>
         <div class="proj-saldo ${saldoCls}">R$ ${fmt(saldoList)}</div>
