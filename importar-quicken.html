@@ -72,6 +72,13 @@ nav a:hover { background:var(--surface2); color:var(--accent); }
 </style>
 </head>
 <body>
+<div style="background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.35);color:#f87171;
+            border-radius:12px;padding:14px;margin:14px;font-size:13px;line-height:1.6">
+  <b>Tela aposentada em 22/11/2026.</b> O link foi tirado do início.
+  Ela usa uma <b>regra de IR própria</b>, que não bate com a tabela de Categorias, e grava
+  <b>subcategoria nula</b> — lançamento importado por aqui entra com a regra errada e some
+  da Conferência. Se algum dia for preciso importar de novo, <b>corrigir antes</b>.
+</div>
 
 <header>
   <div class="logo">Finanças <span>JR</span></div>
@@ -516,7 +523,7 @@ function showResult(ok, title, detail) {
 </script>
 <script>
 // Tela sem login próprio: o auth.js injeta o dele e só libera com sessão.
-const APP_VERSION='v2026.10.03-g';
+const APP_VERSION='v2026.11.22-a';
 document.addEventListener('DOMContentLoaded',function(){
   var e=document.getElementById('appVer'); if(e) e.textContent=APP_VERSION;
   JRAuth.protege(function(){});
